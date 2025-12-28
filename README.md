@@ -1,7 +1,14 @@
 # msa (My Stock Agent)
 
 ##  Description
-MSA (My Stock Agent) is a lightweight and flexible open-source stock intelligence agent tool designed for investors and developers. It integrates core capabilities including stock data collection, multi-dimensional market analysis, strategy backtesting, and automated trading assistance, supporting custom strategy configuration and secondary development. With a modular architecture, MSA lowers the barrier to using quantitative stock tools: it meets individual investors' needs for automated trading while providing developers with an extensible open-source framework. You can optimize strategies based on existing modules, integrate new data sources, or contribute featured functions to build a collaborative community ecosystem. Whether you're a quantitative novice or an experienced developer, MSA enables efficient access to the stock market and facilitates strategy implementation and value accumulation.
+MSA (My Stock Agent) is a lightweight and flexible open-source stock intelligence agent tool designed for investors and developers.
+It integrates core capabilities including stock data collection, multi-dimensional market analysis, strategy backtesting,
+and automated trading assistance, supporting custom strategy configuration and secondary development. With a modular architecture,
+MSA lowers the barrier to using quantitative stock tools: 
+it meets individual investors' needs for automated trading while providing developers with an extensible open-source framework.
+You can optimize strategies based on existing modules, integrate new data sources, or contribute featured functions to build a collaborative community ecosystem. 
+Whether you're a quantitative novice or an experienced developer, MSA enables efficient access to the stock market and facilitates strategy implementation 
+and value accumulation.
 
 ## Project Structure 
 ```
