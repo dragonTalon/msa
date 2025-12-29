@@ -6,11 +6,13 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+
 	"msa/pkg/config"
 	"msa/pkg/utils"
-	"os"
 )
 
 var ConfigCmd = &cobra.Command{
@@ -40,23 +42,23 @@ Examples | 示例:
   msa-cli config set --baseURL=https://api.example.com
   msa-cli config set --apiKey=xxx --baseURL=xxx`,
 	Run: func(cmd *cobra.Command, args []string) {
-		baseConfig, err := loadConfig()
+		cfg, err := loadConfig()
 		if err != nil {
-			baseConfig = &config.LocalStoreConfig{}
+			cfg = &config.LocalStoreConfig{}
 		}
 
 		updated := false
 
 		if cmd.Flags().Changed("apiKey") {
 			apiKey, _ := cmd.Flags().GetString("apiKey")
-			baseConfig.APIKey = apiKey
+			cfg.APIKey = apiKey
 			logrus.Infof("✓ API key set | API密钥已设置: %s", maskAPIKey(apiKey))
 			updated = true
 		}
 
 		if cmd.Flags().Changed("baseURL") {
 			baseURL, _ := cmd.Flags().GetString("baseURL")
-			baseConfig.BaseURL = baseURL
+			cfg.BaseURL = baseURL
 			logrus.Infof("✓ Base URL set | 基础URL已设置: %s", baseURL)
 			updated = true
 		}
@@ -67,7 +69,7 @@ Examples | 示例:
 			return
 		}
 
-		if err := saveConfig(baseConfig); err != nil {
+		if err := saveConfig(cfg); err != nil {
 			logrus.Errorf("Failed to save configuration | 保存配置失败: %v", err)
 			return
 		}
@@ -79,7 +81,7 @@ var configListCmd = &cobra.Command{
 	Short: "List All Configurations | 列出所有配置",
 	Long:  `Display all current configuration items | 显示当前所有的配置项`,
 	Run: func(cmd *cobra.Command, args []string) {
-		config, err := loadConfig()
+		cfg, err := loadConfig()
 		if err != nil {
 			logrus.Error("Configuration file does not exist or format error | 配置文件不存在或格式错误")
 			logrus.Info("Please run 'msa-cli config init' first to initialize configuration file | 请先运行 'msa-cli config init' 初始化配置文件")
@@ -87,15 +89,15 @@ var configListCmd = &cobra.Command{
 		}
 
 		logrus.Info("Current Configuration | 当前配置:")
-		if config.APIKey == "" {
+		if cfg.APIKey == "" {
 			logrus.Info("  apiKey: Not set | 未设置")
 		} else {
-			logrus.Infof("  apiKey: %s", maskAPIKey(config.APIKey))
+			logrus.Infof("  apiKey: %s", maskAPIKey(cfg.APIKey))
 		}
-		if config.BaseURL == "" {
+		if cfg.BaseURL == "" {
 			logrus.Info("  baseURL: Not set | 未设置")
 		} else {
-			logrus.Infof("  baseURL: %s", config.BaseURL)
+			logrus.Infof("  baseURL: %s", cfg.BaseURL)
 		}
 	},
 }
@@ -114,21 +116,21 @@ func loadConfig() (*config.LocalStoreConfig, error) {
 		return nil, err
 	}
 
-	var baseConfig config.LocalStoreConfig
-	if err := json.Unmarshal(data, &baseConfig); err != nil {
+	var cfg config.LocalStoreConfig
+	if err := json.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("配置文件格式错误: %v", err)
 	}
 
-	return &baseConfig, nil
+	return &cfg, nil
 }
 
-func saveConfig(config *config.LocalStoreConfig) error {
+func saveConfig(cfg *config.LocalStoreConfig) error {
 	configPath, err := utils.GetConfigPath()
 	if err != nil {
 		return err
 	}
 
-	data, err := json.MarshalIndent(config, "", "  ")
+	data, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
 		return err
 	}
