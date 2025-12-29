@@ -7,7 +7,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Config 日志配置结构
+// LogConfig 日志配置结构
 type LogConfig struct {
 	Level      string `json:"level"`      // 日志级别: debug, info, warn, error, fatal, panic
 	Format     string `json:"format"`     // 日志格式: json, text
@@ -82,27 +82,32 @@ func InitLogger(config *LogConfig) {
 	}
 }
 
-// ShowCurrentConfig 显示当前日志配置
-func ShowCurrentConfig() {
-	config := GetConfig()
-	if config == nil {
+// ShowLogConfig 显示指定的日志配置
+func ShowLogConfig(cfg *LogConfig) {
+	if cfg == nil {
 		logrus.Info("No logging configuration found | 未找到日志配置")
 		return
 	}
 
 	logrus.Info("Current Logging Configuration | 当前日志配置:")
-	logrus.Infof("  Level | 级别:     %s", config.Level)
-	logrus.Infof("  Format | 格式:    %s", config.Format)
-	logrus.Infof("  Output | 输出:    %s", config.Output)
-	if config.Output == "file" {
-		if config.File != "" {
-			logrus.Infof("  File | 文件:      %s", config.File)
+	logrus.Infof("  Level | 级别:     %s", cfg.Level)
+	logrus.Infof("  Format | 格式:    %s", cfg.Format)
+	logrus.Infof("  Output | 输出:    %s", cfg.Output)
+	if cfg.Output == "file" {
+		if cfg.File != "" {
+			logrus.Infof("  File | 文件:      %s", cfg.File)
 		} else {
 			logrus.Info("  File | 文件:      Not specified | 未指定")
 		}
 	}
-	logrus.Infof("  Show Color | 显示颜色: %t", config.ShowColor)
-	logrus.Infof("  Time Format | 时间格式: %s", config.TimeFormat)
+	logrus.Infof("  Show Color | 显示颜色: %t", cfg.ShowColor)
+	logrus.Infof("  Time Format | 时间格式: %s", cfg.TimeFormat)
+}
+
+// ShowCurrentConfig 显示当前日志配置
+func ShowCurrentConfig() {
+	config := GetConfig()
+	ShowLogConfig(config)
 }
 
 // GetConfig 获取当前日志配置

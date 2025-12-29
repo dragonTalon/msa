@@ -1,12 +1,40 @@
 package cmd
 
 import (
-	"msa/pkg/config"
 	"strings"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+
+	"msa/pkg/config"
 )
+
+// 日志级别常量
+const (
+	LogLevelDebug = "debug"
+	LogLevelInfo  = "info"
+	LogLevelWarn  = "warn"
+	LogLevelError = "error"
+	LogLevelFatal = "fatal"
+	LogLevelPanic = "panic"
+)
+
+// 日志格式常量
+const (
+	LogFormatText = "text"
+	LogFormatJSON = "json"
+)
+
+// 日志输出常量
+const (
+	LogOutputStdout = "stdout"
+	LogOutputStderr = "stderr"
+	LogOutputFile   = "file"
+)
+
+var validLogLevels = []string{LogLevelDebug, LogLevelInfo, LogLevelWarn, LogLevelError, LogLevelFatal, LogLevelPanic}
+var validLogFormats = []string{LogFormatText, LogFormatJSON}
+var validLogOutputs = []string{LogOutputStdout, LogOutputStderr, LogOutputFile}
 
 var LoggerCmd = &cobra.Command{
 	Use:   "logger",
@@ -35,7 +63,7 @@ Available parameters | 可用参数:
   --show-color Enable/disable colors (true|false)
   --time-format Time format string (e.g. "2006-01-02 15:04:05")`,
 	Run: func(cmd *cobra.Command, args []string) {
-		logConfig, err := loadConfig()
+		cfg, err := loadConfig()
 		if err != nil {
 			logrus.Error("Configuration file does not exist or format error | 配置文件不存在或格式错误")
 			logrus.Info("Please run 'msa-cli config init' first to initialize configuration file | 请先运行 'msa-cli config init' 初始化配置文件")
@@ -43,8 +71,8 @@ Available parameters | 可用参数:
 		}
 
 		// 初始化日志配置（如果不存在）
-		if logConfig.LogConfig == nil {
-			logConfig.LogConfig = config.DefaultConfig()
+		if cfg.LogConfig == nil {
+			cfg.LogConfig = config.DefaultConfig()
 		}
 
 		updated := false
@@ -52,7 +80,7 @@ Available parameters | 可用参数:
 		if cmd.Flags().Changed("level") {
 			level, _ := cmd.Flags().GetString("level")
 			if isValidLogLevel(level) {
-				logConfig.LogConfig.Level = level
+				cfg.LogConfig.Level = level
 				logrus.Infof("✓ Log level set | 日志级别已设置: %s", level)
 				updated = true
 			} else {
@@ -65,7 +93,7 @@ Available parameters | 可用参数:
 		if cmd.Flags().Changed("format") {
 			format, _ := cmd.Flags().GetString("format")
 			if isValidLogFormat(format) {
-				logConfig.LogConfig.Format = format
+				cfg.LogConfig.Format = format
 				logrus.Infof("✓ Log format set | 日志格式已设置: %s", format)
 				updated = true
 			} else {
@@ -78,12 +106,12 @@ Available parameters | 可用参数:
 		if cmd.Flags().Changed("output") {
 			output, _ := cmd.Flags().GetString("output")
 			if isValidLogOutput(output) {
-				logConfig.LogConfig.Output = output
+				cfg.LogConfig.Output = output
 				logrus.Infof("✓ Log output set | 日志输出已设置: %s", output)
 				updated = true
 
 				// 如果设置为文件输出，检查是否指定了文件路径
-				if output == "file" && logConfig.LogConfig.File == "" {
+				if output == LogOutputFile && cfg.LogConfig.File == "" {
 					logrus.Warn("File output selected but no file path specified | 选择了文件输出但未指定文件路径")
 					logrus.Info("Use --file parameter to specify log file path | 使用 --file 参数指定日志文件路径")
 				}
@@ -96,12 +124,12 @@ Available parameters | 可用参数:
 
 		if cmd.Flags().Changed("file") {
 			file, _ := cmd.Flags().GetString("file")
-			logConfig.LogConfig.File = file
+			cfg.LogConfig.File = file
 			logrus.Infof("✓ Log file set | 日志文件已设置: %s", file)
 
 			// 如果设置了文件路径但输出不是file，自动设置为file
-			if logConfig.LogConfig.Output != "file" {
-				logConfig.LogConfig.Output = "file"
+			if cfg.LogConfig.Output != LogOutputFile {
+				cfg.LogConfig.Output = LogOutputFile
 				logrus.Info("Output automatically set to 'file' | 输出已自动设置为 'file'")
 			}
 			updated = true
@@ -109,14 +137,14 @@ Available parameters | 可用参数:
 
 		if cmd.Flags().Changed("show-color") {
 			showColor, _ := cmd.Flags().GetBool("show-color")
-			logConfig.LogConfig.ShowColor = showColor
+			cfg.LogConfig.ShowColor = showColor
 			logrus.Infof("✓ Color display set | 颜色显示已设置: %t", showColor)
 			updated = true
 		}
 
 		if cmd.Flags().Changed("time-format") {
 			timeFormat, _ := cmd.Flags().GetString("time-format")
-			logConfig.LogConfig.TimeFormat = timeFormat
+			cfg.LogConfig.TimeFormat = timeFormat
 			logrus.Infof("✓ Time format set | 时间格式已设置: %s", timeFormat)
 			updated = true
 		}
@@ -126,13 +154,13 @@ Available parameters | 可用参数:
 			return
 		}
 
-		if err := saveConfig(logConfig); err != nil {
+		if err := saveConfig(cfg); err != nil {
 			logrus.Errorf("Failed to save logging configuration | 保存日志配置失败: %v", err)
 			return
 		}
 
 		// 重新初始化日志系统
-		config.InitLogger(logConfig.LogConfig)
+		config.InitLogger(cfg.LogConfig)
 		logrus.Info("✓ Logging configuration applied successfully | 日志配置应用成功")
 	},
 }
@@ -142,32 +170,21 @@ var loggerShowCmd = &cobra.Command{
 	Short: "Show current logging configuration | 显示当前日志配置",
 	Long:  `Display all current logging configuration items | 显示当前所有日志配置项`,
 	Run: func(cmd *cobra.Command, args []string) {
-		config, err := loadConfig()
+		cfg, err := loadConfig()
 		if err != nil {
 			logrus.Error("Configuration file does not exist or format error | 配置文件不存在或格式错误")
 			logrus.Info("Please run 'msa-cli config init' first to initialize configuration file | 请先运行 'msa-cli config init' 初始化配置文件")
 			return
 		}
 
-		if config.LogConfig == nil {
+		if cfg.LogConfig == nil {
 			logrus.Info("No logging configuration found | 未找到日志配置")
 			logrus.Info("Use 'msa-cli logger init' to create default logging configuration | 使用 'msa-cli logger init' 创建默认日志配置")
 			return
 		}
 
-		logrus.Info("Current Logging Configuration | 当前日志配置:")
-		logrus.Infof("  Level | 级别:     %s", config.LogConfig.Level)
-		logrus.Infof("  Format | 格式:    %s", config.LogConfig.Format)
-		logrus.Infof("  Output | 输出:    %s", config.LogConfig.Output)
-		if config.LogConfig.Output == "file" {
-			if config.LogConfig.File != "" {
-				logrus.Infof("  File | 文件:      %s", config.LogConfig.File)
-			} else {
-				logrus.Info("  File | 文件:      Not specified | 未指定")
-			}
-		}
-		logrus.Infof("  Show Color | 显示颜色: %t", config.LogConfig.ShowColor)
-		logrus.Infof("  Time Format | 时间格式: %s", config.LogConfig.TimeFormat)
+		// 调用统一的显示方法，避免重复代码
+		config.ShowLogConfig(cfg.LogConfig)
 	},
 }
 
@@ -176,22 +193,22 @@ var loggerResetCmd = &cobra.Command{
 	Short: "Reset logging configuration to defaults | 重置日志配置为默认值",
 	Long:  `Reset all logging configuration to default values | 将所有日志配置重置为默认值`,
 	Run: func(cmd *cobra.Command, args []string) {
-		logConfig, err := loadConfig()
+		cfg, err := loadConfig()
 		if err != nil {
 			logrus.Error("Configuration file does not exist or format error | 配置文件不存在或格式错误")
 			logrus.Info("Please run 'msa-cli config init' first to initialize configuration file | 请先运行 'msa-cli config init' 初始化配置文件")
 			return
 		}
 
-		logConfig.LogConfig = config.DefaultConfig()
+		cfg.LogConfig = config.DefaultConfig()
 
-		if err := saveConfig(logConfig); err != nil {
+		if err := saveConfig(cfg); err != nil {
 			logrus.Errorf("Failed to reset logging configuration | 重置日志配置失败: %v", err)
 			return
 		}
 
 		// 重新初始化日志系统
-		config.InitLogger(logConfig.LogConfig)
+		config.InitLogger(cfg.LogConfig)
 
 		logrus.Info("✓ Logging configuration reset to defaults | 日志配置已重置为默认值")
 		config.ShowCurrentConfig()
@@ -199,8 +216,7 @@ var loggerResetCmd = &cobra.Command{
 }
 
 func isValidLogLevel(level string) bool {
-	validLevels := []string{"debug", "info", "warn", "error", "fatal", "panic"}
-	for _, l := range validLevels {
+	for _, l := range validLogLevels {
 		if strings.ToLower(level) == l {
 			return true
 		}
@@ -209,8 +225,7 @@ func isValidLogLevel(level string) bool {
 }
 
 func isValidLogFormat(format string) bool {
-	validFormats := []string{"text", "json"}
-	for _, f := range validFormats {
+	for _, f := range validLogFormats {
 		if strings.ToLower(format) == f {
 			return true
 		}
@@ -219,8 +234,7 @@ func isValidLogFormat(format string) bool {
 }
 
 func isValidLogOutput(output string) bool {
-	validOutputs := []string{"stdout", "stderr", "file"}
-	for _, o := range validOutputs {
+	for _, o := range validLogOutputs {
 		if strings.ToLower(output) == o {
 			return true
 		}

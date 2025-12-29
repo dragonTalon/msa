@@ -1,11 +1,13 @@
 package cmd
 
 import (
+	"os"
+
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+
 	"msa/pkg/config"
 	"msa/pkg/utils"
-	"os"
 )
 
 var InitCmd = &cobra.Command{
@@ -39,32 +41,32 @@ If no parameters are provided, an empty configuration file will be created | 如
 		}
 
 		// Create configuration | 创建配置
-		config := &config.LocalStoreConfig{
+		cfg := &config.LocalStoreConfig{
 			APIKey:  "",
 			BaseURL: "",
 		}
 
 		// Set configuration based on parameters | 根据参数设置配置
 		if len(args) >= 1 {
-			config.APIKey = args[0]
+			cfg.APIKey = args[0]
 		}
 		if len(args) >= 2 {
-			config.BaseURL = args[1]
+			cfg.BaseURL = args[1]
 		}
 
-		if err := saveConfig(config); err != nil {
+		if err := saveConfig(cfg); err != nil {
 			logrus.Errorf("Failed to create configuration file | 创建配置文件失败: %v", err)
 			return
 		}
 
 		logrus.Infof("✓ Configuration file created | 配置文件已创建: %s", configPath)
-		if config.APIKey != "" {
-			logrus.Infof("✓ API key set | API密钥已设置: %s", maskAPIKey(config.APIKey))
+		if cfg.APIKey != "" {
+			logrus.Infof("✓ API key set | API密钥已设置: %s", maskAPIKey(cfg.APIKey))
 		} else {
 			logrus.Info("• API key not set, you can use 'msa-cli config set apiKey <your-api-key>' to set | API密钥未设置，可使用 'msa-cli config set apiKey <your-api-key>' 设置")
 		}
-		if config.BaseURL != "" {
-			logrus.Infof("✓ Base URL set | 基础URL已设置: %s", config.BaseURL)
+		if cfg.BaseURL != "" {
+			logrus.Infof("✓ Base URL set | 基础URL已设置: %s", cfg.BaseURL)
 		} else {
 			logrus.Info("• Base URL not set, you can use 'msa-cli config set baseURL <your-base-url>' to set | 基础URL未设置，可使用 'msa-cli config set baseURL <your-base-url>' 设置")
 		}
@@ -74,5 +76,4 @@ If no parameters are provided, an empty configuration file will be created | 如
 func init() {
 	InitCmd.Flags().StringP("apiKey", "k", "", "API key")
 	InitCmd.Flags().StringP("baseURL", "u", "", "Base URL")
-
 }
