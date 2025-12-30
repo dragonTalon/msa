@@ -1,48 +1,42 @@
-/*
-Copyright © 2025 NAME HERE <EMAIL ADDRESS>
-*/
-package cmd
+package tui
 
 import (
 	"context"
+	"time"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	log "github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
-	"time"
 )
 
-func run(cmd *cobra.Command, args []string) {
-	// 步骤 1：打印样式化的 MSA LOGO + ASCII 图（核心优化点）
-	PrintPrettyMSALogo()
-	ctx := cmd.Context()
-	// 步骤 2：（可选）添加功能提示，优化用户体验
-	p := tea.NewProgram(&chat{
-		messages: []string{"欢迎使用 MSA！输入你的理财梦想吧..."},
-		ctx:      ctx,
-	})
-	if _, err := p.Run(); err != nil {
-		log.Fatalf("运行 TUI 失败: %v", err)
-	}
-}
-
-type chat struct {
+// Chat TUI聊天模型
+type Chat struct {
 	input       string
 	messages    []string
 	cursor      int
 	ctx         context.Context
-	cursorBlink bool // 新增：光标闪烁状态
+	cursorBlink bool // 光标闪烁状态
+}
+
+// NewChat 创建新的聊天模型
+func NewChat(ctx context.Context) *Chat {
+	return &Chat{
+		messages: []string{"欢迎使用 MSA！输入你的理财梦想吧..."},
+		ctx:      ctx,
+	}
 }
 
 type tickMsg time.Time
 
-func (c *chat) Init() tea.Cmd {
+// Init 实现 tea.Model 接口
+func (c *Chat) Init() tea.Cmd {
 	return tea.Tick(time.Millisecond*500, func(t time.Time) tea.Msg {
 		return tickMsg(t)
 	})
 }
 
-func (c *chat) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+// Update 实现 tea.Model 接口，处理消息更新
+func (c *Chat) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tickMsg:
 		// 切换光标显示状态
@@ -68,8 +62,6 @@ func (c *chat) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			c.messages = append(c.messages, "你: "+c.input)
 			log.Debugf("你输入了: %s", c.input)
 			// 处理输入逻辑
-			//response := handleCommand(m.input)
-			//m.messages = append(m.messages, "MSA: "+response)
 			c.messages = append(c.messages, "MSA: recovery -->"+c.input)
 			c.input = ""
 		case "backspace":
@@ -92,25 +84,25 @@ func (c *chat) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return c, nil
 }
 
-func (c *chat) View() string {
+// View 实现 tea.Model 接口，渲染界面
+func (c *Chat) View() string {
 	if len(c.messages) == 0 {
 		PrintPrettyMSALogo()
 	}
 
-	s := lipgloss.NewStyle().Foreground(primaryColor).Render("")
+	s := lipgloss.NewStyle().Foreground(PrimaryColor).Render("")
 	for _, msg := range c.messages {
 		s += msg + "\n"
 	}
-	// 显示历史消息
 
 	cursor := ""
 	if c.cursorBlink {
-		cursor = "▊" // 或者用 "_" 或 "|"
+		cursor = "▊"
 	} else {
 		cursor = " "
 	}
 	// 显示输入框
-	s += "\n" + lipgloss.NewStyle().Foreground(secondaryColor).Render("MSA :  ") + c.input + cursor
+	s += "\n" + lipgloss.NewStyle().Foreground(SecondaryColor).Render("MSA :  ") + c.input + cursor
 	s += "\n\n" + lipgloss.NewStyle().Faint(true).Render(
 		"(ESC/Ctrl+C: 退出 | Ctrl+K/clear: 清空对话)",
 	)

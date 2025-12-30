@@ -1,11 +1,13 @@
-package cmd
+package tui
 
 import (
 	"fmt"
+
 	"github.com/charmbracelet/lipgloss"
 )
 
-var logo = `
+// Logo MSA ASCII艺术LOGO
+var Logo = `
 $$\      $$\        $$$$$$\         $$$$$$\  
 $$$\    $$$ |      $$  __$$\       $$  __$$\ 
 $$$$\  $$$$ |      $$ /  \__|      $$ /  $$ |
@@ -17,45 +19,45 @@ $$ | \_/ $$ |      \$$$$$$  |      $$ |  $$ |
 (My Stock Agent CLI)`
 
 var (
-	// 主色调：沉稳蓝色（贴合股票/金融工具的视觉定位）
-	primaryColor = lipgloss.Color("#2563eb")
-	// 辅助色调：浅蓝灰（用于次要文本，提升层次感）
-	secondaryColor = lipgloss.Color("#93c5fd")
+	// PrimaryColor 主色调：沉稳蓝色（贴合股票/金融工具的视觉定位）
+	PrimaryColor = lipgloss.Color("#2563eb")
+	// SecondaryColor 辅助色调：浅蓝灰（用于次要文本，提升层次感）
+	SecondaryColor = lipgloss.Color("#93c5fd")
 
-	// 分隔线样式（替换单调等号，带装饰符号）
+	// separatorStyle 分隔线样式（替换单调等号，带装饰符号）
 	separatorStyle = lipgloss.NewStyle().
-			Foreground(secondaryColor).
+			Foreground(SecondaryColor).
 			Bold(false)
 
-	// MSA LOGO 样式（加粗+主色调，突出品牌感）
+	// logoStyle MSA LOGO 样式（加粗+主色调，突出品牌感）
 	logoStyle = lipgloss.NewStyle().
-			Foreground(primaryColor).
+			Foreground(PrimaryColor).
 			Bold(true).
-			Align(lipgloss.Center) // 居中对齐
+			Align(lipgloss.Center)
 
-	// 原有 ASCII 艺术图样式（主色调+轻微加粗，保持质感）
+	// asciiArtStyle 原有 ASCII 艺术图样式（主色调+轻微加粗，保持质感）
 	asciiArtStyle = lipgloss.NewStyle().
-			Foreground(primaryColor).
+			Foreground(PrimaryColor).
 			Bold(false).
-			Align(lipgloss.Center) // 居中对齐，让排版更规整
+			Align(lipgloss.Center)
 
-	// 标题样式（辅助色调+居中，搭配整体布局）
+	// titleStyle 标题样式（辅助色调+居中，搭配整体布局）
 	titleStyle = lipgloss.NewStyle().
-			Foreground(secondaryColor).
+			Foreground(SecondaryColor).
 			Bold(true).
 			Align(lipgloss.Center).
-			MarginTop(1) // 顶部留白，提升呼吸感
+			MarginTop(1)
 )
 
+// PrintPrettyMSALogo 打印美化的 MSA LOGO
 func PrintPrettyMSALogo() {
-	// 1. 定义美观分隔线（替换等号，带前后装饰符，长度适配LOGO）
+	// 定义美观分隔线（替换等号，带前后装饰符，长度适配LOGO）
 	separator := separatorStyle.Render("╭───────────────────────────────────────────────────╮")
 	separatorBottom := separatorStyle.Render("╰───────────────────────────────────────────────────╯")
-	// 修复：移除嵌套的反引号，仅用一对反引号包裹多行字符串，替换硬制表符为空格
-	renderedAsciiArt := asciiArtStyle.Render(logo)
+	renderedAsciiArt := asciiArtStyle.Render(Logo)
 	renderedTitle := titleStyle.Render("📈 专业股票代理工具 | 高效管理你的投资")
 
-	// 3. 拼接并打印最终布局（对称美观，层次分明）
+	// 拼接并打印最终布局（对称美观，层次分明）
 	fmt.Println(separator)
 	fmt.Println(renderedAsciiArt)
 	fmt.Println(separatorBottom)
