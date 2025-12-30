@@ -10,9 +10,6 @@ import (
 
 // Run 启动应用主逻辑
 func Run(ctx context.Context) error {
-	// 打印样式化的 MSA LOGO
-	tui.PrintPrettyMSALogo()
-
 	// 启动 TUI 程序
 	p := tea.NewProgram(tui.NewChat(ctx))
 	if _, err := p.Run(); err != nil {
