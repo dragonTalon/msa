@@ -29,7 +29,7 @@ type Chat struct {
 func NewChat(ctx context.Context) *Chat {
 	// 初始化文本输入组件
 	ti := textinput.New()
-	ti.Placeholder = "输入你的理财梦想..."
+	ti.Placeholder = "输入你的理财问题..."
 	ti.Focus()
 	ti.CharLimit = 0
 	ti.Width = 50
@@ -41,7 +41,7 @@ func NewChat(ctx context.Context) *Chat {
 		textInput: ti,
 		pendingMsgs: []Message{
 			{Role: "logo", Content: GetStyledLogo()},
-			{Role: "system", Content: "欢迎使用 MSA！输入你的理财梦想吧..."},
+			{Role: "system", Content: "欢迎使用 MSA！输入你的理财问题吧..."},
 		},
 		ctx: ctx,
 	}
