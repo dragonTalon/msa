@@ -2,30 +2,38 @@ package cmd
 
 import (
 	"context"
-	log "github.com/sirupsen/logrus"
-	"github.com/spf13/cobra"
 	"os"
 	"os/signal"
 	"syscall"
+
+	log "github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
+
+	"msa/pkg/app"
+	"msa/pkg/tui"
 )
 
 var rootCmd = &cobra.Command{
 	Use:   "msa",
-	Short: "My Stock Agent CLI ",
-	Long:  logo,
-	Run:   run,
+	Short: "My Stock Agent CLI",
+	Long:  tui.Logo,
+	RunE:  runRoot,
 }
 
-// Execute adds all child commands to the root command and sets flags appropriately.
-// This is called by main.main(). It only needs to happen once to the rootCmd.
+// runRoot 根命令执行函数，仅做路由调用
+func runRoot(cmd *cobra.Command, args []string) error {
+	return app.Run(cmd.Context())
+}
+
+// Execute 程序执行入口
 func Execute() {
-	ctx, cancel := notify(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	ExecuteWithSignal(rootCmd)
+}
+
+// ExecuteWithSignal 执行命令并处理信号
+func ExecuteWithSignal(rootCmd *cobra.Command) {
+	ctx, cancel := NotifySignal(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
-	//log.SetLevel(log.DebugLevel)
-	//log.SetOutput(os.Stdout)
-	//log.SetFormatter(&log.TextFormatter{
-	//	FullTimestamp: true,
-	//})
 
 	if err := rootCmd.ExecuteContext(ctx); err != nil {
 		log.Errorf("MSA execute failed: %v", err)
@@ -33,7 +41,8 @@ func Execute() {
 	}
 }
 
-func notify(parent context.Context, signals ...os.Signal) (context.Context, context.CancelFunc) {
+// NotifySignal 创建带信号监听的上下文
+func NotifySignal(parent context.Context, signals ...os.Signal) (context.Context, context.CancelFunc) {
 	ctx, cancel := context.WithCancel(parent)
 
 	// 绑定信号通知
