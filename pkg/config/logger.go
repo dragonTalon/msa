@@ -22,7 +22,7 @@ func DefaultConfig() *LogConfig {
 	return &LogConfig{
 		Level:      "info",
 		Format:     "text",
-		Output:     "stdout",
+		Output:     "file",
 		File:       "",
 		ShowColor:  true,
 		TimeFormat: "2006-01-02 15:04:05",

@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"msa/pkg/app"
+	"msa/pkg/config"
 	"msa/pkg/tui"
 )
 
@@ -32,6 +33,13 @@ func Execute() {
 
 // ExecuteWithSignal 执行命令并处理信号
 func ExecuteWithSignal(rootCmd *cobra.Command) {
+	// 初始化配置
+	if err := config.InitConfig(); err != nil {
+		log.Warnf("初始化配置失败: %v", err)
+	} else {
+		log.Info("配置初始化成功")
+	}
+
 	ctx, cancel := NotifySignal(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
