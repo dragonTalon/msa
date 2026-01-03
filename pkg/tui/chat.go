@@ -2,6 +2,11 @@ package tui
 
 import (
 	"context"
+	"fmt"
+	listStyle "github.com/charmbracelet/lipgloss/list"
+	"msa/pkg/config"
+	command "msa/pkg/logic/command"
+	"msa/pkg/model"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -23,6 +28,19 @@ type Chat struct {
 	ctx         context.Context // 上下文
 	width       int             // 终端宽度
 	height      int             // 终端高度
+	cmdFlag     bool            // 是否处于命令模式
+	cmdList     []string
+}
+
+// maskAPIKey 隐藏 APIKey，只显示前4个和后4个字符
+func maskAPIKey(apiKey string) string {
+	if apiKey == "" {
+		return "未设置"
+	}
+	if len(apiKey) <= 8 {
+		return strings.Repeat("*", len(apiKey))
+	}
+	return apiKey[:4] + "****" + apiKey[len(apiKey)-4:]
 }
 
 // NewChat 创建新的聊天模型
@@ -36,11 +54,18 @@ func NewChat(ctx context.Context) *Chat {
 	ti.PromptStyle = ChatInputPromptStyle
 	ti.Prompt = "MSA > "
 	ti.TextStyle = ChatInputTextStyle
-
+	cfg := config.GetLocalStoreConfig()
+	m := cfg.Model
+	if m == "" {
+		m = "未设置"
+	}
 	return &Chat{
 		textInput: ti,
 		pendingMsgs: []Message{
 			{Role: "logo", Content: GetStyledLogo()},
+			{Role: "system", Content: fmt.Sprintf("模型供应商: %s", cfg.Provider)},
+			{Role: "system", Content: fmt.Sprintf("模型 : %s", m)},
+			{Role: "system", Content: fmt.Sprintf("APIKey : %s", maskAPIKey(cfg.APIKey))},
 			{Role: "system", Content: "欢迎使用 MSA！输入你的理财问题吧..."},
 		},
 		ctx: ctx,
@@ -117,34 +142,28 @@ func (c *Chat) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return c, tea.Quit
 
 		case tea.KeyEnter:
+			c.cmdFlag = false
 			input := strings.TrimSpace(c.textInput.Value())
 			if input == "" {
 				return c, nil
 			}
-
+			// 添加用户消息
+			c.addMessage("user", input)
+			log.Debugf("用户输入: %s", input)
+			if strings.HasPrefix(input, "/") {
+				return c.commandHandler(input)
+			}
 			// 处理特殊命令
 			switch strings.ToLower(input) {
 			case "clear":
 				c.textInput.Reset()
 				c.addMessage("system", "对话已清空，重新开始吧！")
-				return c, c.Flush()
-
 			case "help", "?":
 				c.textInput.Reset()
 				c.addMessage("system", "📋 可用命令:\n  • clear - 清空对话\n  • help/? - 显示帮助\n  • quit/exit - 退出程序")
-				return c, c.Flush()
-
 			case "quit", "exit":
 				return c, tea.Quit
 			}
-
-			// 添加用户消息
-			c.addMessage("user", input)
-			log.Debugf("用户输入: %s", input)
-
-			// 模拟 AI 回复（后续可接入真正的 AI）
-			c.addMessage("assistant", "📊 已收到您的问题: \""+input+"\"\n正在分析中...")
-
 			// 清空输入框
 			c.textInput.Reset()
 
@@ -155,12 +174,16 @@ func (c *Chat) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			c.textInput.Reset()
 			c.addMessage("system", "对话已清空，重新开始吧！")
 			return c, c.Flush()
+		default:
+			c.textInput, tiCmd = c.textInput.Update(msg)
+			if strings.HasPrefix(c.textInput.Value(), "/") {
+				c.cmdFlag = true
+				log.Infof("进入命令模式 %s\n", c.textInput.Value())
+				c.cmdList = command.GetLikeCommand(c.textInput.Value())
+				log.Infof("命令列表: %v", c.cmdList)
+			}
 		}
 	}
-
-	// 更新输入组件
-	c.textInput, tiCmd = c.textInput.Update(msg)
-
 	return c, tiCmd
 }
 
@@ -173,7 +196,15 @@ func (c *Chat) View() string {
 		Padding(0, 1).
 		Render(c.textInput.View())
 	sb.WriteString(inputBox)
-
+	if c.cmdFlag {
+		styles := listStyle.New()
+		for _, cmd := range c.cmdList {
+			styles.Item("/" + cmd)
+		}
+		log.Infof("view styles %s", styles)
+		sb.WriteString("\n")
+		sb.WriteString(fmt.Sprintf("%s", styles))
+	}
 	// 帮助提示
 	help := ChatHelpStyle.Render(
 		"ESC/Ctrl+C: 退出 | Ctrl+K: 清空 | Enter: 发送",
@@ -182,4 +213,65 @@ func (c *Chat) View() string {
 	sb.WriteString(help)
 
 	return sb.String()
+}
+
+// analyzeResult 分析结果
+func analyzeResult(result *model.CmdResult) string {
+	if result == nil {
+		return "结果为空"
+	}
+	sb := strings.Builder{}
+	sb.WriteString("\n")
+	switch result.Type {
+	case "list":
+		list, ok := result.Data.([]string)
+		if !ok {
+			return "结果类型错误"
+		}
+		styles := listStyle.New()
+		for _, v := range list {
+			styles = styles.Item(v)
+		}
+		log.Infof("list styles %s", styles)
+		sb.WriteString(fmt.Sprintf("%s", styles))
+
+	case "boolean":
+		b, ok := result.Data.(bool)
+		if !ok {
+			return "结果类型错误"
+		}
+		if b {
+			sb.WriteString(ChatNormalMsgStyle.Render(result.Msg))
+		} else {
+			sb.WriteString(ChatNormalMsgStyle.Render(result.Error.Error()))
+		}
+
+	}
+	return sb.String()
+}
+
+// commandHandler 命令处理器
+func (c *Chat) commandHandler(input string) (tea.Model, tea.Cmd) {
+	input = strings.TrimPrefix(input, "/")
+	split := strings.Split(input, " ")
+	msaCmd := command.GetCommand(split[0])
+	if msaCmd == nil {
+		c.addMessage("system", "未找到命令: "+input)
+		c.addMessage("system", fmt.Sprintf("可用命令: %v", command.GetLikeCommand("/")))
+		return c, c.Flush()
+	}
+	var args []string
+	if len(split) > 1 {
+		args = split[1:]
+	}
+	runResult, err := msaCmd.Run(c.ctx, args)
+	if err != nil {
+		c.addMessage("system", "执行命令失败: "+err.Error())
+		log.Errorf("执行命令失败: %v", err)
+		return c, c.Flush()
+	}
+	log.Infof("执行命令成功: %v", runResult)
+	c.addMessage("system", analyzeResult(runResult))
+	c.textInput.Reset()
+	return c, c.Flush()
 }
