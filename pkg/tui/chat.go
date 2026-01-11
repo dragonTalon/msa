@@ -200,8 +200,8 @@ func (c *Chat) View() string {
 	sb.WriteString(inputBox)
 	if c.cmdFlag {
 		styles := listStyle.New()
-		for _, cmd := range c.cmdList {
-			styles.Item("/" + cmd)
+		for _, cmdStr := range c.cmdList {
+			styles.Item("/" + cmdStr)
 		}
 		log.Infof("view styles %s", styles)
 		sb.WriteString("\n")
@@ -278,10 +278,10 @@ func renderTable(data map[string]string) string {
 		Padding(0, 1).
 		Width(30)
 
-	evenRowStyle := cellStyle.Copy().
+	evenRowStyle := cellStyle.
 		Background(lipgloss.Color("#2E2E2E"))
 
-	oddRowStyle := cellStyle.Copy().
+	oddRowStyle := cellStyle.
 		Background(lipgloss.Color("#1E1E1E"))
 
 	var sb strings.Builder

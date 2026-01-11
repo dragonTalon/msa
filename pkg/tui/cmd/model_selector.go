@@ -6,30 +6,20 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	log "github.com/sirupsen/logrus"
-)
-
-// 本地样式定义，避免循环导入
-var (
-	chatSystemMsgStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#2563eb")).
-				Bold(true)
-
-	chatHelpStyle = lipgloss.NewStyle().
-			Faint(true).
-			MarginTop(1)
 )
 
 // SelectorView 选择器视图，包装 BaseSelector 并实现 tea.Model 接口
 type SelectorView struct {
 	selector *model.BaseSelector
+	styles   *SelectorStyles
 }
 
 // NewSelectorView 创建新的选择器视图
 func NewSelectorView(selector *model.BaseSelector) *SelectorView {
 	return &SelectorView{
 		selector: selector,
+		styles:   NewSelectorStyles(),
 	}
 }
 
@@ -192,86 +182,94 @@ func (v *SelectorView) View() string {
 	m := v.selector
 
 	if m.Confirmed {
-		if m.Err != nil {
-			return chatSystemMsgStyle.Render(fmt.Sprintf("❌ 设置失败: %v\n", m.Err))
-		}
-		return chatSystemMsgStyle.Render(fmt.Sprintf("✅ 已选择: %s\n", m.Selected))
+		return v.renderConfirmation()
 	}
-
-	// 标题样式
-	titleStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("#7D56F4")).
-		Padding(0, 0)
-
-	// 选中项样式 - 整行高亮
-	selectedStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("#000000")).
-		Background(lipgloss.Color("#FFD700")).
-		Padding(0, 1)
-
-	// 普通项样式
-	normalStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#CCCCCC"))
-
-	// 描述样式
-	descStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#888888")).
-		Italic(true)
-
-	// 光标样式 - 超级醒目的金色箭头
-	cursorStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("#FFD700"))
-
-	// 行号样式
-	lineNumStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#666666")).
-		Width(4).
-		Align(lipgloss.Right)
-
-	// 滚动指示器样式
-	scrollStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#888888"))
 
 	var s string
 
-	// 标题
-	s += titleStyle.Render("🎯 模型选择器") + "\n"
-	s += titleStyle.Render(fmt.Sprintf("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")) + "\n"
+	// 渲染标题
+	s += v.renderHeader()
 
-	// 搜索框
-	searchBoxStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#FFD700")).
-		Bold(true)
+	// 渲染搜索框
+	s += v.renderSearchBox()
 
-	if m.SearchQuery != "" {
-		s += searchBoxStyle.Render(fmt.Sprintf("🔍 搜索: %s_", m.SearchQuery)) + "\n"
-	} else {
-		s += lipgloss.NewStyle().Faint(true).Render("🔍 搜索: (输入关键字进行前缀匹配...)") + "\n"
-	}
-	s += "\n"
-
-	// 位置信息和滚动提示
-	posInfo := fmt.Sprintf("📍 位置: %d/%d", m.Cursor+1, len(m.FilteredItems))
-	if len(m.Items) != len(m.FilteredItems) {
-		posInfo += fmt.Sprintf("  |  已过滤: %d/%d", len(m.FilteredItems), len(m.Items))
-	}
-	if len(m.FilteredItems) > m.ViewportSize {
-		posInfo += fmt.Sprintf("  |  显示: %d-%d", m.ViewportTop+1, min(m.ViewportTop+m.ViewportSize, len(m.FilteredItems)))
-	}
-	s += titleStyle.Render(posInfo) + "\n\n"
+	// 渲染位置信息
+	s += v.renderPositionInfo()
 
 	// 如果没有匹配结果
 	if len(m.FilteredItems) == 0 {
-		s += lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#FF6B6B")).
-			Bold(true).
-			Render("❌ 没有找到匹配的模型") + "\n\n"
-		s += lipgloss.NewStyle().Faint(true).Render("提示: 按 ESC 清空搜索，按 Ctrl+C 退出") + "\n"
-		return s
+		return s + v.renderEmptyResult()
 	}
+
+	// 渲染选择项列表
+	s += v.renderItemList()
+
+	// 渲染底部帮助信息
+	s += v.renderFooter()
+
+	return s
+}
+
+// renderConfirmation 渲染确认信息
+func (v *SelectorView) renderConfirmation() string {
+	m := v.selector
+	if m.Err != nil {
+		return v.styles.SystemMsg.Render(fmt.Sprintf("❌ 设置失败: %v\n", m.Err))
+	}
+	return v.styles.SystemMsg.Render(fmt.Sprintf("✅ 已选择: %s\n", m.Selected))
+}
+
+// renderHeader 渲染标题
+func (v *SelectorView) renderHeader() string {
+	var s string
+	s += v.styles.Title.Render("🎯 模型选择器") + "\n"
+	s += v.styles.Separator.Render(SeparatorLine) + "\n"
+	return s
+}
+
+// renderSearchBox 渲染搜索框
+func (v *SelectorView) renderSearchBox() string {
+	m := v.selector
+	var s string
+	if m.SearchQuery != "" {
+		s += v.styles.SearchBox.Render(fmt.Sprintf("🔍 搜索: %s_", m.SearchQuery)) + "\n"
+	} else {
+		s += v.styles.SearchPlaceholder.Render("🔍 搜索: (输入关键字进行前缀匹配...)") + "\n"
+	}
+	s += "\n"
+	return s
+}
+
+// renderPositionInfo 渲染位置信息
+func (v *SelectorView) renderPositionInfo() string {
+	m := v.selector
+	posInfo := fmt.Sprintf("📍 位置: %d/%d", m.Cursor+1, len(m.FilteredItems))
+
+	if len(m.Items) != len(m.FilteredItems) {
+		posInfo += fmt.Sprintf("  |  已过滤: %d/%d", len(m.FilteredItems), len(m.Items))
+	}
+
+	if len(m.FilteredItems) > m.ViewportSize {
+		posInfo += fmt.Sprintf("  |  显示: %d-%d",
+			m.ViewportTop+1,
+			min(m.ViewportTop+m.ViewportSize, len(m.FilteredItems)))
+	}
+
+	return v.styles.Title.Render(posInfo) + "\n\n"
+}
+
+// renderEmptyResult 渲染空结果提示
+func (v *SelectorView) renderEmptyResult() string {
+	var s string
+	s += v.styles.Error.Render("❌ 没有找到匹配的模型") + "\n\n"
+	s += v.styles.SearchPlaceholder.Render("提示: 按 ESC 清空搜索，按 Ctrl+C 退出") + "\n"
+	return s
+}
+
+// renderItemList 渲染选择项列表
+func (v *SelectorView) renderItemList() string {
+	m := v.selector
+	var s string
 
 	// 计算可见范围
 	viewportEnd := m.ViewportTop + m.ViewportSize
@@ -281,53 +279,62 @@ func (v *SelectorView) View() string {
 
 	// 上方滚动指示器
 	if m.ViewportTop > 0 {
-		s += scrollStyle.Render(fmt.Sprintf("     ▲▲▲ 上方还有 %d 项 ▲▲▲", m.ViewportTop)) + "\n"
+		s += v.styles.Scroll.Render(fmt.Sprintf("     ▲▲▲ 上方还有 %d 项 ▲▲▲", m.ViewportTop)) + "\n"
 	}
 
-	// 显示可见的选择项列表
+	// 显示可见的选择项
 	for i := m.ViewportTop; i < viewportEnd; i++ {
-		item := m.FilteredItems[i]
-
-		// 行号
-		lineNum := lineNumStyle.Render(fmt.Sprintf("%d.", i+1))
-
-		// 光标指示器 - 使用超级醒目的符号
-		var cursor string
-		if m.Cursor == i {
-			cursor = cursorStyle.Render("►►► ")
-		} else {
-			cursor = "    "
-		}
-
-		var line string
-		if m.Cursor == i {
-			// 选中行：金色背景 + 黑色文字，超级醒目
-			content := fmt.Sprintf("%s %s%s", lineNum, cursor, item.Name)
-			if item.Description != "" {
-				content += fmt.Sprintf(" - %s", item.Description)
-			}
-			line = selectedStyle.Render(content)
-		} else {
-			// 普通行
-			line = lineNum + " " + cursor + normalStyle.Render(item.Name)
-			if item.Description != "" {
-				line += " " + descStyle.Render("- "+item.Description)
-			}
-		}
-
-		s += line + "\n"
+		s += v.renderItem(i) + "\n"
 	}
 
 	// 下方滚动指示器
 	if viewportEnd < len(m.FilteredItems) {
 		remaining := len(m.FilteredItems) - viewportEnd
-		s += scrollStyle.Render(fmt.Sprintf("     ▼▼▼ 下方还有 %d 项 ▼▼▼", remaining)) + "\n"
+		s += v.styles.Scroll.Render(fmt.Sprintf("     ▼▼▼ 下方还有 %d 项 ▼▼▼", remaining)) + "\n"
 	}
 
-	// 底部帮助信息
-	s += "\n" + titleStyle.Render("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━") + "\n"
-	s += chatHelpStyle.Render("⌨️  输入:搜索  ↑/↓:移动  PgUp/PgDn:翻页  Enter:确认  ESC:清空搜索  Ctrl+C:退出")
+	return s
+}
 
+// renderItem 渲染单个选择项
+func (v *SelectorView) renderItem(index int) string {
+	m := v.selector
+	item := m.FilteredItems[index]
+
+	// 行号
+	lineNum := v.styles.LineNumber.Render(fmt.Sprintf("%d.", index+1))
+
+	// 光标指示器
+	var cursor string
+	if m.Cursor == index {
+		cursor = v.styles.Cursor.Render(CursorSymbol)
+	} else {
+		cursor = CursorEmpty
+	}
+
+	// 根据是否选中使用不同样式
+	if m.Cursor == index {
+		// 选中行：金色背景 + 黑色文字
+		content := fmt.Sprintf("%s %s%s", lineNum, cursor, item.Name)
+		if item.Description != "" {
+			content += fmt.Sprintf(" - %s", item.Description)
+		}
+		return v.styles.Selected.Render(content)
+	}
+
+	// 普通行
+	line := lineNum + " " + cursor + v.styles.Normal.Render(item.Name)
+	if item.Description != "" {
+		line += " " + v.styles.Description.Render("- "+item.Description)
+	}
+	return line
+}
+
+// renderFooter 渲染底部帮助信息
+func (v *SelectorView) renderFooter() string {
+	var s string
+	s += "\n" + v.styles.Separator.Render(SeparatorLine) + "\n"
+	s += v.styles.Help.Render("⌨️  输入:搜索  ↑/↓:移动  PgUp/PgDn:翻页  Enter:确认  ESC:清空搜索  Ctrl+C:退出")
 	return s
 }
 
