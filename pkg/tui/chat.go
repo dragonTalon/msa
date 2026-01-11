@@ -3,11 +3,13 @@ package tui
 import (
 	"context"
 	"fmt"
-	listStyle "github.com/charmbracelet/lipgloss/list"
 	"msa/pkg/config"
 	command "msa/pkg/logic/command"
 	"msa/pkg/model"
+	"msa/pkg/tui/cmd"
 	"strings"
+
+	listStyle "github.com/charmbracelet/lipgloss/list"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -235,6 +237,14 @@ func analyzeResult(result *model.CmdResult) string {
 		log.Infof("list styles %s", styles)
 		sb.WriteString(fmt.Sprintf("%s", styles))
 
+	case "table":
+		table, ok := result.Data.(map[string]string)
+		if !ok {
+			return "结果类型错误"
+		}
+		// 渲染表格
+		sb.WriteString(renderTable(table))
+
 	case "boolean":
 		b, ok := result.Data.(bool)
 		if !ok {
@@ -250,27 +260,114 @@ func analyzeResult(result *model.CmdResult) string {
 	return sb.String()
 }
 
+// renderTable 渲染表格，展示 key-value 数据
+func renderTable(data map[string]string) string {
+	if len(data) == 0 {
+		return "无数据"
+	}
+
+	// 定义表格样式
+	headerStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("#FAFAFA")).
+		Background(lipgloss.Color("#7D56F4")).
+		Padding(0, 1).
+		Width(30)
+
+	cellStyle := lipgloss.NewStyle().
+		Padding(0, 1).
+		Width(30)
+
+	evenRowStyle := cellStyle.Copy().
+		Background(lipgloss.Color("#2E2E2E"))
+
+	oddRowStyle := cellStyle.Copy().
+		Background(lipgloss.Color("#1E1E1E"))
+
+	var sb strings.Builder
+
+	// 表头
+	sb.WriteString(headerStyle.Render("模型名称"))
+	sb.WriteString(headerStyle.Render("描述"))
+	sb.WriteString("\n")
+
+	// 表格内容
+	rowIndex := 0
+	for key, value := range data {
+		var rowStyle lipgloss.Style
+		if rowIndex%2 == 0 {
+			rowStyle = evenRowStyle
+		} else {
+			rowStyle = oddRowStyle
+		}
+
+		sb.WriteString(rowStyle.Render(key))
+		sb.WriteString(rowStyle.Render(value))
+		sb.WriteString("\n")
+		rowIndex++
+	}
+
+	return sb.String()
+}
+
 // commandHandler 命令处理器
 func (c *Chat) commandHandler(input string) (tea.Model, tea.Cmd) {
 	input = strings.TrimPrefix(input, "/")
 	split := strings.Split(input, " ")
-	msaCmd := command.GetCommand(split[0])
+	cmdName := split[0]
+
+	msaCmd := command.GetCommand(cmdName)
 	if msaCmd == nil {
 		c.addMessage("system", "未找到命令: "+input)
 		c.addMessage("system", fmt.Sprintf("可用命令: %v", command.GetLikeCommand("/")))
 		return c, c.Flush()
 	}
+
 	var args []string
 	if len(split) > 1 {
 		args = split[1:]
 	}
+
+	// 执行命令
 	runResult, err := msaCmd.Run(c.ctx, args)
 	if err != nil {
 		c.addMessage("system", "执行命令失败: "+err.Error())
 		log.Errorf("执行命令失败: %v", err)
 		return c, c.Flush()
 	}
+
 	log.Infof("执行命令成功: %v", runResult)
+
+	// 检查是否需要启动交互式选择器
+	// 如果命令返回的是 selector 类型，则启动选择器
+	if runResult.Type == "selector" {
+		items, ok := runResult.Data.([]*model.SelectorItem)
+		if !ok {
+			c.addMessage("system", "选择器数据类型错误")
+			log.Errorf("选择器数据类型错误")
+			return c, c.Flush()
+		}
+
+		// 调用命令的 ToSelect 方法创建选择器
+		selector, err := msaCmd.ToSelect(items)
+		if err != nil {
+			c.addMessage("system", "创建选择器失败: "+err.Error())
+			log.Errorf("创建选择器失败: %v", err)
+			return c, c.Flush()
+		}
+
+		// 设置上下文
+		selector.Ctx = c.ctx
+		c.textInput.Reset()
+
+		// 使用 SelectorView 包装 BaseSelector
+		selectorView := cmd.NewSelectorView(selector)
+
+		// 启动交互式选择器
+		return selectorView, nil
+	}
+
+	// 普通命令结果，直接显示
 	c.addMessage("system", analyzeResult(runResult))
 	c.textInput.Reset()
 	return c, c.Flush()

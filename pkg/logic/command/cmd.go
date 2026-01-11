@@ -2,15 +2,18 @@ package command
 
 import (
 	"context"
-	log "github.com/sirupsen/logrus"
 	"msa/pkg/model"
 	"strings"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type MsaCommand interface {
 	Name() string
 	Description() string
 	Run(ctx context.Context, args []string) (*model.CmdResult, error)
+	// 新tea模型入口
+	ToSelect(item []*model.SelectorItem) (*model.BaseSelector, error)
 }
 
 var commandMap = map[string]MsaCommand{}

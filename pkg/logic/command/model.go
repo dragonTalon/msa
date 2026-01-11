@@ -3,16 +3,18 @@ package command
 import (
 	"context"
 	"fmt"
-	log "github.com/sirupsen/logrus"
 	"msa/pkg/config"
 	"msa/pkg/logic/provider"
 	"msa/pkg/model"
-	"strings"
+	"sort"
+
+	log "github.com/sirupsen/logrus"
 )
 
 func init() {
 	RegisterCommand(&ListModel{})
-	RegisterCommand(&SetModel{})
+	// SetModel 命令已被交互式选择器替代，使用 /models 或 /model 命令
+	// RegisterCommand(&SetModel{})
 }
 
 type ListModel struct {
@@ -35,61 +37,47 @@ func (l *ListModel) Run(ctx context.Context, args []string) (*model.CmdResult, e
 	if err != nil {
 		return nil, err
 	}
-	var modelNames []string
+
+	// 转换为 SelectorItem
+	var items []*model.SelectorItem
 	for _, m := range models {
-		modelNames = append(modelNames, m.Name)
+		items = append(items, &model.SelectorItem{
+			Name:        m.Name,
+			Description: m.Description,
+		})
 	}
+
 	return &model.CmdResult{
 		Code: 0,
 		Msg:  "success",
-		Type: "list",
-		Data: modelNames,
+		Type: "selector", // 返回 selector 类型，启动交互式选择器
+		Data: items,
 	}, nil
 }
 
-type SetModel struct {
-}
+func (l *ListModel) ToSelect(items []*model.SelectorItem) (*model.BaseSelector, error) {
+	// 按名称排序，保证顺序一致
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].Name < items[j].Name
+	})
 
-func (s *SetModel) Name() string {
-	return "model"
-}
-
-func (s *SetModel) Description() string {
-	return "set model"
-}
-
-func (s *SetModel) Run(ctx context.Context, args []string) (*model.CmdResult, error) {
-	p := provider.GetProvider()
-	if p == nil {
-		log.Errorf("provider not found")
-		return nil, fmt.Errorf("provider not found")
-	}
-	models, err := p.ListModels(ctx)
-	if err != nil {
-		return nil, err
-	}
-	checkModel := make(map[string]string)
-	for _, m := range models {
-		checkModel[m.Name] = m.Description
-	}
-	log.Infof("checkModel: %v args: %v", checkModel, args)
-	if len(args) == 0 {
-		return nil, fmt.Errorf("model not found")
-	}
-	m := strings.TrimSpace(args[0])
-	if _, ok := checkModel[m]; !ok {
-		return nil, fmt.Errorf("model %s not found", m)
-	}
-	config.GetLocalStoreConfig().Model = m
-	err = config.SaveConfig()
-	if err != nil {
-		return nil, err
-	}
-	log.Infof("SetModel: %s", m)
-	return &model.CmdResult{
-		Code: 0,
-		Msg:  "修改成功",
-		Type: "boolean",
-		Data: true,
+	return &model.BaseSelector{
+		Items:         items,
+		FilteredItems: items, // 初始时显示所有项
+		Cursor:        0,
+		ViewportTop:   0,
+		ViewportSize:  15, // 默认显示15行
+		SearchQuery:   "", // 初始搜索为空
+		OnConfirm: func(selected string) error {
+			// 保存选中的模型到配置
+			config.GetLocalStoreConfig().Model = selected
+			err := config.SaveConfig()
+			if err != nil {
+				log.Errorf("保存配置失败: %v", err)
+				return err
+			}
+			log.Infof("已选择模型: %s", selected)
+			return nil
+		},
 	}, nil
 }
