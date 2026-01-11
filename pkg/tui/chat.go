@@ -3,13 +3,16 @@ package tui
 import (
 	"context"
 	"fmt"
+	"io"
 	"msa/pkg/config"
+	"msa/pkg/logic/agent"
 	command "msa/pkg/logic/command"
 	"msa/pkg/model"
-	"msa/pkg/tui/cmd"
+	"msa/pkg/tui/style"
 	"strings"
 
 	listStyle "github.com/charmbracelet/lipgloss/list"
+	"github.com/cloudwego/eino/schema"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -17,21 +20,37 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+// MessageRole 消息角色类型
+type MessageRole string
+
+// 消息角色枚举常量
+const (
+	RoleLogo      MessageRole = "logo"      // Logo 显示
+	RoleUser      MessageRole = "user"      // 用户消息
+	RoleSystem    MessageRole = "system"    // 系统消息
+	RoleAssistant MessageRole = "assistant" // AI 助手消息
+)
+
 // Message 聊天消息结构
 type Message struct {
-	Role    string // "user", "system", "assistant"
-	Content string
+	Role    MessageRole // 消息角色
+	Content string      // 消息内容
 }
 
 // Chat TUI聊天模型
 type Chat struct {
-	textInput   textinput.Model // 文本输入组件
-	pendingMsgs []Message       // 待 flush 的消息
-	ctx         context.Context // 上下文
-	width       int             // 终端宽度
-	height      int             // 终端高度
-	cmdFlag     bool            // 是否处于命令模式
-	cmdList     []string
+	textInput         textinput.Model                       // 文本输入组件
+	history           []Message                             // 历史消息
+	pendingMsgs       []Message                             // 待 flush 的消息
+	ctx               context.Context                       // 上下文
+	width             int                                   // 终端宽度
+	height            int                                   // 终端高度
+	cmdFlag           bool                                  // 是否处于命令模式
+	cmdList           []string                              // 命令列表
+	streamingMsg      string                                // 流式输出的临时内容
+	isStreaming       bool                                  // 是否正在流式输出
+	streamReader      *schema.StreamReader[*schema.Message] // 流式读取器
+	fullStreamContent strings.Builder                       // 完整的流式内容
 }
 
 // maskAPIKey 隐藏 APIKey，只显示前4个和后4个字符
@@ -53,9 +72,9 @@ func NewChat(ctx context.Context) *Chat {
 	ti.Focus()
 	ti.CharLimit = 0
 	ti.Width = 50
-	ti.PromptStyle = ChatInputPromptStyle
+	ti.PromptStyle = style.ChatInputPromptStyle
 	ti.Prompt = "MSA > "
-	ti.TextStyle = ChatInputTextStyle
+	ti.TextStyle = style.ChatInputTextStyle
 	cfg := config.GetLocalStoreConfig()
 	m := cfg.Model
 	if m == "" {
@@ -64,11 +83,11 @@ func NewChat(ctx context.Context) *Chat {
 	return &Chat{
 		textInput: ti,
 		pendingMsgs: []Message{
-			{Role: "logo", Content: GetStyledLogo()},
-			{Role: "system", Content: fmt.Sprintf("模型供应商: %s", cfg.Provider)},
-			{Role: "system", Content: fmt.Sprintf("模型 : %s", m)},
-			{Role: "system", Content: fmt.Sprintf("APIKey : %s", maskAPIKey(cfg.APIKey))},
-			{Role: "system", Content: "欢迎使用 MSA！输入你的理财问题吧..."},
+			{Role: RoleLogo, Content: style.GetStyledLogo()},
+			{Role: RoleSystem, Content: fmt.Sprintf("模型供应商: %s", cfg.Provider)},
+			{Role: RoleSystem, Content: fmt.Sprintf("模型 : %s", m)},
+			{Role: RoleSystem, Content: fmt.Sprintf("APIKey : %s", maskAPIKey(cfg.APIKey))},
+			{Role: RoleSystem, Content: "欢迎使用 MSA！输入你的理财问题吧..."},
 		},
 		ctx: ctx,
 	}
@@ -99,17 +118,18 @@ func (c *Chat) renderPendingMessages() string {
 
 	for i, msg := range c.pendingMsgs {
 		switch msg.Role {
-		case "logo":
+		case RoleLogo:
 			sb.WriteString(msg.Content)
-		case "user":
-			sb.WriteString(ChatUserMsgStyle.Render("👤 你: "))
-			sb.WriteString(ChatNormalMsgStyle.Render(msg.Content))
-		case "system":
-			sb.WriteString(ChatSystemMsgStyle.Render("🔧 系统: "))
-			sb.WriteString(ChatNormalMsgStyle.Render(msg.Content))
-		case "assistant":
-			sb.WriteString(ChatSystemMsgStyle.Render("🤖 MSA: "))
-			sb.WriteString(ChatNormalMsgStyle.Render(msg.Content))
+		case RoleUser:
+			sb.WriteString(style.ChatUserMsgStyle.Render("👤 你: "))
+			sb.WriteString(style.ChatNormalMsgStyle.Render(msg.Content))
+			c.history = append(c.history, msg)
+		case RoleSystem:
+			sb.WriteString(style.ChatSystemMsgStyle.Render("🔧 系统: "))
+			sb.WriteString(style.ChatNormalMsgStyle.Render(msg.Content))
+		case RoleAssistant:
+			sb.WriteString(style.ChatSystemMsgStyle.Render("🤖 MSA: "))
+			sb.WriteString(style.ChatNormalMsgStyle.Render(msg.Content))
 		}
 		if i < len(c.pendingMsgs)-1 {
 			sb.WriteString("\n")
@@ -120,7 +140,7 @@ func (c *Chat) renderPendingMessages() string {
 }
 
 // addMessage 添加消息到待 flush 队列
-func (c *Chat) addMessage(role, content string) {
+func (c *Chat) addMessage(role MessageRole, content string) {
 	c.pendingMsgs = append(c.pendingMsgs, Message{
 		Role:    role,
 		Content: content,
@@ -137,6 +157,41 @@ func (c *Chat) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		c.height = msg.Height
 		c.textInput.Width = msg.Width - 10
 
+	case streamChunkMsg:
+		if msg.err != nil {
+			c.clearStreamState()
+			c.addMessage(RoleSystem, fmt.Sprintf("接收消息失败: %v", msg.err))
+			return c, c.Flush()
+		}
+
+		if msg.isEnd {
+			fullContent := c.fullStreamContent.String()
+			log.Infof("stream end: %s", fullContent)
+			c.clearStreamState()
+
+			if fullContent != "" {
+				c.history = append(c.history, Message{
+					Role:    RoleAssistant,
+					Content: fullContent,
+				})
+				c.addMessage(RoleAssistant, fullContent)
+			}
+			return c, c.Flush()
+		}
+
+		// 累积完整内容
+		c.fullStreamContent.WriteString(msg.content)
+
+		// 更新临时显示内容
+		if msg.isFirst {
+			c.streamingMsg = style.ChatSystemMsgStyle.Render("🤖 MSA: ") +
+				style.ChatNormalMsgStyle.Render(msg.content)
+		} else {
+			c.streamingMsg += style.ChatNormalMsgStyle.Render(msg.content)
+		}
+
+		return c, c.receiveNextChunk()
+
 	case tea.KeyMsg:
 		log.Debugf("捕获按键: %s, Type: %v", msg.String(), msg.Type)
 		switch msg.Type {
@@ -149,40 +204,49 @@ func (c *Chat) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if input == "" {
 				return c, nil
 			}
-			// 添加用户消息
-			c.addMessage("user", input)
-			log.Debugf("用户输入: %s", input)
+
+			c.addMessage(RoleUser, input)
+			c.textInput.Reset()
+
+			// 处理命令
 			if strings.HasPrefix(input, "/") {
 				return c.commandHandler(input)
 			}
+
 			// 处理特殊命令
 			switch strings.ToLower(input) {
 			case "clear":
-				c.textInput.Reset()
-				c.addMessage("system", "对话已清空，重新开始吧！")
+				c.history = []Message{}
+				c.addMessage(RoleSystem, "对话已清空，重新开始吧！")
+				return c, c.Flush()
 			case "help", "?":
-				c.textInput.Reset()
-				c.addMessage("system", "📋 可用命令:\n  • clear - 清空对话\n  • help/? - 显示帮助\n  • quit/exit - 退出程序")
+				c.addMessage(RoleSystem, "📋 可用命令:\n  • clear - 清空对话\n  • help/? - 显示帮助\n  • quit/exit - 退出程序")
+				return c, c.Flush()
 			case "quit", "exit":
 				return c, tea.Quit
 			}
-			// 清空输入框
-			c.textInput.Reset()
 
-			// flush 消息到终端
-			return c, c.Flush()
+			// 发起聊天请求
+			streamResult, err := agent.Ask(c.ctx, input)
+			if err != nil {
+				log.Errorf("chat error: %v", err)
+				c.addMessage(RoleSystem, "聊天出错: "+err.Error())
+				return c, c.Flush()
+			}
+
+			return c, tea.Batch(c.Flush(), c.reportStream(streamResult))
 
 		case tea.KeyCtrlK:
 			c.textInput.Reset()
-			c.addMessage("system", "对话已清空，重新开始吧！")
+			c.history = []Message{}
+			c.addMessage(RoleSystem, "对话已清空，重新开始吧！")
 			return c, c.Flush()
+
 		default:
 			c.textInput, tiCmd = c.textInput.Update(msg)
 			if strings.HasPrefix(c.textInput.Value(), "/") {
 				c.cmdFlag = true
-				log.Infof("进入命令模式 %s\n", c.textInput.Value())
 				c.cmdList = command.GetLikeCommand(c.textInput.Value())
-				log.Infof("命令列表: %v", c.cmdList)
 			}
 		}
 	}
@@ -192,6 +256,12 @@ func (c *Chat) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // View 实现 tea.Model 接口，渲染界面（只渲染输入框和帮助信息）
 func (c *Chat) View() string {
 	var sb strings.Builder
+
+	// 如果正在流式输出，显示临时内容
+	if c.isStreaming {
+		sb.WriteString(c.streamingMsg)
+		sb.WriteString("\n")
+	}
 
 	// 输入区域
 	inputBox := lipgloss.NewStyle().
@@ -208,7 +278,7 @@ func (c *Chat) View() string {
 		sb.WriteString(fmt.Sprintf("%s", styles))
 	}
 	// 帮助提示
-	help := ChatHelpStyle.Render(
+	help := style.ChatHelpStyle.Render(
 		"ESC/Ctrl+C: 退出 | Ctrl+K: 清空 | Enter: 发送",
 	)
 	sb.WriteString("\n")
@@ -251,9 +321,9 @@ func analyzeResult(result *model.CmdResult) string {
 			return "结果类型错误"
 		}
 		if b {
-			sb.WriteString(ChatNormalMsgStyle.Render(result.Msg))
+			sb.WriteString(style.ChatNormalMsgStyle.Render(result.Msg))
 		} else {
-			sb.WriteString(ChatNormalMsgStyle.Render(result.Error.Error()))
+			sb.WriteString(style.ChatNormalMsgStyle.Render(result.Error.Error()))
 		}
 
 	}
@@ -266,29 +336,11 @@ func renderTable(data map[string]string) string {
 		return "无数据"
 	}
 
-	// 定义表格样式
-	headerStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("#FAFAFA")).
-		Background(lipgloss.Color("#7D56F4")).
-		Padding(0, 1).
-		Width(30)
-
-	cellStyle := lipgloss.NewStyle().
-		Padding(0, 1).
-		Width(30)
-
-	evenRowStyle := cellStyle.
-		Background(lipgloss.Color("#2E2E2E"))
-
-	oddRowStyle := cellStyle.
-		Background(lipgloss.Color("#1E1E1E"))
-
 	var sb strings.Builder
 
 	// 表头
-	sb.WriteString(headerStyle.Render("模型名称"))
-	sb.WriteString(headerStyle.Render("描述"))
+	sb.WriteString(style.TableHeaderStyle.Render("模型名称"))
+	sb.WriteString(style.TableHeaderStyle.Render("描述"))
 	sb.WriteString("\n")
 
 	// 表格内容
@@ -296,9 +348,9 @@ func renderTable(data map[string]string) string {
 	for key, value := range data {
 		var rowStyle lipgloss.Style
 		if rowIndex%2 == 0 {
-			rowStyle = evenRowStyle
+			rowStyle = style.TableEvenRowStyle
 		} else {
-			rowStyle = oddRowStyle
+			rowStyle = style.TableOddRowStyle
 		}
 
 		sb.WriteString(rowStyle.Render(key))
@@ -318,8 +370,8 @@ func (c *Chat) commandHandler(input string) (tea.Model, tea.Cmd) {
 
 	msaCmd := command.GetCommand(cmdName)
 	if msaCmd == nil {
-		c.addMessage("system", "未找到命令: "+input)
-		c.addMessage("system", fmt.Sprintf("可用命令: %v", command.GetLikeCommand("/")))
+		c.addMessage(RoleSystem, "未找到命令: "+input)
+		c.addMessage(RoleSystem, fmt.Sprintf("可用命令: %v", command.GetLikeCommand("/")))
 		return c, c.Flush()
 	}
 
@@ -331,7 +383,7 @@ func (c *Chat) commandHandler(input string) (tea.Model, tea.Cmd) {
 	// 执行命令
 	runResult, err := msaCmd.Run(c.ctx, args)
 	if err != nil {
-		c.addMessage("system", "执行命令失败: "+err.Error())
+		c.addMessage(RoleSystem, "执行命令失败: "+err.Error())
 		log.Errorf("执行命令失败: %v", err)
 		return c, c.Flush()
 	}
@@ -343,7 +395,7 @@ func (c *Chat) commandHandler(input string) (tea.Model, tea.Cmd) {
 	if runResult.Type == "selector" {
 		items, ok := runResult.Data.([]*model.SelectorItem)
 		if !ok {
-			c.addMessage("system", "选择器数据类型错误")
+			c.addMessage(RoleSystem, "选择器数据类型错误")
 			log.Errorf("选择器数据类型错误")
 			return c, c.Flush()
 		}
@@ -351,7 +403,7 @@ func (c *Chat) commandHandler(input string) (tea.Model, tea.Cmd) {
 		// 调用命令的 ToSelect 方法创建选择器
 		selector, err := msaCmd.ToSelect(items)
 		if err != nil {
-			c.addMessage("system", "创建选择器失败: "+err.Error())
+			c.addMessage(RoleSystem, "创建选择器失败: "+err.Error())
 			log.Errorf("创建选择器失败: %v", err)
 			return c, c.Flush()
 		}
@@ -360,15 +412,64 @@ func (c *Chat) commandHandler(input string) (tea.Model, tea.Cmd) {
 		selector.Ctx = c.ctx
 		c.textInput.Reset()
 
-		// 使用 SelectorView 包装 BaseSelector
-		selectorView := cmd.NewSelectorView(selector)
+		// 使用 SelectorView 包装 BaseSelector，并传入当前聊天模型
+		selectorView := NewSelectorView(selector, c)
 
 		// 启动交互式选择器
 		return selectorView, nil
 	}
 
 	// 普通命令结果，直接显示
-	c.addMessage("system", analyzeResult(runResult))
+	c.addMessage(RoleSystem, analyzeResult(runResult))
 	c.textInput.Reset()
 	return c, c.Flush()
+}
+
+// streamChunkMsg 流式消息块
+type streamChunkMsg struct {
+	content string
+	isFirst bool
+	isEnd   bool
+	err     error
+}
+
+// reportStream 启动流式输出
+func (c *Chat) reportStream(sr *schema.StreamReader[*schema.Message]) tea.Cmd {
+	c.streamReader = sr
+	c.isStreaming = true
+	c.streamingMsg = style.ChatNormalMsgStyle.Render("⏳ 正在思考...")
+	c.fullStreamContent.Reset()
+	return c.receiveNextChunk()
+}
+
+// receiveNextChunk 接收下一个流式消息块
+func (c *Chat) receiveNextChunk() tea.Cmd {
+	return func() tea.Msg {
+		if c.streamReader == nil {
+			return streamChunkMsg{err: fmt.Errorf("stream reader is nil")}
+		}
+
+		message, err := c.streamReader.Recv()
+		if err == io.EOF {
+			c.streamReader.Close()
+			return streamChunkMsg{isEnd: true}
+		}
+		if err != nil {
+			c.streamReader.Close()
+			log.Errorf("recv failed: %v", err)
+			return streamChunkMsg{err: err}
+		}
+
+		return streamChunkMsg{
+			content: message.Content,
+			isFirst: c.fullStreamContent.Len() == 0,
+		}
+	}
+}
+
+// clearStreamState 清除流式输出状态
+func (c *Chat) clearStreamState() {
+	c.isStreaming = false
+	c.streamingMsg = ""
+	c.streamReader = nil
 }

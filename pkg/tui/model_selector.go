@@ -1,8 +1,9 @@
-package cmd
+package tui
 
 import (
 	"fmt"
 	"msa/pkg/model"
+	"msa/pkg/tui/style"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -11,15 +12,17 @@ import (
 
 // SelectorView 选择器视图，包装 BaseSelector 并实现 tea.Model 接口
 type SelectorView struct {
-	selector *model.BaseSelector
-	styles   *SelectorStyles
+	selector  *model.BaseSelector
+	styles    *style.SelectorStyles
+	chatModel *Chat // 保存聊天模型的引用，用于返回
 }
 
 // NewSelectorView 创建新的选择器视图
-func NewSelectorView(selector *model.BaseSelector) *SelectorView {
+func NewSelectorView(selector *model.BaseSelector, chatModel *Chat) *SelectorView {
 	return &SelectorView{
-		selector: selector,
-		styles:   NewSelectorStyles(),
+		selector:  selector,
+		styles:    style.NewSelectorStyles(),
+		chatModel: chatModel,
 	}
 }
 
@@ -139,6 +142,19 @@ func (v *SelectorView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 			}
+
+			// 返回到聊天界面
+			if v.chatModel != nil {
+				// 添加确认消息到聊天界面
+				if m.Err != nil {
+					v.chatModel.addMessage(RoleSystem, fmt.Sprintf("❌ 设置失败: %v", m.Err))
+				} else {
+					v.chatModel.addMessage(RoleSystem, fmt.Sprintf("✅ 已选择模型: %s", m.Selected))
+				}
+				// 返回聊天模型，并刷新消息
+				return v.chatModel, v.chatModel.Flush()
+			}
+			// 如果没有聊天模型引用，则退出程序
 			return v, tea.Quit
 
 		default:
@@ -223,7 +239,7 @@ func (v *SelectorView) renderConfirmation() string {
 func (v *SelectorView) renderHeader() string {
 	var s string
 	s += v.styles.Title.Render("🎯 模型选择器") + "\n"
-	s += v.styles.Separator.Render(SeparatorLine) + "\n"
+	s += v.styles.Separator.Render(style.SeparatorLine) + "\n"
 	return s
 }
 
@@ -307,9 +323,9 @@ func (v *SelectorView) renderItem(index int) string {
 	// 光标指示器
 	var cursor string
 	if m.Cursor == index {
-		cursor = v.styles.Cursor.Render(CursorSymbol)
+		cursor = v.styles.Cursor.Render(style.CursorSymbol)
 	} else {
-		cursor = CursorEmpty
+		cursor = style.CursorEmpty
 	}
 
 	// 根据是否选中使用不同样式
@@ -333,15 +349,7 @@ func (v *SelectorView) renderItem(index int) string {
 // renderFooter 渲染底部帮助信息
 func (v *SelectorView) renderFooter() string {
 	var s string
-	s += "\n" + v.styles.Separator.Render(SeparatorLine) + "\n"
+	s += "\n" + v.styles.Separator.Render(style.SeparatorLine) + "\n"
 	s += v.styles.Help.Render("⌨️  输入:搜索  ↑/↓:移动  PgUp/PgDn:翻页  Enter:确认  ESC:清空搜索  Ctrl+C:退出")
 	return s
-}
-
-// min 返回两个整数中的较小值
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }

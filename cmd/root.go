@@ -11,13 +11,13 @@ import (
 
 	"msa/pkg/app"
 	"msa/pkg/config"
-	"msa/pkg/tui"
+	"msa/pkg/tui/style"
 )
 
 var rootCmd = &cobra.Command{
 	Use:   "msa",
 	Short: "My Stock Agent CLI",
-	Long:  tui.Logo,
+	Long:  style.Logo,
 	RunE:  runRoot,
 }
 
