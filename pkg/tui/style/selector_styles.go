@@ -1,4 +1,4 @@
-package cmd
+package style
 
 import (
 	"github.com/charmbracelet/lipgloss"

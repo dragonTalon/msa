@@ -1,4 +1,4 @@
-package tui
+package style
 
 import (
 	"github.com/charmbracelet/lipgloss"
@@ -30,30 +30,11 @@ var (
 	TextColor = lipgloss.Color("#e2e8f0")
 	// WhiteColor 白色
 	WhiteColor = lipgloss.Color("#ffffff")
-
-	// separatorStyle 分隔线样式（替换单调等号，带装饰符号）
-	separatorStyle = lipgloss.NewStyle().
-			Foreground(SecondaryColor).
-			Bold(false)
-
 	// logoStyle MSA LOGO 样式（加粗+主色调，突出品牌感）
 	logoStyle = lipgloss.NewStyle().
 			Foreground(PrimaryColor).
 			Bold(true).
 			Align(lipgloss.Center)
-
-	// asciiArtStyle 原有 ASCII 艺术图样式（主色调+轻微加粗，保持质感）
-	asciiArtStyle = lipgloss.NewStyle().
-			Foreground(PrimaryColor).
-			Bold(false).
-			Align(lipgloss.Center)
-
-	// titleStyle 标题样式（辅助色调+居中，搭配整体布局）
-	titleStyle = lipgloss.NewStyle().
-			Foreground(SecondaryColor).
-			Bold(true).
-			Align(lipgloss.Center).
-			MarginTop(1)
 )
 
 // ==================== 聊天界面样式 ====================
@@ -97,6 +78,30 @@ var (
 			Foreground(PrimaryColor).
 			Bold(true).
 			Padding(0, 1)
+)
+
+// ==================== 表格样式 ====================
+var (
+	// TableHeaderStyle 表格表头样式
+	TableHeaderStyle = lipgloss.NewStyle().
+				Bold(true).
+				Foreground(lipgloss.Color("#FAFAFA")).
+				Background(lipgloss.Color("#7D56F4")).
+				Padding(0, 1).
+				Width(30)
+
+	// TableCellStyle 表格单元格基础样式
+	TableCellStyle = lipgloss.NewStyle().
+			Padding(0, 1).
+			Width(30)
+
+	// TableEvenRowStyle 表格偶数行样式
+	TableEvenRowStyle = TableCellStyle.
+				Background(lipgloss.Color("#2E2E2E"))
+
+	// TableOddRowStyle 表格奇数行样式
+	TableOddRowStyle = TableCellStyle.
+				Background(lipgloss.Color("#1E1E1E"))
 )
 
 // GetStyledLogo 返回带样式的 Logo 字符串
