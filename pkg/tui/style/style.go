@@ -66,18 +66,6 @@ var (
 	ChatHelpStyle = lipgloss.NewStyle().
 			Faint(true).
 			MarginTop(1)
-
-	// ChatBorderStyle 消息区域边框样式
-	ChatBorderStyle = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(PrimaryColor).
-			Padding(0, 1)
-
-	// ChatTitleStyle 聊天标题样式
-	ChatTitleStyle = lipgloss.NewStyle().
-			Foreground(PrimaryColor).
-			Bold(true).
-			Padding(0, 1)
 )
 
 // ==================== 表格样式 ====================
