@@ -2,9 +2,11 @@ package agent
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/flow/agent/react"
+	"io"
 	"msa/pkg/config"
 	tools2 "msa/pkg/logic/tools"
 	"msa/pkg/model"
@@ -45,9 +47,31 @@ func GetChatModel(ctx context.Context) (*react.Agent, error) {
 	tools := compose.ToolsNodeConfig{
 		Tools: allTools,
 	}
+
+	toolCallChecker := func(ctx context.Context, sr *schema.StreamReader[*schema.Message]) (bool, error) {
+		defer sr.Close()
+		for {
+			msg, err := sr.Recv()
+			if err != nil {
+				if errors.Is(err, io.EOF) {
+					// finish
+					break
+				}
+
+				return false, err
+			}
+
+			if len(msg.ToolCalls) > 0 {
+				return true, nil
+			}
+		}
+		return false, nil
+	}
 	agent, err := react.NewAgent(ctx, &react.AgentConfig{
-		ToolCallingModel: chatModel,
-		ToolsConfig:      tools,
+		ToolCallingModel:      chatModel,
+		ToolsConfig:           tools,
+		MaxStep:               40,
+		StreamToolCallChecker: toolCallChecker,
 	})
 	if err != nil {
 		return nil, err
@@ -63,6 +87,7 @@ func Ask(ctx context.Context, messages string, history []model.Message) (*schema
 		return nil, err
 	}
 	historyMsg := make([]*schema.Message, 0, len(history)) // ✅ 使用 0 长度，但预分配容量
+	log.Infof("history: %v", len(history))
 	for _, msg := range history {
 		role := schema.System
 		switch msg.Role {
