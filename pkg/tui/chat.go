@@ -162,10 +162,22 @@ func (c *Chat) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return c, c.Flush()
 		}
 
-		// 累积完整内容
+		// 跳过空消息（继续接收下一个）
+		if msg.content == "" && !msg.isToolCall {
+			return c, c.receiveNextChunk()
+		}
+
+		// 处理工具调用消息
+		if msg.isToolCall {
+			if msg.content != "" {
+				c.addMessage(model.RoleSystem, msg.content)
+			}
+			return c, tea.Batch(c.Flush(), c.receiveNextChunk())
+		}
+
+		// 正常流式内容
 		c.fullStreamContent.WriteString(msg.content)
 
-		// 更新临时显示内容
 		if msg.isFirst {
 			c.streamingMsg = style.ChatSystemMsgStyle.Render("🤖 MSA: ") +
 				style.ChatNormalMsgStyle.Render(msg.content)
@@ -410,11 +422,11 @@ func (c *Chat) commandHandler(input string) (tea.Model, tea.Cmd) {
 
 // streamChunkMsg 流式消息块
 type streamChunkMsg struct {
-	content  string
-	isFirst  bool
-	isEnd    bool
-	err      error
-	exchange int
+	content    string
+	isFirst    bool
+	isEnd      bool
+	isToolCall bool
+	err        error
 }
 
 // reportStream 启动流式输出
@@ -442,6 +454,28 @@ func (c *Chat) receiveNextChunk() tea.Cmd {
 			c.streamReader.Close()
 			log.Errorf("recv failed: %v", err)
 			return streamChunkMsg{err: err}
+		}
+
+		// 处理工具调用
+		if len(message.ToolCalls) > 0 {
+			toolCallInfo := ""
+			for _, tc := range message.ToolCalls {
+				if tc.Function.Name != "" {
+					toolCallInfo += fmt.Sprintf("🔧 调用工具: %s\n", tc.Function.Name)
+				}
+			}
+			// 只有当确实有工具名称时才返回工具调用消息
+			if toolCallInfo != "" {
+				return streamChunkMsg{
+					content:    toolCallInfo,
+					isToolCall: true,
+				}
+			}
+		}
+
+		// 跳过空消息（工具调用过程中可能产生）
+		if message.Content == "" {
+			return streamChunkMsg{}
 		}
 
 		return streamChunkMsg{

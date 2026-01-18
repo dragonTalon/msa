@@ -82,11 +82,11 @@ func GetStockCompanyK(ctx context.Context, param *CompanyKParam) (string, error)
 		}
 
 		wrapper.StockData[stockCode] = &detail
-		fmt.Printf("成功解析股票代码: %s\n", stockCode)
+		log.Infof("成功解析股票代码: %s\n", stockCode)
 	}
 	if wrapper != nil {
 		stockCode := wrapper.GetStockCode()
-		fmt.Printf("股票代码: %s\n", stockCode)
+		log.Infof("股票代码: %s\n", stockCode)
 
 		// 获取Python对齐的StockCurrentResp
 		stockCurrentResp, err := wrapper.GetStockCurrentResp(stockCode)
@@ -94,25 +94,25 @@ func GetStockCompanyK(ctx context.Context, param *CompanyKParam) (string, error)
 			return "", fmt.Errorf("获取股票行情数据失败: %w", err)
 		}
 
-		fmt.Printf("日期: %s\n", stockCurrentResp.Date)
-		fmt.Printf("每手股数: %s\n", stockCurrentResp.Lot2Share)
-		fmt.Printf("当前价: %s\n", stockCurrentResp.CurrentPrice)
-		fmt.Printf("昨收: %s\n", stockCurrentResp.PrevClose)
-		fmt.Printf("开盘价: %s\n", stockCurrentResp.CurrentStartPrice)
-		fmt.Printf("成交量(手): %s\n", stockCurrentResp.VolumeByLot)
-		fmt.Printf("最高价: %s\n", stockCurrentResp.CurrentMaxPrice)
-		fmt.Printf("最低价: %s\n", stockCurrentResp.CurrentMinPrice)
-		fmt.Printf("市盈率: %s\n", stockCurrentResp.PERatio)
-		fmt.Printf("振幅: %s\n", stockCurrentResp.Amplitude)
-		fmt.Printf("52周最高价: %s\n", stockCurrentResp.WeekHighIn52)
-		fmt.Printf("52周最低价: %s\n", stockCurrentResp.WeekLowIn52)
+		log.Infof("日期: %s\n", stockCurrentResp.Date)
+		log.Infof("每手股数: %s\n", stockCurrentResp.Lot2Share)
+		log.Infof("当前价: %s\n", stockCurrentResp.CurrentPrice)
+		log.Infof("昨收: %s\n", stockCurrentResp.PrevClose)
+		log.Infof("开盘价: %s\n", stockCurrentResp.CurrentStartPrice)
+		log.Infof("成交量(手): %s\n", stockCurrentResp.VolumeByLot)
+		log.Infof("最高价: %s\n", stockCurrentResp.CurrentMaxPrice)
+		log.Infof("最低价: %s\n", stockCurrentResp.CurrentMinPrice)
+		log.Infof("市盈率: %s\n", stockCurrentResp.PERatio)
+		log.Infof("振幅: %s\n", stockCurrentResp.Amplitude)
+		log.Infof("52周最高价: %s\n", stockCurrentResp.WeekHighIn52)
+		log.Infof("52周最低价: %s\n", stockCurrentResp.WeekLowIn52)
 
 		// 显示分时数据数量
 		if len(stockCurrentResp.Data) > 0 {
-			fmt.Printf("分时数据点数: %d\n", len(stockCurrentResp.Data))
+			log.Infof("分时数据点数: %d\n", len(stockCurrentResp.Data))
 			// 显示前3个时间点
 			for i := 0; i < len(stockCurrentResp.Data) && i < 3; i++ {
-				fmt.Printf("  数据点%d: %s\n", i+1, stockCurrentResp.Data[i])
+				log.Infof("  数据点%d: %s\n", i+1, stockCurrentResp.Data[i])
 			}
 		}
 		return mas_utils.ToJSONString(stockCurrentResp), nil
