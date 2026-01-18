@@ -147,9 +147,9 @@ func (v *SelectorView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if v.chatModel != nil {
 				// 添加确认消息到聊天界面
 				if m.Err != nil {
-					v.chatModel.addMessage(RoleSystem, fmt.Sprintf("❌ 设置失败: %v", m.Err))
+					v.chatModel.addMessage(model.RoleSystem, fmt.Sprintf("❌ 设置失败: %v", m.Err))
 				} else {
-					v.chatModel.addMessage(RoleSystem, fmt.Sprintf("✅ 已选择模型: %s", m.Selected))
+					v.chatModel.addMessage(model.RoleSystem, fmt.Sprintf("✅ 已选择模型: %s", m.Selected))
 				}
 				// 返回聊天模型，并刷新消息
 				return v.chatModel, v.chatModel.Flush()

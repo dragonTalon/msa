@@ -41,7 +41,7 @@ func InitLogger(config *LogConfig) {
 		level = logrus.InfoLevel
 	}
 	logrus.SetLevel(level)
-
+	logrus.SetReportCaller(true)
 	// 设置日志格式
 	switch strings.ToLower(config.Format) {
 	case "json":
