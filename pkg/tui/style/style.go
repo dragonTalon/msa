@@ -24,6 +24,8 @@ var Logo = `
 var (
 	// PrimaryColor 主色调：沉稳蓝色（贴合股票/金融工具的视觉定位）
 	PrimaryColor = lipgloss.Color("#2563eb")
+	// ToolColor 工具色调：黄色（强调工具属性，提升用户参与感）
+	ToolColor = lipgloss.Color("#FFED4E")
 	// SecondaryColor 辅助色调：浅蓝灰（用于次要文本，提升层次感）
 	SecondaryColor = lipgloss.Color("#93c5fd")
 	// TextColor 文本颜色
@@ -49,9 +51,18 @@ var (
 				Foreground(PrimaryColor).
 				Bold(true)
 
-	// ChatNormalMsgStyle 普通消息样式
+	// ChatNormalMsgStyle 普通消息样式（正文-白色）
 	ChatNormalMsgStyle = lipgloss.NewStyle().
-				Foreground(TextColor)
+				Foreground(WhiteColor)
+
+	// ChatToolMsgStyle 工具消息样式（工具-黄色）
+	ChatToolMsgStyle = lipgloss.NewStyle().
+				Foreground(ToolColor)
+
+	// ChatReasonMsgStyle 思考消息样式（思考-灰色）
+	ChatReasonMsgStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#9ca3af")).
+				Italic(true)
 
 	// ChatInputPromptStyle 输入框提示样式
 	ChatInputPromptStyle = lipgloss.NewStyle().

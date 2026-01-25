@@ -3,11 +3,13 @@ package stock
 import (
 	"context"
 	"fmt"
+	"msa/pkg/logic/message"
+	"msa/pkg/model"
+	mas_utils "msa/pkg/utils"
+
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"
 	log "github.com/sirupsen/logrus"
-	"msa/pkg/model"
-	mas_utils "msa/pkg/utils"
 )
 
 type CompanyParam struct {
@@ -34,25 +36,43 @@ func (c *CompanyCode) GetToolGroup() model.ToolGroup {
 }
 
 func GetStockCompanyCode(ctx context.Context, param *CompanyParam) (string, error) {
-	log.Infof("GetStockCompanyK start")
+	log.Debugf("GetStockCompanyCode start, stock_name: %s", param.StockName)
+
+	// 使用公共函数记录工具调用开始
+	message.BroadcastToolStart("get stock company code", fmt.Sprintf("stock_name: %s", param.StockName))
+
+	// 参数校验
 	if param.StockName == "" {
-		return "", fmt.Errorf("stock name is empty")
-	}
-	stockName := param.StockName
-	if stockName == "" && len(stockName) < 2 {
-		return "", fmt.Errorf("stock name is too short")
-	}
-	resp := &model.SearchResponse{}
-	client := mas_utils.GetRestyClient()
-	getResp, err := client.R().SetResult(resp).Get(model.FinanceSearchCode + stockName)
-	if err != nil {
+		err := fmt.Errorf("stock name is empty")
+		message.BroadcastToolEnd("get stock company code", "", err)
 		return "", err
 	}
-	if len(resp.Stock) > 0 {
-		log.Infof("get company info  : %s", mas_utils.ToJSONString(resp.Stock[0]))
-		return mas_utils.ToJSONString(resp.Stock[0]), nil
+	if len(param.StockName) < 2 {
+		err := fmt.Errorf("stock name is too short, minimum length is 2")
+		message.BroadcastToolEnd("get stock company code", "", err)
+		return "", err
 	}
-	log.Errorf("getResp fail : %v", getResp)
-	return "", nil
 
+	// 发起请求
+	resp := &model.SearchResponse{}
+	client := mas_utils.GetRestyClient()
+	_, err := client.R().SetResult(resp).Get(model.FinanceSearchCode + param.StockName)
+	if err != nil {
+		log.Errorf("failed to get stock company code: %v", err)
+		message.BroadcastToolEnd("get stock company code", "", err)
+		return "", err
+	}
+
+	// 处理响应
+	if len(resp.Stock) > 0 {
+		msg := mas_utils.ToJSONString(resp.Stock[0])
+		message.BroadcastToolEnd("get stock company code", fmt.Sprintf("找到股票: %s", msg), nil)
+		log.Debugf("found company info: %s", msg)
+		return msg, nil
+	}
+
+	err = fmt.Errorf("no stock found for name: %s", param.StockName)
+	message.BroadcastToolEnd("get stock company code", "", err)
+	log.Warnf("no stock found for name: %s", param.StockName)
+	return "", err
 }
