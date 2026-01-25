@@ -3,7 +3,6 @@ package tui
 import (
 	"context"
 	"fmt"
-	"io"
 	"msa/pkg/config"
 	"msa/pkg/logic/agent"
 	command "msa/pkg/logic/command"
@@ -11,29 +10,28 @@ import (
 	"msa/pkg/tui/style"
 	"strings"
 
-	listStyle "github.com/charmbracelet/lipgloss/list"
-	"github.com/cloudwego/eino/schema"
-
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	listStyle "github.com/charmbracelet/lipgloss/list"
 	log "github.com/sirupsen/logrus"
 )
 
 // Chat TUI聊天模型
 type Chat struct {
-	textInput         textinput.Model                       // 文本输入组件
-	history           []model.Message                       // 历史消息
-	pendingMsgs       []model.Message                       // 待 flush 的消息
-	ctx               context.Context                       // 上下文
-	width             int                                   // 终端宽度
-	height            int                                   // 终端高度
-	cmdFlag           bool                                  // 是否处于命令模式
-	cmdList           []string                              // 命令列表
-	streamingMsg      string                                // 流式输出的临时内容
-	isStreaming       bool                                  // 是否正在流式输出
-	streamReader      *schema.StreamReader[*schema.Message] // 流式读取器
-	fullStreamContent strings.Builder                       // 完整的流式内容
+	textInput         textinput.Model           // 文本输入组件
+	history           []model.Message           // 历史消息
+	pendingMsgs       []model.Message           // 待 flush 的消息
+	ctx               context.Context           // 上下文
+	width             int                       // 终端宽度
+	height            int                       // 终端高度
+	cmdFlag           bool                      // 是否处于命令模式
+	cmdList           []string                  // 命令列表
+	streamingMsg      string                    // 流式输出的临时内容
+	isStreaming       bool                      // 是否正在流式输出
+	fullStreamContent strings.Builder           // 完整的流式内容
+	streamOutputCh    <-chan *agent.StreamChunk // 流式输出 channel
+	streamUnregister  func()                    // 取消订阅函数
 }
 
 // maskAPIKey 隐藏 APIKey，只显示前4个和后4个字符
@@ -140,14 +138,14 @@ func (c *Chat) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		c.height = msg.Height
 		c.textInput.Width = msg.Width - 10
 
-	case streamChunkMsg:
-		if msg.err != nil {
+	case *agent.StreamChunk:
+		if msg.Err != nil {
 			c.clearStreamState()
-			c.addMessage(model.RoleSystem, fmt.Sprintf("接收消息失败: %v", msg.err))
+			c.addMessage(model.RoleSystem, fmt.Sprintf("接收消息失败: %v", msg.Err))
 			return c, c.Flush()
 		}
 
-		if msg.isEnd {
+		if msg.IsDone {
 			fullContent := c.fullStreamContent.String()
 			log.Infof("stream end: %s", fullContent)
 			c.clearStreamState()
@@ -163,26 +161,19 @@ func (c *Chat) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		// 跳过空消息（继续接收下一个）
-		if msg.content == "" && !msg.isToolCall {
+		if msg.Content == "" {
 			return c, c.receiveNextChunk()
 		}
 
-		// 处理工具调用消息
-		if msg.isToolCall {
-			if msg.content != "" {
-				c.addMessage(model.RoleSystem, msg.content)
-			}
-			return c, tea.Batch(c.Flush(), c.receiveNextChunk())
-		}
-
 		// 正常流式内容
-		c.fullStreamContent.WriteString(msg.content)
+		c.fullStreamContent.WriteString(msg.Content)
 
-		if msg.isFirst {
+		isFirst := c.fullStreamContent.Len() == len(msg.Content)
+		if isFirst {
 			c.streamingMsg = style.ChatSystemMsgStyle.Render("🤖 MSA: ") +
-				style.ChatNormalMsgStyle.Render(msg.content)
+				style.ChatNormalMsgStyle.Render(msg.Content)
 		} else {
-			c.streamingMsg += style.ChatNormalMsgStyle.Render(msg.content)
+			c.streamingMsg += style.ChatNormalMsgStyle.Render(msg.Content)
 		}
 
 		return c, c.receiveNextChunk()
@@ -221,15 +212,24 @@ func (c *Chat) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return c, tea.Quit
 			}
 
-			// 发起聊天请求
-			streamResult, err := agent.Ask(c.ctx, input, c.history)
+			// 先注册订阅，确保不丢失消息
+			c.streamOutputCh, c.streamUnregister = agent.RegisterStreamOutput(100)
+
+			// 发起聊天请求（Ask 会在后台异步处理并通过 StreamOutputManager 广播流式数据）
+			err := agent.Ask(c.ctx, input, c.history)
 			if err != nil {
 				log.Errorf("chat error: %v", err)
+				// 清理订阅
+				if c.streamUnregister != nil {
+					c.streamUnregister()
+					c.streamUnregister = nil
+				}
+				c.streamOutputCh = nil
 				c.addMessage(model.RoleSystem, "聊天出错: "+err.Error())
 				return c, c.Flush()
 			}
 
-			return c, tea.Batch(c.Flush(), c.reportStream(streamResult))
+			return c, tea.Batch(c.Flush(), c.startStreaming())
 
 		case tea.KeyCtrlK:
 			c.textInput.Reset()
@@ -420,68 +420,34 @@ func (c *Chat) commandHandler(input string) (tea.Model, tea.Cmd) {
 	return c, c.Flush()
 }
 
-// streamChunkMsg 流式消息块
-type streamChunkMsg struct {
-	content    string
-	isFirst    bool
-	isEnd      bool
-	isToolCall bool
-	err        error
-}
-
-// reportStream 启动流式输出
-func (c *Chat) reportStream(sr *schema.StreamReader[*schema.Message]) tea.Cmd {
-	c.streamReader = sr
+// startStreaming 启动流式输出（订阅已在调用 Ask 之前完成）
+func (c *Chat) startStreaming() tea.Cmd {
 	c.isStreaming = true
 	c.streamingMsg = style.ChatNormalMsgStyle.Render("⏳ 正在思考...")
 	c.fullStreamContent.Reset()
+
+	// 注意：订阅已在调用 Ask 之前完成，Ask 会通过 toolCallChecker 广播数据
+	// 这里直接开始从 streamOutputCh 接收
 	return c.receiveNextChunk()
 }
 
-// receiveNextChunk 接收下一个流式消息块
+// receiveNextChunk 接收下一个流式消息块（从 StreamOutputManager 的 channel 接收）
 func (c *Chat) receiveNextChunk() tea.Cmd {
 	return func() tea.Msg {
-		if c.streamReader == nil {
-			return streamChunkMsg{err: fmt.Errorf("stream reader is nil")}
+		if c.streamOutputCh == nil {
+			return &agent.StreamChunk{Err: fmt.Errorf("stream output channel is nil")}
 		}
 
-		message, err := c.streamReader.Recv()
-		if err == io.EOF {
-			c.streamReader.Close()
-			return streamChunkMsg{isEnd: true}
-		}
-		if err != nil {
-			c.streamReader.Close()
-			log.Errorf("recv failed: %v", err)
-			return streamChunkMsg{err: err}
+		// 从 channel 接收数据
+		chunk, ok := <-c.streamOutputCh
+		if !ok {
+			// channel 已关闭
+			return &agent.StreamChunk{IsDone: true}
 		}
 
-		// 处理工具调用
-		if len(message.ToolCalls) > 0 {
-			toolCallInfo := ""
-			for _, tc := range message.ToolCalls {
-				if tc.Function.Name != "" {
-					toolCallInfo += fmt.Sprintf("🔧 调用工具: %s\n", tc.Function.Name)
-				}
-			}
-			// 只有当确实有工具名称时才返回工具调用消息
-			if toolCallInfo != "" {
-				return streamChunkMsg{
-					content:    toolCallInfo,
-					isToolCall: true,
-				}
-			}
-		}
-
-		// 跳过空消息（工具调用过程中可能产生）
-		if message.Content == "" {
-			return streamChunkMsg{}
-		}
-
-		return streamChunkMsg{
-			content: message.Content,
-			isFirst: c.fullStreamContent.Len() == 0,
-		}
+		log.Infof("recv chunk: Content=%s, IsDone=%v, Err=%v", chunk.Content, chunk.IsDone, chunk.Err)
+		// 直接返回接收到的 chunk
+		return chunk
 	}
 }
 
@@ -489,5 +455,11 @@ func (c *Chat) receiveNextChunk() tea.Cmd {
 func (c *Chat) clearStreamState() {
 	c.isStreaming = false
 	c.streamingMsg = ""
-	c.streamReader = nil
+
+	// 取消订阅并清理 channel
+	if c.streamUnregister != nil {
+		c.streamUnregister()
+		c.streamUnregister = nil
+	}
+	c.streamOutputCh = nil
 }
