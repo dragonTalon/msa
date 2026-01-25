@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"io"
 	"msa/pkg/config"
+	msamessage "msa/pkg/logic/message"
 	tools2 "msa/pkg/logic/tools"
 	"msa/pkg/model"
+	msamodel "msa/pkg/model"
 
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/flow/agent/react"
@@ -65,20 +67,20 @@ func GetChatModel(ctx context.Context) (*react.Agent, error) {
 func toolCallChecker(ctx context.Context, sr *schema.StreamReader[*schema.Message]) (bool, error) {
 	defer sr.Close()
 
-	streamManager := GetStreamManager()
+	streamManager := msamessage.GetStreamManager()
 
 	for {
 		msg, err := sr.Recv()
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				// 发送结束标记
-				streamManager.Broadcast(&StreamChunk{
+				streamManager.Broadcast(&msamodel.StreamChunk{
 					IsDone: true,
 				})
 				break
 			}
 			// 发送错误
-			streamManager.Broadcast(&StreamChunk{
+			streamManager.Broadcast(&msamodel.StreamChunk{
 				Err:    err,
 				IsDone: true,
 			})
@@ -91,9 +93,18 @@ func toolCallChecker(ctx context.Context, sr *schema.StreamReader[*schema.Messag
 			log.Infof("tool call: %v", msg.ToolCalls)
 			return true, nil
 		}
+		if msg.ReasoningContent != "" {
+			// 广播给所有订阅者
+			streamManager.Broadcast(&msamodel.StreamChunk{
+				Content: msg.ReasoningContent,
+				MsgType: model.StreamMsgTypeReason,
+			})
+			return false, nil
+		}
 		// 广播给所有订阅者
-		streamManager.Broadcast(&StreamChunk{
+		streamManager.Broadcast(&msamodel.StreamChunk{
 			Content: msg.Content,
+			MsgType: model.StreamMsgTypeText,
 		})
 	}
 
@@ -135,17 +146,17 @@ func Ask(ctx context.Context, messages string, history []model.Message) error {
 
 	// 启动异步流式处理
 	go func() {
-		streamResult, err := chatModel.Stream(ctx, queryMsg)
+		// 发送流式请求
+		_, err := chatModel.Stream(ctx, queryMsg)
 		if err != nil {
 			log.Errorf("流式请求失败: %v", err)
 			// 广播错误
-			GetStreamManager().Broadcast(&StreamChunk{
+			msamessage.GetStreamManager().Broadcast(&msamodel.StreamChunk{
 				Err:    err,
 				IsDone: true,
 			})
 			return
 		}
-		log.Infof("streamResult: %v", streamResult)
 	}()
 
 	return nil

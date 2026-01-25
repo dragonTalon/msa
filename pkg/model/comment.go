@@ -37,6 +37,7 @@ const (
 
 // Message 聊天消息结构
 type Message struct {
-	Role    MessageRole // 消息角色
-	Content string      // 消息内容
+	Role    MessageRole   // 消息角色
+	Content string        // 消息内容
+	MsgType StreamMsgType // 消息类型（text/tool/reason）
 }
