@@ -88,7 +88,7 @@ func (m *StreamOutputManager) SubscriberCount() int {
 // params: 工具参数描述
 func BroadcastToolStart(toolName string, params string) {
 	globalStreamManager.Broadcast(&msamodel.StreamChunk{
-		Content: fmt.Sprintf("\n正在调用工具: %s, 参数: %s\n", toolName, params),
+		Content: fmt.Sprintf("\n正在调用工具: %s, 参数: %s", toolName, params),
 		MsgType: msamodel.StreamMsgTypeTool,
 	})
 	log.Debugf("Tool [%s] started with params: %s", toolName, params)
@@ -101,14 +101,14 @@ func BroadcastToolStart(toolName string, params string) {
 func BroadcastToolEnd(toolName string, result string, err error) {
 	if err != nil {
 		globalStreamManager.Broadcast(&msamodel.StreamChunk{
-			Content: fmt.Sprintf("工具 %s 执行失败: %v\n\n", toolName, err),
+			Content: fmt.Sprintf("工具 %s 执行失败: %v\n", toolName, err),
 			MsgType: msamodel.StreamMsgTypeTool,
 			Err:     err,
 		})
 		log.Errorf("Tool [%s] failed: %v", toolName, err)
 	} else {
 		globalStreamManager.Broadcast(&msamodel.StreamChunk{
-			Content: fmt.Sprintf("工具 %s 执行完成: %s\n\n", toolName, result),
+			Content: fmt.Sprintf("工具 %s 执行完成: %s\n", toolName, result),
 			MsgType: msamodel.StreamMsgTypeTool,
 		})
 		log.Debugf("Tool [%s] completed: %s", toolName, result)

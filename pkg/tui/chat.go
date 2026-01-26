@@ -338,7 +338,7 @@ func (c *Chat) chatStreamMsg(msg *model.StreamChunk) (tea.Model, tea.Cmd) {
 
 	if isFirst {
 		c.streamingMsg = style.ChatSystemMsgStyle.Render("🤖 MSA: ") +
-			contentStyle.Render(msg.Content)
+			contentStyle.Render(msg.Content) + "\n"
 	} else {
 		c.streamingMsg += contentStyle.Render(msg.Content)
 	}
