@@ -1,20 +1,20 @@
-# Creating Fix Artifacts
+# 创建修复工件
 
-Create `fix.md` when encountering unexpected errors, bugs, performance issues, config problems, or design flaws.
+当遇到意外错误、bug、性能问题、配置问题或设计缺陷时创建 `fix.md`。
 
-## Quick Start
+## 快速开始
 
 ```bash
 /opsx:continue
-# Choose to create fix.md
+# 选择创建 fix.md
 ```
 
-## Frontmatter
+## 前置信息
 
 ```yaml
 ---
 id: "003"
-title: "Descriptive title"
+title: "描述性标题"
 type: "runtime"              # runtime|compile|logic|config
 severity: "high"             # critical|high|medium|low
 component: "component-name"
@@ -28,33 +28,33 @@ status: "resolved"           # open|investigating|resolved|cancelled
 ---
 ```
 
-## Required Sections
+## 必需部分
 
-### Problem
+### 问题
 
-- What happened?
-- What should have happened?
-- Reproduction steps
-- Error messages with stack traces
-- Impact assessment (user/system/business)
+- 发生了什么？
+- 应该发生什么？
+- 重现步骤
+- 错误消息和堆栈跟踪
+- 影响评估（用户/系统/业务）
 
-### Root Cause
+### 根本原因
 
-- Investigation process
-- Root cause statement
-- Contributing factors
-- Related files with line numbers
+- 调查过程
+- 根本原因陈述
+- 促成因素
+- 带行号的相关文件
 
-### Solution
+### 解决方案
 
-- Solution approach
-- Alternatives considered
-- Changes made (use diff format)
+- 解决方案方法
+- 考虑的替代方案
+- 代码变更（使用diff格式）
 
 ```markdown
-#### Add timeout context
+#### 添加超时上下文
 
-**File**: `src/handlers/streaming.ts`
+**文件**：`src/handlers/streaming.ts`
 
 ```diff
 + export function createStreamingContext(timeout: number) {
@@ -64,37 +64,37 @@ status: "resolved"           # open|investigating|resolved|cancelled
 + }
 ```
 
-**Description**: Added abort controller for timeout handling
-**Reason**: Allows proper cleanup when timeout occurs
+**说明**：添加了超时处理的abort controller
+**原因**：允许超时时适当清理
 ```
 
-### Verification
+### 验证
 
-- How to verify (steps)
-- Test results
+- 如何验证（步骤）
+- 测试结果
 
-## Critical: Pattern Extraction
+## 关键：模式提取
 
-This builds the knowledge base!
+这构建知识库！
 
-### Reusable Pattern (if applicable)
+### 可复用模式（如适用）
 
-If the solution is generalizable:
+如果解决方案可泛化：
 
 ```markdown
-## Reusable Pattern
+## 可复用模式
 
-**Pattern Name**: Non-Blocking Channel Send with Timeout
-**Pattern ID**: p005
+**模式名称**：带超时的非阻塞通道发送
+**模式ID**：p005
 
-**Description**:
-Use non-blocking operations with timeout handling to prevent deadlocks.
+**描述**：
+使用非阻塞操作配合超时处理以防止死锁。
 
-**When to Use**:
-- All streaming operations
-- Any channel send in async context
+**适用场景**：
+- 所有流式操作
+- 任何异步上下文中的通道发送
 
-**Implementation**:
+**实现**：
 ```typescript
 function sendWithTimeout<T>(
   channel: Channel<T>,
@@ -103,89 +103,89 @@ function sendWithTimeout<T>(
 ): boolean {
   const result = channel.trySend(value);
   if (!result) {
-    throw new Error(`Channel send timed out after ${timeout}ms`);
+    throw new Error(`通道发送在 ${timeout}ms 后超时`);
   }
   return result;
 }
 ```
 ```
 
-### Anti-Pattern (if applicable)
+### 反模式（如适用）
 
 ```markdown
-## Anti-Pattern Identified
+## 反模式
 
-**Anti-Pattern Name**: Blocking Channel Send in Async Context
-**Anti-Pattern ID**: a003
+**反模式名称**：异步上下文中的阻塞通道发送
+**反模式ID**：a003
 
-**Why Problematic**:
-Blocking sends in async contexts cause deadlocks when buffer is full.
+**问题所在**：
+异步上下文中的阻塞发送在缓冲区满时会导致死锁。
 
-**Avoid**:
+**避免**：
 ```typescript
-// DON'T
-channel.send(value);  // May block indefinitely
+// 不要这样做
+channel.send(value);  // 可能无限期阻塞
 ```
 ```
 
-## Lessons Learned
+## 经验教训
 
 ```markdown
-## Lessons Learned
+## 经验教训
 
-### What Went Wrong
-- Assumed channel would never be full
-- Didn't consider timeout interaction with blocking sends
-- Missing tests for timeout scenarios
+### 出了什么问题
+- 假设通道永远不会满
+- 没有考虑超时与阻塞发送的交互
+- 缺少超时场景的测试
 
-### What We Learned
-- Always consider channel capacity in async code
-- Timeout handling requires non-blocking operations
-- Need comprehensive tests for edge cases
+### 学到了什么
+- 在异步代码中总是考虑通道容量
+- 超时处理需要非阻塞操作
+- 需要边缘情况的全面测试
 
-### Preventive Measures
-1. Add validation for channel capacity
-2. Use non-blocking operations in async contexts
-3. Add tests for timeout scenarios
-4. Document channel behavior patterns
+### 预防措施
+1. 添加通道容量假设的验证
+2. 在所有异步上下文中使用非阻塞操作
+3. 添加超时和溢出场景的测试
+4. 记录通道行为模式
 ```
 
-## Quality Checklist
+## 质量清单
 
-- [ ] Clear, descriptive title
-- [ ] Complete frontmatter
-- [ ] Problem clearly described
-- [ ] Reproduction steps
-- [ ] Error messages/logs
-- [ ] Impact assessed
-- [ ] Root cause identified
-- [ ] Related files linked
-- [ ] Solution documented with code changes
-- [ ] Verification steps
-- [ ] Test results
-- [ ] Pattern extracted (if applicable)
-- [ ] Anti-pattern documented (if applicable)
-- [ ] Lessons learned documented
+- [ ] 清晰的描述性标题
+- [ ] 完整的前置信息
+- [ ] 清楚描述问题
+- [ ] 重现步骤
+- [ ] 错误消息/日志
+- [ ] 影响评估
+- [ ] 识别根本原因
+- [ ] 链接相关文件
+- [ ] 记录解决方案
+- [ ] 验证步骤
+- [ ] 测试结果
+- [ ] 提取模式（如适用）
+- [ ] 记录反模式（如适用）
+- [ ] 记录经验教训
 
-## After Creating Fix
+## 创建修复后
 
-1. Complete the fix
-2. Verify thoroughly
-3. Archive: `/opsx:archive`
-4. Collect knowledge: `/opsx:collect`
+1. 完成修复
+2. 彻底验证
+3. 归档：`/opsx:archive`
+4. 收集知识：`/opsx:collect`
 
-The fix will be processed into the knowledge base automatically!
+修复将自动处理到知识库！
 
-## Common Mistakes
+## 常见错误
 
-❌ **Too vague**: "Fixed a bug"
-✅ **Specific**: "Fixed channel blocking by adding non-blocking send"
+❌ **太模糊**："修复了一个bug"
+✅ **具体**："通过添加非阻塞发送修复通道阻塞问题"
 
-❌ **No root cause**: "It didn't work"
-✅ **Root cause**: "Channel.send() blocked because buffer was full"
+❌ **没有根本原因**："不工作"
+✅ **根本原因**："Channel.send() 阻塞因为缓冲区已满"
 
-❌ **No verification**: "Should work now"
-✅ **Verified**: "Tested with 1000 concurrent requests, no deadlocks"
+❌ **没有验证**："现在应该工作"
+✅ **已验证**："测试了1000个并发请求，无死锁"
 
-❌ **No pattern**: "Just fixed it"
-✅ **Pattern extracted**: "Created pattern p005 for non-blocking sends"
+❌ **没有模式**："只是修复了它"
+✅ **提取模式**："为非阻塞发送创建模式 p005"
