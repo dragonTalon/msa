@@ -1,37 +1,36 @@
-# Creating Knowledge-Aware Design
+# 创建知识感知设计
 
-You are creating design for: **{{changeName}}**
+你正在为变更创建设计：**{{changeName}}**
 
-## Context
+## 上下文
 
-Your design should:
-1. Apply recommended patterns from knowledge base
-2. Avoid documented anti-patterns
-3. Address historical issues proactively
-4. Consider edge cases that caused problems before
+你的设计应该：
+1. 应用知识库中推荐的模式
+2. 避免记录的反模式
+3. 主动解决历史问题
+4. 考虑过去导致问题的边缘情况
 
-## Step 1: Patterns to Apply
+## 步骤1：应用推荐模式
 
 ```markdown
-## Recommended Patterns
+## 推荐模式
 
-✅ From knowledge base, apply these patterns:
+✅ 基于知识库，推荐以下模式：
 
-### Non-Blocking Stream Channel Pattern
+### 非阻塞流通道模式
 
-**Pattern ID**: p001
-**From Issue**: #001 - Streaming timeout causes channel block
+**模式ID**：p001
+**来源问题**：#001 - 流超时导致通道阻塞
 
-**Description**:
-Use non-blocking channel operations with select statements to handle
-timeouts gracefully without deadlocks.
+**描述**：
+使用非阻塞通道操作配合select语句，优雅处理超时而不死锁。
 
-**When to Use**:
-- All streaming operations
-- Async operations with timeouts
-- Producer-consumer patterns
+**适用场景**：
+- 所有流式操作
+- 带超时的异步操作
+- 生产者-消费者模式
 
-**Implementation**:
+**实现**：
 ```typescript
 async function sendWithTimeout<T>(
   channel: Channel<T>,
@@ -52,58 +51,74 @@ async function sendWithTimeout<T>(
   }
 }
 ```
+
+**收益**：
+- 防止死锁
+- 优雅的超时处理
+- 清晰的错误消息
+- 可预测的行为
 ```
 
-## Step 2: Anti-Patterns to Avoid
+## 步骤2：避免反模式
 
 ```markdown
-## Anti-Patterns to Avoid
+## 避免的反模式
 
-⚠️ Documented anti-patterns:
+⚠️ 已记录以下反模式：
 
-### Blocking Channel Send in Streaming Context
+### 流上下文中的阻塞通道发送
 
-**Anti-Pattern ID**: a001
-**From Issue**: #001
+**反模式ID**：a001
+**来源问题**：#001 - 流超时导致通道阻塞
 
-**Why Problematic**:
-Blocking sends cause deadlocks when channel buffer is full or timeout occurs.
+**问题所在**：
+当以下情况时阻塞发送会导致死锁：
+- 通道缓冲区已满
+- 发送期间超时
+- 多个操作同时阻塞
 
-**Impact**:
-- High severity - system hangs
-- Difficult to debug
+**影响**：
+- 高严重性 - 系统挂起
+- 难以调试
+- 影响所有连接的操作
 
-**Don't**:
+**不要这样做**：
 ```typescript
-// DON'T
-channel.send(value);  // Blocks!
+// 不要这样做
+function sendValue<T>(channel: Channel<T>, value: T) {
+  channel.send(value);  // 如果满了会无限期阻塞！
+}
 ```
 
-**Do**:
+**应该这样做**：
 ```typescript
-// DO
-const sent = await channel.trySend(value);
-if (!sent) throw new Error('Channel full');
+// 应该这样做
+async function sendValue<T>(channel: Channel<T>, value: T) {
+  const sent = await channel.trySend(value);
+  if (!sent) {
+    throw new Error('通道已满 - 需要背压处理');
+  }
+}
 ```
 ```
 
-## Step 3: Component Design with Patterns
-
-When designing components, reference patterns:
+## 步骤3：组件设计应用模式
 
 ```markdown
+## 组件
+
 ### StreamingHandler
 
-> 📚 **Knowledge Note**: Addresses issue #001 where timeout handling
-> caused channel blocks.
+> 📚 **知识备注**：此组件解决问题 #001，其中超时处理
+> 导致通道阻塞。
 
-**Key Decisions** (from pattern p001):
-1. Non-blocking channel operations
-2. Abort controller for cancellation
-3. Timeout monitoring
-4. Clear error messages
+**关键决策**（来自模式 p001）：
+1. 使用非阻塞通道操作
+2. 实现取消的abort controller
+3. 添加超时监控
+4. 提供清晰的错误消息
 
-**Interface**:
+**接口**：
 ```typescript
 interface StreamingHandler {
   withTimeout(ms: number): StreamingHandler;
@@ -113,21 +128,21 @@ interface StreamingHandler {
 ```
 ```
 
-## Step 4: Error Handling from History
+## 步骤4：错误处理
 
-Apply lessons from historical issues:
+应用历史问题的教训：
 
 ```markdown
-## Error Handling
+## 错误处理
 
-### Timeout Error
+### 超时错误
 
-> 📚 **Historical Context**: From issue #001
+> 📚 **历史上下文**：来自问题 #001
 
-**Previous Problem**:
-Timeouts left channels blocked, causing cascading failures.
+**以前的问题**：
+超时导致通道阻塞，引起级联故障。
 
-**Improved Handling**:
+**改进的错误处理**：
 ```typescript
 class TimeoutError extends Error {
   constructor(
@@ -135,63 +150,66 @@ class TimeoutError extends Error {
     public timeout: number,
     public elapsed: number
   ) {
-    super(`Operation '${operation}' timed out after ${elapsed}ms`);
+    super(`操作 '${operation}' 在 ${elapsed}ms 后超时（限制：${timeout}ms）`);
   }
 }
 
-// Handler ensures cleanup
+// 处理器确保清理
 function handleTimeout(error: TimeoutError) {
   abortController.abort();
-  channel.close();  // Non-blocking
+  channel.close();
   cleanup();
-  logger.error('Timeout', { operation, timeout, elapsed });
+  logger.error('超时发生', { operation, timeout, elapsed });
   notify(error);
 }
 ```
 ```
 
-## Step 5: Testing Strategy
+## 步骤5：测试策略
 
-Include tests for historical issues:
+包含历史问题的测试：
 
 ```markdown
-## Testing
+## 测试
 
-### Unit Tests
+### 单元测试
 
-**Test Pattern Application**:
+**测试模式应用**：
 ```typescript
-describe('Non-blocking send (pattern p001)', () => {
-  it('should handle full channel without blocking', async () => {
+describe('非阻塞发送（模式 p001）', () => {
+  it('应该无阻塞地处理满通道', async () => {
     const channel = new Channel<string>(1);
     channel.send('first');
 
     await expect(
       sendWithTimeout(channel, 'second', 100)
-    ).rejects.toThrow('Channel full');
+    ).rejects.toThrow('通道已满');
   });
 });
 ```
 
-**Test Anti-Pattern Prevention**:
+**测试反模式预防**：
 ```typescript
-describe('Anti-pattern a001 prevention', () => {
-  it('should never block indefinitely', async () => {
+describe('反模式 a001 预防', () => {
+  it('应该永远不无限期阻塞', async () => {
+    const timeout = 100;
     const start = Date.now();
+
     try {
-      await sendWithTimeout(blockingChannel, 'value', 100);
-    } catch (e) { /* expected */ }
+      await sendWithTimeout(blockingChannel, 'value', timeout);
+    } catch (e) { /* 预期 */ }
+
     const elapsed = Date.now() - start;
-    expect(elapsed).toBeLessThan(200);  // Should not exceed 2x timeout
+    expect(elapsed).toBeLessThan(timeout * 2);
   });
 });
 ```
 
-### Regression Tests
+### 回归测试
 
 ```typescript
-describe('Issue #001 regression test', () => {
-  it('should handle timeout without deadlock', async () => {
+describe('问题 #001 回归测试', () => {
+  it('应该无死锁地处理超时', async () => {
     const handler = new StreamingHandler({ timeout: 100 });
     const result = await handler.stream(slowSource);
     expect(result.status).toBe('timeout');
@@ -201,13 +219,13 @@ describe('Issue #001 regression test', () => {
 ```
 ```
 
-## Verification Checklist
+## 验证清单
 
-- [ ] Recommended patterns applied
-- [ ] Anti-patterns explicitly avoided
-- [ ] Historical issues addressed
-- [ ] Edge cases considered
-- [ ] Error handling improved from past
-- [ ] Tests for historical issues included
-- [ ] Monitoring for past problems added
-- [ ] Knowledge references documented
+- [ ] 应用了推荐模式
+- [ ] 明确避免了反模式
+- [ ] 解决了历史问题
+- [ ] 考虑了边缘情况
+- [ ] 从过去改进了错误处理
+- [ ] 包含历史问题的测试
+- [ ] 为过去问题添加了监控
+- [ ] 记录了知识引用

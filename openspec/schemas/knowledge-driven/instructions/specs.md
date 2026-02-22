@@ -1,121 +1,127 @@
-# Creating Knowledge-Aware Specifications
+# 创建知识感知规格
 
-You are creating specs for: **{{changeName}}**
+你正在为变更创建规格：**{{changeName}}**
 
-## Context
+## 上下文
 
-Specs should be informed by:
-1. Proposal's knowledge context (historical issues, patterns, anti-patterns)
-2. Requirements addressing past problems
-3. Scenarios testing historical edge cases
+规格应该基于以下信息：
+1. 提案的知识上下文（历史问题、模式、反模式）
+2. 解决过去问题的需求
+3. 测试历史边缘情况的场景
 
-## Knowledge-Informed Requirements
+## 知识感知需求
 
-When a requirement addresses a historical issue:
-
-```markdown
-### [R-1] Proper Timeout Handling
-
-> 📚 **Knowledge Context**: Based on issue #001
-
-**Historical Problem**:
-Streaming operations blocked indefinitely when timeouts occurred.
-
-**Informed Requirement**:
-The system MUST handle timeouts gracefully without blocking.
-
-**Acceptance Criteria**:
-- [ ] Timeout configuration is required
-- [ ] Operations cancel when timeout occurs
-- [ ] Resources cleaned up on timeout
-- [ ] Clear timeout error messages
-
-**Prevention Measures**:
-- Use non-blocking operations
-- Implement proper cancellation
-- Add timeout monitoring
-```
-
-## Edge Case Scenarios
-
-Include scenarios for historical edge cases:
+当需求解决历史问题时：
 
 ```markdown
-### Scenario: Streaming with Timeout
+### [R-1] 适当的超时处理
 
-> 📚 **Knowledge Note**: Issue #001 - Streaming timeout causes channel block
+> 📚 **知识上下文**：基于问题 #001
 
-**Given**:
-- Streaming request with 30-second timeout
-- Data source takes 35 seconds
+**历史问题**：
+流式操作在超时后会无限期阻塞，导致整个流处理器挂起。
 
-**When**:
-- Timeout expires
-- Data arrives after timeout
+**知情的需求**：
+系统必须优雅地处理超时而不阻塞。
 
-**Then**:
-- Operation cancelled
-- Resources cleaned up
-- User receives timeout error
-- No deadlocks occur
+**验收标准**：
+- [ ] 超时配置是必需的
+- [ ] 超时时操作取消
+- [ ] 超时时清理资源
+- [ ] 用户收到清晰的超时错误消息
+
+**预防措施**：
+- 使用非阻塞操作
+- 实现适当的取消
+- 添加超时监控
 ```
 
-## Security from Knowledge
+## 边缘情况场景
 
-If historical security issues exist:
+包含历史边缘情况的场景：
 
 ```markdown
-### Security Considerations
+#### 场景：带超时的流
 
-⚠️ **Historical Security Issues**:
+> 📚 **知识备注**：问题 #001 - 流超时导致通道阻塞
 
-**#012**: SQL Injection in Search
-- Vulnerability: Unescaped user input
-- Prevention: Use parameterized queries
+**给定**：
+- 带有30秒超时的流请求
+- 数据源需要35秒响应
 
-**Requirements**:
-- [ ] All user input parameterized
-- [ ] Sensitive data redacted from logs
+**当**：
+- 超时到期
+- 数据在超时后到达
+
+**那么**：
+- 操作被取消
+- 资源被清理
+- 用户收到超时错误
+- 没有数据丢失或损坏
+- 没有死锁发生
 ```
 
-## Performance from Knowledge
+## 安全知识
 
-Address historical performance issues:
+如果存在历史安全问题：
 
 ```markdown
-### Performance
+### 安全考虑
 
-Based on issue #008 (memory leak in streaming):
+⚠️ **历史安全问题**：
 
-**Memory Requirements**:
-- [ ] Constant memory usage during streaming
-- [ ] No leaks in long-running operations
-- [ ] Proper buffer cleanup
+**#012**：搜索中的SQL注入
+- 漏洞：未转义的用户输入
+- 预防：使用参数化查询
 
-**Response Time**:
-- [ ] API responses under 200ms (p95)
-- [ ] Timeout configuration honored
+**#023**：认证令牌泄漏
+- 漏洞：令牌以明文记录
+- 预防：在日志中编辑敏感数据
+
+**需求**：
+- [ ] 所有用户输入参数化
+- [ ] 敏感数据从日志中编辑
+- [ ] 认证令牌加密存储
 ```
 
-## Knowledge References
+## 性能知识
 
-At the end, add:
+解决历史性能问题：
+
+```markdown
+### 性能
+
+基于问题 #008（流中的内存泄漏）：
+
+**内存需求**：
+- [ ] 流期间内存使用保持恒定
+- [ ] 长时间运行操作中没有内存泄漏
+- [ ] 缓冲区和流的适当清理
+
+**响应时间**：
+- [ ] API响应在200ms以下（p95）
+- [ ] 超时配置被精确遵守
+```
+
+## 知识引用
+
+在最后添加：
 
 ```markdown
 ---
 
-**Knowledge References**:
-- issue: #001 - Streaming timeout causes channel block
-- pattern: p001 - Non-blocking stream channel pattern
-- anti-pattern: a001 - Blocking channel send
+**知识引用**：
+- 问题：#001 - 流超时导致通道阻塞
+- 模式：p001 - 非阻塞流通道模式
+- 反模式：a001 - 阻塞通道发送
 ```
 
-## Verification Checklist
+## 验证清单
 
-- [ ] Requirements informed by knowledge (where applicable)
-- [ ] Historical issues referenced
-- [ ] Edge cases from past issues included
-- [ ] Security considerations from past incidents
-- [ ] Performance issues addressed
-- [ ] Knowledge references tagged
-- [ ] Scenarios test preventive measures
+- [ ] 需求基于知识信息（如适用）
+- [ ] 历史问题被引用
+- [ ] 包含过去问题的边缘情况
+- [ ] 包含过去事件的安全考虑
+- [ ] 解决了性能问题
+- [ ] 知识引用已标记
+- [ ] 场景测试预防措施

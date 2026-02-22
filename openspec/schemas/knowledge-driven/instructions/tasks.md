@@ -1,179 +1,182 @@
-# Creating Knowledge-Aware Tasks
+# 创建知识感知任务
 
-You are creating tasks for: **{{changeName}}**
+你正在为变更创建任务：**{{changeName}}**
 
-## Context
+## 上下文
 
-Tasks should:
-1. Be aware of historical issues and complexity
-2. Include tasks preventing past problems
-3. Add verification based on past failures
-4. Consider difficulty of similar past changes
+任务分解应该：
+1. 了解历史问题及其复杂性
+2. 包含防止过去问题的任务
+3. 基于过去失败添加验证任务
+4. 考虑类似过去变更的难度
 
-## Step 1: Risk Assessment from Knowledge
+## 步骤1：知识风险分析
 
 ```markdown
-## ⚠️ Risk Alerts
+## ⚠️ 风险警报
 
-Based on historical issues:
+基于历史问题识别了以下风险：
 
-### HIGH: Timeout-Related Deadlocks
-- **Issue**: #001 - Streaming timeout causes channel block
-- **Risk**: Similar timeout handling could cause deadlocks
-- **Mitigation**: Use pattern p001 for all channel operations
+### 高：超时相关的死锁
 
-### MEDIUM: Memory Leaks in Streaming
-- **Issue**: #008 - Memory leak in streaming operations
-- **Risk**: Long-running operations may leak memory
-- **Mitigation**: Add memory monitoring and cleanup tasks
+- **相关问题**：#001 - 流超时导致通道阻塞
+- **风险**：类似的超时处理可能导致死锁
+- **缓解**：对所有通道操作使用模式 p001
+
+### 中：流中的内存泄漏
+
+- **相关问题**：#008 - 流操作中的内存泄漏
+- **风险**：长时间运行的操作可能泄漏内存
+- **缓解**：添加内存监控和清理任务
 ```
 
-## Step 2: Task Breakdown with Knowledge
+## 步骤2：任务分解
 
-### Implementation Tasks
+### 实现任务
 
-Add knowledge context to tasks:
+添加知识上下文到任务：
 
 ```markdown
-### [T-1] Implement Timeout Configuration
+### [T-1] 实现超时配置
 
-**Type**: feature | **Priority**: high | **Effort**: 2h
+**类型**：feature | **优先级**：high | **工作量**：2h
 
-> 📚 **Knowledge Context**:
-> **From**: Issue #001 - Streaming timeout causes channel block
-> **Lesson**: Hardcoded timeouts made deployment difficult.
+> 📚 **知识上下文**：
+> **来源**：问题 #001 - 流超时导致通道阻塞
+> **经验**：硬编码超时导致部署困难
 
-**Acceptance Criteria**:
-- [ ] Timeout is configurable
-- [ ] Default: 30s, Min: 1s, Max: 5min
-- [ ] Validation implemented
+**验收标准**：
+- [ ] 超时可配置
+- [ ] 默认：30秒，最小：1秒，最大：5分钟
+- [ ] 实现配置验证
 ```
 
-### Tasks Applying Patterns
+### 应用模式的任务
 
 ```markdown
-### [T-2] Implement Non-Blocking Channel Operations
+### [T-2] 实现非阻塞通道操作
 
-**Type**: feature | **Priority**: high | **Effort**: 4h
+**类型**：feature | **优先级**：high | **工作量**：4h
 
-> 📚 **Knowledge Context**:
-> **From**: Issue #001 - blocking operations cause deadlocks
-> **Lesson**: Use pattern p001
+> 📚 **知识上下文**：
+> **来源**：问题 #001 - 阻塞操作导致死锁
+> **经验**：使用模式 p001
 
-**Acceptance Criteria**:
-- [ ] Apply pattern p001
-- [ ] No blocking operations
-- [ ] Timeout handling
-- [ ] Clean cancellation
+**验收标准**：
+- [ ] 应用模式 p001
+- [ ] 没有阻塞操作
+- [ ] 超时处理
+- [ ] 清晰的取消
 
-**Reference**:
+**参考**：
 ```typescript
-// Use pattern p001
+// 使用模式 p001
 async function sendWithTimeout<T>(
   channel: Channel<T>,
   value: T,
   timeout: number
 ): Promise<boolean> {
-  // Implementation from pattern p001
+  // 模式 p001 的实现
 }
 ```
 ```
 
-### Tasks Preventing Issues
+### 预防问题的任务
 
 ```markdown
-### [T-3] Add Memory Monitoring
+### [T-3] 添加内存监控
 
-**Type**: feature | **Priority**: medium | **Effort**: 2h
+**类型**：feature | **优先级**：medium | **工作量**：2h
 
-> 📚 **Knowledge Context**:
-> **From**: Issue #008 - Memory leak in streaming operations
-> **Lesson**: Long-running operations leaked buffers
+> 📚 **知识上下文**：
+> **来源**：问题 #008 - 流操作中的内存泄漏
+> **经验**：长时间运行的操作泄漏缓冲区
 
-**Acceptance Criteria**:
-- [ ] Track buffer size
-- [ ] Log memory usage
-- [ ] Alert on unusual growth
-- [ ] Cleanup verified
+**验收标准**：
+- [ ] 跟踪缓冲区大小
+- [ ] 记录内存使用
+- [ ] 异常增长时警报
+- [ ] 验证清理
 ```
 
-## Step 3: Knowledge-Based Tests
+## 步骤3：基于知识的测试
 
 ```markdown
-## Knowledge-Based Tests
+## 基于知识的测试
 
-### Test for Issue #001 - Channel Blocking
+### 问题 #001 测试 - 通道阻塞
 
-> 📚 **From**: Issue #001
+> 📚 **来源**：问题 #001
 
-**Historical Problem**:
-Timeouts left channels blocked, causing deadlocks.
+**历史问题**：
+超时导致通道阻塞，引起死锁。
 
-**Test Scenario**:
-1. Create streaming with 100ms timeout
-2. Trigger timeout
-3. Verify channel not blocked
-4. Verify cleanup
-5. Verify no deadlock
+**测试场景**：
+1. 创建带100ms超时的流
+2. 触发超时场景
+3. 验证通道未阻塞
+4. 验证清理
+5. 验证无死锁
 
-**Expected**:
-- Times out at ~100ms
-- Channel unblocked
-- Resources cleaned
-- No deadlock
+**预期行为**：
+- 在约100ms时超时
+- 通道解除阻塞
+- 资源清理
+- 无死锁
 ```
 
-## Step 4: Enhanced Definition of Done
+## 步骤4：增强的完成定义
 
 ```markdown
-## Definition of Done
+## 完成定义
 
-**Standard**:
-- [ ] Code implemented
-- [ ] Tests passing
-- [ ] Code reviewed
-- [ ] Documentation updated
+**标准**：
+- [ ] 代码已实现
+- [ ] 测试通过
+- [ ] 代码已审查
+- [ ] 文档已更新
 
-**Knowledge-Enhanced**:
-- [ ] No anti-patterns used
-- [ ] Recommended patterns followed
-- [ ] Tests for historical issues pass
-- [ ] No regressions
-- [ ] Memory/performance acceptable
-- [ ] Error handling covers past edge cases
+**知识增强**：
+- [ ] 未使用反模式
+- [ ] 遵循了推荐模式
+- [ ] 历史问题的测试通过
+- [ ] 无回归
+- [ ] 内存/性能可接受
+- [ ] 错误处理覆盖过去的边缘情况
 ```
 
-## Step 5: During Implementation
+## 步骤5：实现期间
 
 ```markdown
-## If Issues Arise
+## 如果遇到问题
 
-1. **Document in fix.md**:
+1. **在 fix.md 中记录**：
    ```bash
    /opsx:continue
-   # Choose to create fix.md
+   # 选择创建 fix.md
    ```
 
-2. **Check if known issue**:
+2. **检查是否是已知问题**：
    ```bash
    grep -r "error" openspec/knowledge/issues/
    ```
 
-3. **Extract patterns**:
-   - Is this reusable?
-   - Should we document a pattern/anti-pattern?
+3. **提取模式**：
+   - 这是否类似于过去的问题？
+   - 我们应该记录模式/反模式吗？
 
-4. **Update tasks**:
-   - Add new tasks if needed
-   - Update estimates
+4. **更新任务**：
+   - 如需要添加新任务
+   - 更新估算
+   - 调整依赖关系
 ```
 
-## Verification Checklist
+## 验证清单
 
-- [ ] Risks from knowledge base addressed
-- [ ] Tasks reference historical issues
-- [ ] Test tasks include regression tests
-- [ ] Estimates consider past complexity
-- [ ] Dependencies are logical
-- [ ] Definition of done includes knowledge checks
-- [ ] Pre-checklist includes knowledge review
+- [ ] 解决了知识库中的风险
+- [ ] 任务引用历史问题
+- [ ] 测试任务包含回归测试
+- [ ] 估算考虑了过去的复杂性
+- [ ] 依赖关系符合逻辑
+- [ ] 完成定义包含知识检查
+- [ ] 前检查清单包含知识审查
