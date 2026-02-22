@@ -1,0 +1,104 @@
+# OpenSpec Knowledge - Component Definitions
+# This file defines the components in the system and their relationships
+
+version: "1.0"
+
+# Component definitions
+# Each component represents a major part of the system
+components:
+  streaming:
+    display_name: "Streaming"
+    description: "流式输出处理，包括消息广播、订阅管理"
+    files:
+      - pkg/logic/message/stream_manage.go
+      - pkg/logic/agent/chat.go
+      - pkg/tui/chat.go
+    related_components:
+      - agent
+      - tui
+    common_tags:
+      - channel
+      - goroutine
+      - timeout
+      - blocking
+
+  agent:
+    display_name: "AI Agent"
+    description: "AI Agent 逻辑，包括模型调用、工具调用、流式处理"
+    files:
+      - pkg/logic/agent/chat.go
+      - pkg/logic/agent/tempate.go
+    related_components:
+      - streaming
+      - tools
+    common_tags:
+      - tool-calling
+      - react-agent
+      - error-propagation
+
+  tools:
+    display_name: "Tools"
+    description: "工具调用系统，包括工具注册、执行、结果处理"
+    files:
+      - pkg/logic/tools/basic.go
+      - pkg/logic/tools/stock/
+    related_components:
+      - agent
+    common_tags:
+      - validation
+      - error-handling
+
+  config:
+    display_name: "Configuration"
+    description: "配置管理，包括配置加载、验证、持久化"
+    files:
+      - pkg/config/local_config.go
+      - pkg/config/logger.go
+      - openspec/config.yaml
+    related_components:
+      - agent
+    common_tags:
+      - validation
+      - fail-fast
+
+  tui:
+    display_name: "Terminal UI"
+    description: "终端用户界面，包括聊天界面、模型选择器"
+    files:
+      - pkg/tui/chat.go
+      - pkg/tui/model_selector.go
+      - pkg/tui/style/
+    related_components:
+      - streaming
+      - command
+    common_tags:
+      - rendering
+      - input-handling
+
+  command:
+    display_name: "Commands"
+    description: "命令系统，包括命令注册、执行、参数解析"
+    files:
+      - pkg/logic/command/cmd.go
+      - pkg/logic/command/model.go
+    related_components:
+      - tui
+    common_tags:
+      - validation
+      - error-handling
+
+# Component hierarchy
+# Defines parent-child relationships between components
+hierarchy:
+  core:
+    children:
+      - agent
+      - config
+  ui:
+    children:
+      - tui
+      - command
+  infrastructure:
+    children:
+      - streaming
+      - tools

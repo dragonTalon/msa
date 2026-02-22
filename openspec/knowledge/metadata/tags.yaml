@@ -1,0 +1,96 @@
+# OpenSpec Knowledge - Tag Definitions
+# This file defines the tag categories and relationships used in knowledge items
+
+version: "1.0"
+
+# Tag categories
+# Tags are organized into logical categories for better navigation
+categories:
+  error-handling:
+    display_name: "Error Handling"
+    description: "Tags related to error detection, propagation, and recovery"
+    tags:
+      - timeout
+      - error-propagation
+      - retry
+      - graceful-degradation
+      - fail-fast
+      - error-recovery
+
+  concurrency:
+    display_name: "Concurrency"
+    description: "Tags related to concurrent programming patterns"
+    tags:
+      - goroutine
+      - channel
+      - mutex
+      - deadlock
+      - race-condition
+      - blocking
+      - non-blocking
+
+  architecture:
+    display_name: "Architecture"
+    description: "Tags related to system architecture and design"
+    tags:
+      - streaming
+      - pub-sub
+      - agent
+      - tool-calling
+      - react-agent
+
+  quality:
+    display_name: "Code Quality"
+    description: "Tags related to code quality and maintainability"
+    tags:
+      - validation
+      - testing
+      - debugging
+      - logging
+      - documentation
+
+  performance:
+    display_name: "Performance"
+    description: "Tags related to performance optimization"
+    tags:
+      - latency
+      - throughput
+      - memory
+      - caching
+      - optimization
+
+# Tag relationships
+# Defines relationships between tags for better search and discovery
+related:
+  timeout:
+    related_to:
+      - channel
+      - goroutine
+      - streaming
+      - performance
+
+  error-handling:
+    related_to:
+      - error-propagation
+      - retry
+      - logging
+      - debugging
+
+  channel:
+    related_to:
+      - goroutine
+      - concurrency
+      - blocking
+      - deadlock
+
+  agent:
+    related_to:
+      - tool-calling
+      - react-agent
+      - architecture
+
+  validation:
+    related_to:
+      - config
+      - fail-fast
+      - error-handling
