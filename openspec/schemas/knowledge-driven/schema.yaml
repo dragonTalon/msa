@@ -1,0 +1,299 @@
+name: knowledge-driven
+version: 1
+description: |
+  知识驱动开发工作流 - 在实现过程中捕获、存储和重用经验教训的反馈循环。
+
+  核心特性：
+  - **知识感知提案** - 自动包含历史问题、推荐模式和反模式警告
+  - **修复工件** - 记录实现过程中遇到的问题
+  - **知识收集** - 从已归档的变更中提取知识
+  - **模式识别** - 识别可复用的解决方案和需要避免的反模式
+
+  适用场景：
+  - 希望从过去的错误中学习
+  - 长期项目或团队协作
+  - 复杂领域且有许多边缘情况
+  - 高价值系统，错误成本高
+  - 需要知识共享的团队
+
+artifacts:
+  - id: proposal
+    generates: proposal.md
+    description: 变更提案，包含历史上下文和警告
+    template: proposal.md
+    instruction: |
+      创建带有知识上下文的提案文档。
+
+      **⚠️ 强制要求：必须先读取 openspec/knowledge/index.yaml**
+
+      步骤：
+      1. 验证知识库存在（检查 openspec/knowledge/index.yaml）
+      2. 加载知识库索引，解析 items、categories、lastUpdated
+      3. 分析变更上下文（组件、关键词、类别）
+      4. 搜索相关知识（按组件、标签、标题匹配，计算相关性分数）
+      5. 在提案开头注入知识上下文
+
+      必需部分（按顺序）：
+      - **知识上下文** (Knowledge Context)：相关历史问题、已知反模式、推荐模式
+      - **风险评估** (Risk Assessment)：基于历史问题的风险因素
+      - **缓解策略** (Mitigation Strategy)：如何避免过去的问题
+      - **标准提案部分**：Why, What Changes, Capabilities, Impact
+
+      相关性评分：
+      - 组件匹配：+10分（必须包含）
+      - 标签匹配：+5分（应该包含）
+      - 类别匹配：+5分（应该包含）
+      - 标题关键词：+2分（可选）
+
+      如果知识库为空，添加说明："这是新领域，如遇问题请创建 fix.md 来构建知识库"
+
+      参考 instructions/proposal.md 获取详细步骤。
+    requires: []
+
+  - id: specs
+    generates: "specs/**/*.md"
+    description: 基于历史问题信息丰富的详细规格说明
+    template: spec.md
+    instruction: |
+      创建规格说明文件，每个capability对应一个spec文件。
+
+      **必须应用提案中的知识上下文**：
+      - 使用推荐的模式
+      - 避免已知的反模式
+      - 为历史问题添加回归测试
+      - 在相关需求中标注知识来源
+
+      文件命名：
+      - 新能力：specs/<capability>/spec.md（使用提案中的kebab-case名称）
+      - 修改能力：specs/<capability>/spec.md（使用 openspec/specs/ 中的现有名称）
+
+      增量操作（使用 ## 标题）：
+      - **ADDED Requirements**：新能力
+      - **MODIFIED Requirements**：行为变更 - 必须包含完整更新内容
+      - **REMOVED Requirements**：弃用功能 - 必须包含 **Reason** 和 **Migration**
+      - **RENAMED Requirements**：仅名称变更 - 使用 FROM:/TO: 格式
+
+      格式要求：
+      - 每个需求：`### Requirement: <name>` 后跟描述
+      - 每个场景：`#### Scenario: <name>` 使用 WHEN/THEN 格式
+      - **关键**：场景必须使用4个井号（`####`），否则会静默失败
+      - 每个需求至少有一个场景
+
+      知识感知需求示例：
+      ```markdown
+      ### [R-1] 超时处理
+
+      > 📚 知识上下文：基于问题 #001
+
+      历史问题：
+      流式操作在超时后会无限期阻塞。
+
+      需求：
+      系统必须优雅地处理超时而不阻塞。
+
+      验收标准：
+      - [ ] 超时配置必需
+      - [ ] 超时时取消操作
+      - [ ] 超时时清理资源
+      ```
+
+      参考 instructions/specs.md 获取详细步骤。
+    requires:
+      - proposal
+
+  - id: design
+    generates: design.md
+    description: 包含模式建议和反模式警告的技术设计
+    template: design.md
+    instruction: |
+      创建技术设计文档，解释如何实现变更。
+
+      **何时创建 design.md**（仅在以下情况创建）：
+      - 跨领域变更（多个服务/模块）或新的架构模式
+      - 新的外部依赖或重要的数据模型变更
+      - 安全、性能或迁移复杂性
+      - 模糊性需要在编码前做出技术决策
+
+      **必须应用知识库中的模式**：
+      - 在"推荐模式"部分详细说明要使用的模式
+      - 在"避免的反模式"部分列出要避免的做法
+      - 在设计决策中引用相关的历史问题
+
+      必需部分：
+      - **Context**：背景、当前状态、约束、利益相关者
+      - **Goals / Non-Goals**：此设计要实现的目标和明确排除的内容
+      - **Decisions**：关键技术选择及理由（为什么选X而不选Y？）
+      - **Recommended Patterns**：来自知识库的推荐模式
+      - **Anti-Patterns to Avoid**：来自知识库的反模式警告
+      - **Risks / Trade-offs**：已知限制和风险
+      - **Migration Plan**：部署步骤（如适用）
+
+      模式应用示例：
+      ```markdown
+      ## 推荐模式
+
+      ### 非阻塞流通道模式
+
+      **模式ID**：p001
+      **来源问题**：#001 - 流超时导致通道阻塞
+
+      **描述**：
+      使用非阻塞通道操作配合select语句，优雅处理超时而不死锁。
+
+      **适用场景**：
+      - 所有流式操作
+      - 带超时的异步操作
+      - 生产者-消费者模式
+      ```
+
+      参考 instructions/design.md 获取详细步骤。
+    requires:
+      - specs
+
+  - id: tasks
+    generates: tasks.md
+    description: 实现任务列表，包含风险感知和基于知识的检查清单
+    template: tasks.md
+    instruction: |
+      创建任务列表，分解实现工作。
+
+      **重要：严格按照模板格式。** apply阶段解析复选框格式来跟踪进度。
+      不使用 `- [ ]` 格式的任务不会被跟踪。
+
+      **必须包含基于知识的元素**：
+      - 风险警报（来自历史问题）
+      - 知识上下文（引用相关问题）
+      - 预防性任务（防止重复错误）
+      - 回归测试（测试历史问题）
+
+      指南：
+      - 在 ## 编号标题下对相关任务进行分组
+      - 每个任务必须是复选框：`- [ ] X.Y 任务描述`
+      - 任务应该足够小，可以在一个会话中完成
+      - 按依赖关系排序（什么必须先完成？）
+
+      风险感知任务示例：
+      ```markdown
+      ### [T-1] 实现超时配置
+
+      > 📚 知识上下文：
+      > 来源：问题 #001 - 流超时导致通道阻塞
+      > 经验：硬编码超时导致部署困难
+
+      验收标准：
+      - [ ] 超时可配置
+      - [ ] 验证：1秒 <= 超时 <= 5分钟
+      - [ ] 默认：30秒
+      ```
+
+      知识感知测试：
+      ```markdown
+      ## 基于知识的测试
+
+      ### 问题 #001 回归测试
+
+      > 📚 来源：问题 #001
+
+      **历史问题**：
+      超时导致通道阻塞和死锁。
+
+      **测试场景**：
+      1. 创建100ms超时的流
+      2. 触发超时
+      3. 验证通道未阻塞
+      4. 验证无死锁
+      ```
+
+      参考 instructions/tasks.md 获取详细步骤。
+    requires:
+      - design
+
+  - id: fix
+    generates: fix.md
+    description: 可选工件，用于记录实现过程中遇到的问题
+    template: fix.md
+    instruction: |
+      创建修复文档来记录问题。
+
+      **仅在发现问题时创建**：
+      - 意外错误（运行时、编译时、逻辑错误）
+      - 发现的bug
+      - 性能问题
+      - 配置或部署问题
+      - 设计缺陷
+
+      **必须包含**：
+      - **Problem**：问题描述、重现步骤、错误消息、影响评估
+      - **Root Cause**：调查过程、根本原因、相关文件
+      - **Solution**：解决方案、替代方案、代码变更
+      - **Verification**：验证步骤、测试结果
+      - **Lessons Learned**：学到的经验、预防措施
+
+      **可选包含**：
+      - **Reusable Pattern**：可复用的解决方案模式
+      - **Anti-Pattern Identified**：需要避免的反模式
+
+      模式提取示例：
+      ```markdown
+      ## 可复用模式
+
+      **模式名称**：非阻塞通道发送
+      **模式ID**：p005
+
+      **描述**：
+      在异步上下文中使用非阻塞操作配合超时处理以防止死锁。
+
+      **适用场景**：
+      - 所有流式操作
+      - 任何异步上下文中的通道发送
+
+      **实现**：
+      \`\`\`typescript
+      function sendWithTimeout<T>(channel, value, timeout): boolean {
+        const result = channel.trySend(value);
+        if (!result) throw new Error(\`超时 \${timeout}ms\`);
+        return result;
+      }
+      \`\`\`
+      ```
+
+      这是构建知识库的关键步骤。高质量的 fix.md 将：
+      - 帮助团队从错误中学习
+      - 防止重复犯错
+      - 建立模式和反模式库
+
+      参考 instructions/fix.md 获取详细步骤。
+    requires:
+      - tasks
+    optional: true
+
+apply:
+  requires: [tasks]
+  tracks: tasks.md
+  instruction: |
+    阅读上下文文件，完成待处理任务。
+
+    **知识驱动的应用**：
+    - 应用知识库中推荐的模式
+    - 避免知识库中的反模式
+    - 如果遇到问题，创建 fix.md 来记录
+    - 完成后标记任务为完成
+
+    如果遇到阻碍或需要澄清，暂停并寻求帮助。
+
+archive:
+  instruction: |
+    归档变更并更新主规格。
+
+    **知识收集**：
+    如果 fix.md 存在，提示用户运行 `/opsx:collect` 来提取知识到 `openspec/knowledge/`
+
+knowledge:
+  directory: openspec/knowledge
+  required: true
+  index_file: index.yaml
+  subdirectories:
+    - issues/
+    - patterns/
+    - anti-patterns/
+    - lessons/
