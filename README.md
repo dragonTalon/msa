@@ -88,6 +88,34 @@ msa config show
 msa config set
 ```
 
+## 🧪 Testing
+
+The project includes unit tests covering core business logic and utility functions.
+
+### Running Tests
+
+```bash
+# Run all tests
+go test ./pkg/...
+
+# Run tests with coverage
+go test -cover ./pkg/...
+
+# Generate coverage report
+go test -coverprofile=coverage.out ./pkg/...
+go tool cover -html=coverage.out
+```
+
+### Current Coverage
+
+| Module | Coverage |
+|--------|----------|
+| pkg/utils | 83.7% |
+| pkg/logic/tools | 100.0% |
+| pkg/logic/provider | 76.9% |
+| pkg/config | 53.4% |
+| pkg/logic/command | 51.1% |
+
 ## 🏗️ Architecture
 
 ```

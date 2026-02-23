@@ -88,6 +88,34 @@ msa config show
 msa config set
 ```
 
+## 🧪 测试
+
+项目包含单元测试，覆盖核心业务逻辑和工具函数。
+
+### 运行测试
+
+```bash
+# 运行所有测试
+go test ./pkg/...
+
+# 运行测试并显示覆盖率
+go test -cover ./pkg/...
+
+# 生成覆盖率报告
+go test -coverprofile=coverage.out ./pkg/...
+go tool cover -html=coverage.out
+```
+
+### 当前覆盖率
+
+| 模块 | 覆盖率 |
+|------|--------|
+| pkg/utils | 83.7% |
+| pkg/logic/tools | 100.0% |
+| pkg/logic/provider | 76.9% |
+| pkg/config | 53.4% |
+| pkg/logic/command | 51.1% |
+
 ## 🏗️ 架构设计
 
 ```

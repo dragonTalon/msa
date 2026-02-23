@@ -45,7 +45,7 @@ func (c SiliconflowProvider) ListModels(ctx context.Context) ([]*model.LLMModel,
 	if !resp.IsSuccess() {
 		return nil, fmt.Errorf("API 请求失败 (状态码 %d): %s", resp.StatusCode(), resp.String())
 	}
-	log.Info("ListModels: %s", utils.ToJSONString(result))
+	log.Infof("ListModels: %s", utils.ToJSONString(result))
 	// 转换为 LlModel 格式
 	models := make([]*model.LLMModel, len(result.Data))
 	for i, m := range result.Data {

@@ -62,7 +62,7 @@ func ParseJSONBytes(data []byte, v interface{}) error {
 func ToJSONString(obj interface{}) string {
 	bytes, err := json.Marshal(obj)
 	if err != nil {
-		log.Error("ToJSONString error: %v", err)
+		log.Errorf("ToJSONString error: %v", err)
 		return ""
 	}
 	return string(bytes)

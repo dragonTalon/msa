@@ -151,7 +151,7 @@ func SaveConfig() error {
 	// 写入配置
 	configPath := filepath.Join(configDir, CONFIG_FILE)
 	cfg := configCache
-	log.Info("SaveConfig: %v", cfg)
+	log.Infof("SaveConfig: %v", cfg)
 	data, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
 		return err
