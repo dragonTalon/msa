@@ -30,7 +30,7 @@ func GetLikeCommand(cmd string) []string {
 	if cmd == "" || len(commandMap) == 0 {
 		return nil
 	}
-	log.Info("GetLikeCommand: %s", cmd)
+	log.Infof("GetLikeCommand: %s", cmd)
 	cmd = strings.ToLower(cmd)
 	cmd = strings.TrimPrefix(cmd, "/")
 

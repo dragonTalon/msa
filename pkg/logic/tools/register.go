@@ -2,7 +2,7 @@ package tools
 
 import (
 	"msa/pkg/logic/tools/search"
-	
+	"msa/pkg/logic/tools/stock"
 )
 
 var _ MsaTool = (*stock.CompanyCode)(nil)
