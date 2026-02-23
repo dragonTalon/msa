@@ -17,6 +17,8 @@ const (
 	NewsToolGroup ToolGroup = "news"
 	// 股票工具组
 	StockToolGroup ToolGroup = "stock"
+	// 搜索工具组
+	SearchToolGroup ToolGroup = "search"
 )
 
 type Pair struct {

@@ -1,15 +1,49 @@
-version: 1
-lastUpdated: 2026-02-22T08:33:29.001Z
-categories:
-  issues: 1
-  patterns: 0
-  antiPatterns: 0
-  lessons: 0
-items:
-  - id: 2025-02-23-test-fix-channel-timeout-causes-deadlock
-    title: Channel timeout causes deadlock
-    category: issue
-    tags:
-      - timeout
-      - channel
-      - deadlock
+# OpenSpec Knowledge Index
+# 本索引记录了从已归档变更中收集的知识
+
+issues:
+  - id: "001"
+    title: "AI 助手不应自动执行 git commit"
+    source: "2026-02-23-add-web-search-tool"
+    category: "workflow"
+    severity: "critical"
+  - id: "002"
+    title: "chromedp 依赖未正确添加"
+    source: "2026-02-23-add-web-search-tool"
+    category: "build"
+    severity: "medium"
+  - id: "003"
+    title: "不安全的 disable-web-security 标志"
+    source: "2026-02-23-add-web-search-tool"
+    category: "security"
+    severity: "high"
+  - id: "004"
+    title: "浏览器超时时间过短"
+    source: "2026-02-23-add-web-search-tool"
+    category: "performance"
+    severity: "medium"
+  - id: "005"
+    title: "Google CAPTCHA 检测"
+    source: "2026-02-23-add-web-search-tool"
+    category: "integration"
+    severity: "high"
+
+patterns:
+  - id: "001"
+    title: "chromedp 浏览器配置最佳实践"
+    source: "2026-02-23-add-web-search-tool"
+    category: "browser-automation"
+  - id: "002"
+    title: "搜索引擎接口设计模式"
+    source: "2026-02-23-add-web-search-tool"
+    category: "design-patterns"
+  - id: "003"
+    title: "错误处理和重试策略"
+    source: "2026-02-23-add-web-search-tool"
+    category: "error-handling"
+
+guides:
+  - id: "001"
+    title: "chromedp 网页抓取实施指南"
+    source: "2026-02-23-add-web-search-tool"
+    category: "implementation"
