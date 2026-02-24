@@ -3,14 +3,16 @@ package internal
 import (
 	"context"
 	"fmt"
+	"msa/pkg/utils"
 	"net/url"
 	"strings"
 	"time"
 
+	searchmsa_model "msa/pkg/model"
+
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
-	searchmsa_model "msa/pkg/model"
 )
 
 // BingSearchEngine Bing 搜索引擎实现
@@ -58,18 +60,28 @@ func (b *BingSearchEngine) Search(ctx context.Context, query string, numResults 
 		return nil, fmt.Errorf("解析 Bing 搜索结果失败: %w", err)
 	}
 
+	// 过滤无关结果（日历、节假日等与查询无关的内容）
+	results = b.filterResults(results, query)
+
 	log.Infof("Bing 成功获取 %d 条搜索结果", len(results))
+	log.Infof("Bing 搜索结果: %v", utils.ToJSONString(results))
 	return results, nil
 }
 
 // buildSearchURL 构建 Bing 搜索 URL
+// 参数参考真实浏览器搜索行为（form=QBRE 等），避免 Bing 以 API/爬虫模式处理请求导致结果质量下降。
+// 注意：不加 count 参数（会触发 Bing API 模式），不加 mkt/cc（会导致地域热门内容偏向）。
 func (b *BingSearchEngine) buildSearchURL(query string, numResults int) string {
 	baseURL := "https://www.bing.com/search"
+	// 去除多余空格，合并为紧凑查询词
+	query = strings.Join(strings.Fields(query), " ")
 	params := url.Values{}
-	params.Add("q", query)
-	params.Add("count", fmt.Sprintf("%d", numResults))
-	params.Add("cc", "CN")         // 设置地区为中国
-	params.Add("setlang", "zh-CN") // 设置语言为中文
+	params.Set("q", query)
+	params.Set("qs", "n")          // 禁用查询建议自动替换
+	params.Set("form", "QBRE")     // 标识来自搜索框的真实提交，Bing 按相关性排序
+	params.Set("sp", "-1")         // 无建议位置（真实搜索特征）
+	params.Set("lq", "0")          // 禁用 lq 模式
+	params.Set("setlang", "zh-CN") // 界面语言：中文
 	return fmt.Sprintf("%s?%s", baseURL, params.Encode())
 }
 
@@ -132,6 +144,125 @@ func (b *BingSearchEngine) isCAPTCHA(html string) bool {
 	}
 
 	return false
+}
+
+// irrelevantDomains 与搜索无关的通用内容域名黑名单
+// 这些域名通常返回日历、节假日、百科等与具体查询无关的内容
+var irrelevantDomains = []string{
+	"calendar411.com",
+	"5adanci.com",
+	"rili.51240.com",
+	"wannianli.com",
+	"nongli.com",
+	"jiaqi.51240.com",
+}
+
+// irrelevantSnippetKeywords 摘要中出现这些词时，说明结果与具体查询无关
+var irrelevantSnippetKeywords = []string{
+	"农历",
+	"放假调休",
+	"节假日安排",
+	"日历表",
+	"法定节假日",
+	"春节假期共",
+	"元旦、春节、清明节",
+}
+
+// filterResults 过滤与查询无关的搜索结果
+func (b *BingSearchEngine) filterResults(results []searchmsa_model.SearchResultItem, query string) []searchmsa_model.SearchResultItem {
+	// 提取查询中的核心关键词（去掉时间词，保留实体词）
+	coreKeywords := b.extractCoreKeywords(query)
+
+	var filtered []searchmsa_model.SearchResultItem
+	for _, r := range results {
+		// 1. 域名黑名单过滤
+		if b.isIrrelevantDomain(r.Source) {
+			log.Debugf("[Bing Filter] 过滤无关域名: %s", r.Source)
+			continue
+		}
+
+		// 2. 摘要关键词过滤（摘要中含有明显无关词且与核心关键词无关）
+		if b.isIrrelevantSnippet(r.Snippet, coreKeywords) {
+			log.Debugf("[Bing Filter] 过滤无关摘要: title=%s", r.Title)
+			continue
+		}
+
+		filtered = append(filtered, r)
+	}
+
+	// 如果过滤后结果为空，返回原始结果（避免过度过滤）
+	if len(filtered) == 0 {
+		log.Warnf("[Bing Filter] 过滤后结果为空，返回原始 %d 条结果", len(results))
+		return results
+	}
+
+	return filtered
+}
+
+// extractCoreKeywords 从查询中提取核心关键词（去掉时间词等噪音词）
+func (b *BingSearchEngine) extractCoreKeywords(query string) []string {
+	// 时间相关的噪音词，不作为相关性判断依据
+	timeNoiseWords := []string{
+		"年", "月", "日", "最新", "今年", "今天", "最近",
+		"2024", "2025", "2026", "2027",
+	}
+
+	words := strings.Fields(query)
+	var coreWords []string
+	for _, w := range words {
+		isNoise := false
+		for _, noise := range timeNoiseWords {
+			if strings.Contains(w, noise) {
+				isNoise = true
+				break
+			}
+		}
+		if !isNoise && len([]rune(w)) >= 2 {
+			coreWords = append(coreWords, w)
+		}
+	}
+	return coreWords
+}
+
+// isIrrelevantDomain 判断域名是否在黑名单中
+func (b *BingSearchEngine) isIrrelevantDomain(source string) bool {
+	for _, domain := range irrelevantDomains {
+		if strings.Contains(source, domain) {
+			return true
+		}
+	}
+	return false
+}
+
+// isIrrelevantSnippet 判断摘要是否与查询无关
+// 规则：摘要中含有无关词，且标题/摘要中不含任何核心关键词
+func (b *BingSearchEngine) isIrrelevantSnippet(snippet string, coreKeywords []string) bool {
+	if snippet == "" {
+		return false
+	}
+
+	// 检查是否含有无关词
+	hasIrrelevantWord := false
+	for _, kw := range irrelevantSnippetKeywords {
+		if strings.Contains(snippet, kw) {
+			hasIrrelevantWord = true
+			break
+		}
+	}
+	if !hasIrrelevantWord {
+		return false
+	}
+
+	// 如果含有无关词，再检查是否同时含有核心关键词
+	// 若含有核心关键词，说明这条结果可能仍然相关（不过滤）
+	for _, kw := range coreKeywords {
+		if strings.Contains(snippet, kw) {
+			return false
+		}
+	}
+
+	// 含有无关词且不含核心关键词 → 过滤
+	return true
 }
 
 // parseSearchResults 解析 Bing 搜索结果

@@ -8,6 +8,7 @@ import (
 	"msa/pkg/model"
 	mas_utils "msa/pkg/utils"
 	"net/url"
+	"sync"
 
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"
@@ -69,11 +70,10 @@ func FetchPageContent(ctx context.Context, param *model.FetchPageParams) (string
 		return "", err
 	}
 
-	// 创建工具实例（如果未初始化）
-	if defaultFetcherTool == nil {
-		browser := internal.NewBrowserManager()
-		defaultFetcherTool = NewFetcherTool(browser, internal.NewBasicExtractor())
-	}
+	// 使用共享的浏览器实例（懒加载单例，线程安全）
+	fetcherOnce.Do(func() {
+		defaultFetcherTool = NewFetcherTool(GetSharedBrowser(), internal.NewBasicExtractor())
+	})
 
 	// 获取页面 HTML
 	html, err := defaultFetcherTool.browser.GetPageHTML(ctx, param.URL)
@@ -130,4 +130,7 @@ func FetchPageContent(ctx context.Context, param *model.FetchPageParams) (string
 }
 
 // 全局默认抓取工具实例
-var defaultFetcherTool *FetcherTool
+var (
+	defaultFetcherTool *FetcherTool
+	fetcherOnce        sync.Once
+)

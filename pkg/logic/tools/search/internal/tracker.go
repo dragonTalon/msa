@@ -36,8 +36,8 @@ type EngineTracker struct {
 func NewEngineTracker() *EngineTracker {
 	return &EngineTracker{
 		health:           make(map[string]*EngineHealth),
-		cooldown:         5 * time.Minute, // 默认 5 分钟
-		failureThreshold: 3,               // 默认 3 次失败触发熔断
+		cooldown:         30 * time.Second, // CAPTCHA 冷却期：30 秒后重试（而非 5 分钟）
+		failureThreshold: 3,                // 默认 3 次失败触发熔断
 	}
 }
 
@@ -104,10 +104,12 @@ func (t *EngineTracker) RecordFailure(engine string, err error) {
 		h.CooldownUntil = time.Now().Add(t.cooldown)
 	}
 
-	// 如果是 CAPTCHA 错误，立即标记为不健康
+	// 如果是 CAPTCHA 错误：进入短暂冷却（30s），而非永久熔断
+	// CAPTCHA 是会话/IP 级别的问题，短暂等待后可能恢复
 	if err != nil && isCaptchaError(err) {
 		h.State = StateUnhealthy
-		h.CooldownUntil = time.Now().Add(t.cooldown)
+		h.CooldownUntil = time.Now().Add(t.cooldown) // 使用配置的冷却时间（默认 30s）
+		h.FailureCount = 0                           // 重置计数，冷却后恢复为 degraded 状态继续尝试
 	}
 }
 
