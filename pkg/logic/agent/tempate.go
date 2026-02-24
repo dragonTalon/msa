@@ -39,8 +39,9 @@ func GetDefaultTemplate(ctx context.Context, question string, history []*schema.
 
 【数据处理流程】
 1. **信息收集阶段**：
-   - 使用web_search进行初步信息检索
-   - 根据搜索结果相关性，选择性使用fetch_page_content获取详细内容
+   - 使用web_search进行初步信息检索，获取相关链接列表
+   - **必须**从搜索结果中选取 1~10 个最相关的链接，调用fetch_page_content获取完整页面内容
+   - fetch_page_content是获取准确数据的关键步骤，不可跳过；仅凭搜索摘要（snippet）不足以支撑分析
    - 对多源信息进行交叉验证
 
 2. **分析框架**：

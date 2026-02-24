@@ -10,6 +10,7 @@ import (
 	internal "msa/pkg/logic/tools/search/internal"
 	"msa/pkg/model"
 	mas_utils "msa/pkg/utils"
+	"sync"
 )
 
 // SearchTool 搜索工具
@@ -66,12 +67,12 @@ func WebSearch(ctx context.Context, param *model.WebSearchParams) (string, error
 		return "", err
 	}
 
-	// 初始化搜索路由器（如果未初始化）
-	if defaultSearchRouter == nil {
-		browser := internal.NewBrowserManager()
+	// 初始化搜索路由器（懒加载单例）
+	routerOnce.Do(func() {
 		searchLogger := internal.NewSearchLogger(log.StandardLogger())
-		defaultSearchRouter = internal.NewSearchRouter(browser, searchLogger)
-	}
+		defaultSearchRouter = internal.NewSearchRouter(GetSharedBrowser(), searchLogger)
+	})
+
 	// 执行搜索（支持自动降级）
 	searchResult := defaultSearchRouter.Search(ctx, param.Query, 10)
 
@@ -113,5 +114,18 @@ func SetDefaultRouter(router *internal.SearchRouter) {
 	defaultSearchRouter = router
 }
 
+// GetSharedBrowser 获取共享的浏览器实例（单例）
+func GetSharedBrowser() *internal.BrowserManager {
+	sharedBrowserOnce.Do(func() {
+		sharedBrowser = internal.NewBrowserManager()
+	})
+	return sharedBrowser
+}
+
 // 全局默认搜索路由器实例
-var defaultSearchRouter *internal.SearchRouter
+var (
+	defaultSearchRouter *internal.SearchRouter
+	routerOnce          sync.Once
+	sharedBrowser       *internal.BrowserManager
+	sharedBrowserOnce   sync.Once
+)
