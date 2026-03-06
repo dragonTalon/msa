@@ -88,6 +88,38 @@ msa config show
 msa config set
 ```
 
+## 🗄️ Local Database
+
+MSA includes SQLite local database support for storing:
+- **Accounts**: User accounts with balance tracking
+- **Transactions**: Buy/sell orders with status tracking
+- **Positions**: Holding calculations and profit/loss
+
+### Database Location
+
+The database file is stored at:
+```
+~/.msa/msa.sqlite
+```
+
+### Data Backup
+
+To backup your data:
+```bash
+cp ~/.msa/msa.sqlite ~/.msa/msa.sqlite.backup.$(date +%Y%m%d)
+```
+
+To restore from backup:
+```bash
+cp ~/.msa/msa.sqlite.backup.YYYYMMDD ~/.msa/msa.sqlite
+```
+
+### Amount Units
+
+**Important**: All monetary amounts are stored in "cents" (分) as integers to avoid floating-point precision issues.
+- `10000` = 100.00 元
+- Display conversion: `amount / 100 = displayed value`
+
 ## 🧪 Testing
 
 The project includes unit tests covering core business logic and utility functions.
@@ -135,6 +167,18 @@ msa/ (Project Root)
     ├── config/              # Configuration management
     │   ├── local_config.go  # Local storage configuration
     │   └── logger.go        # Logging configuration
+    ├── db/                  # Database layer
+    │   ├── db.go            # Database initialization
+    │   ├── migrate.go       # Schema migration
+    │   ├── account.go       # Account operations
+    │   └── transaction.go   # Transaction operations
+    ├── model/               # Data models
+    │   ├── account.go       # Account model
+    │   └── transaction.go   # Transaction model
+    ├── service/             # Business services
+    │   ├── account_service.go    # Account service
+    │   ├── trade_service.go      # Trading service
+    │   └── position_service.go   # Position calculation
     ├── logic/               # Business logic
     │   ├── agent/           # AI agent
     │   ├── command/         # Command handling
@@ -168,10 +212,13 @@ msa/ (Project Root)
 - [ ] CI/CD pipeline (GitHub Actions)
 
 ### Phase 2: Core Features (v0.2.x)
-- [ ] **Data Module**
-  - [ ] Stock data fetching API integration
+- [x] **Data Module**
+  - [x] Stock data fetching API integration
   - [ ] Real-time quotes subscription
-  - [ ] Historical data storage (SQLite/PostgreSQL)
+  - [x] Historical data storage (SQLite)
+  - [x] Account management
+  - [x] Transaction recording
+  - [x] Position tracking
   - [ ] Data caching layer (Redis)
 - [ ] **Analysis Module**
   - [ ] Technical indicators (MA, MACD, RSI, KDJ)
