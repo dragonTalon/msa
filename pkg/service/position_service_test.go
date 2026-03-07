@@ -23,7 +23,7 @@ func setupPositionTestDB(t *testing.T) (*gorm.DB, uint) {
 	}
 
 	userID := "test_user"
-	initialAmount := int64(10000000) // 100000.00元 - 足够用于测试
+	initialAmount := int64(10000000) // 1000.00元 - 足够用于测试
 
 	accountID, err := db.CreateAccount(database, userID, initialAmount)
 	if err != nil {
@@ -75,7 +75,7 @@ func TestGetPositionCost(t *testing.T) {
 	defer db.CloseDB(database)
 
 	// 创建交易
-	// 买入：100 股 @ 1800 = 180000 + 手续费
+	// 买入：100 股 @ 18.00元 = 18000000毫 + 手续费
 	createTestTransaction(database, accountID, model.TransactionTypeBuy, 100, 180000)
 
 	// 卖出：30 股 @ 1850 = 55500 - 手续费
@@ -114,7 +114,7 @@ func TestGetPositionValue(t *testing.T) {
 
 	createTestTransaction(database, accountID, model.TransactionTypeBuy, 100, 180000)
 
-	// 计算持仓市值（假设当前价格 1900 元）
+	// 计算持仓市值（假设当前价格 19.00元）
 	currentPrice := int64(190000)
 	value, err := GetPositionValue(database, accountID, "600519", currentPrice)
 	if err != nil {
@@ -155,7 +155,7 @@ func TestGetAccountTotalValue(t *testing.T) {
 
 	// 计算总市值
 	prices := PriceMap{
-		"600519": 190000, // 当前价格 1900 元
+		"600519": 190000, // 当前价格 19.00元
 	}
 
 	value, err := GetAccountTotalValue(database, accountID, prices)
@@ -177,7 +177,7 @@ func TestGetAccountPnL(t *testing.T) {
 
 	// 计算盈亏
 	prices := PriceMap{
-		"600519": 190000, // 当前价格 1900 元，买入价 1800 元，盈利
+		"600519": 190000, // 当前价格 19.00元，买入价 18.00元，盈利
 	}
 
 	pnl, err := GetAccountPnL(database, accountID, prices)
@@ -185,7 +185,7 @@ func TestGetAccountPnL(t *testing.T) {
 		t.Fatalf("GetAccountPnL failed: %v", err)
 	}
 
-	// 10股 × (190000 - 180000) = 1000000 = 10000元盈利
+	// 10股 × (190000 - 180000)毫 = 1000000毫 = 100.00元盈利
 	_ = pnl
 }
 

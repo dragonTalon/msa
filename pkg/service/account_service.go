@@ -27,11 +27,11 @@ func (s *AccountService) CreateAccount(userID string, initialAmount float64) (*m
 		return nil, fmt.Errorf("user already exists: %s", userID)
 	}
 
-	// 转换金额为分
-	initialAmtFen := model.YuanToFen(initialAmount)
+	// 转换金额为毫
+	initialAmtHao := model.YuanToHao(initialAmount)
 
 	// 创建账户
-	accountID, err := db.CreateAccount(s.db, userID, initialAmtFen)
+	accountID, err := db.CreateAccount(s.db, userID, initialAmtHao)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create account: %w", err)
 	}

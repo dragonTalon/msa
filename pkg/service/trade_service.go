@@ -14,8 +14,8 @@ type Order struct {
 	StockCode string
 	StockName string
 	Quantity  int64
-	Price     int64 // 价格（分）
-	Fee       int64 // 手续费（分）
+	Price     int64 // 价格（毫）
+	Fee       int64 // 手续费（毫）
 	Note      string
 }
 

@@ -11,13 +11,13 @@ import (
 
 // Position 持仓信息
 type Position struct {
-	StockCode   string
-	StockName   string
-	Quantity    int64  // 持仓数量
-	Cost        int64  // 持仓成本（分）
-	CurrentPrice int64 // 当前价格（分，需要外部传入）
-	Value       int64  // 持仓市值（分）
-	PnL         int64  // 盈亏（分）
+	StockCode    string
+	StockName    string
+	Quantity     int64 // 持仓数量
+	Cost         int64 // 持仓成本（毫）
+	CurrentPrice int64 // 当前价格（毫，需要外部传入）
+	Value        int64 // 持仓市值（毫）
+	PnL          int64 // 盈亏（毫）
 }
 
 // GetPosition 获取指定股票的持仓数量
@@ -120,7 +120,7 @@ func GetAccountTotalCost(database *gorm.DB, accountID uint) (int64, error) {
 
 // GetAccountTotalValue 获取账户总市值
 // 计算：available_amt + locked_amt + 持仓市值（需要外部提供价格）
-type PriceMap map[string]int64 // stock_code -> price (分)
+type PriceMap map[string]int64 // stock_code -> price (毫)
 
 func GetAccountTotalValue(database *gorm.DB, accountID uint, prices PriceMap) (int64, error) {
 	// 查询账户
