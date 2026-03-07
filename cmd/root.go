@@ -11,6 +11,7 @@ import (
 
 	"msa/pkg/app"
 	"msa/pkg/config"
+	"msa/pkg/db"
 	"msa/pkg/tui/style"
 )
 
@@ -39,6 +40,13 @@ func ExecuteWithSignal(rootCmd *cobra.Command) {
 	} else {
 		log.Info("配置初始化成功")
 	}
+
+	// 注册数据库清理函数
+	defer func() {
+		if err := db.CloseGlobalDB(); err != nil {
+			log.Warnf("关闭数据库时出错: %v", err)
+		}
+	}()
 
 	ctx, cancel := NotifySignal(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()

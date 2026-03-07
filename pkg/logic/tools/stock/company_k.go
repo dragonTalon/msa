@@ -48,7 +48,7 @@ func GetStockCompanyK(ctx context.Context, param *CompanyKParam) (string, error)
 	}
 
 	// 调用公共函数获取股票数据
-	stockCurrentResp, err := fetchStockData(param.StockCode)
+	stockCurrentResp, err := FetchStockData(param.StockCode)
 	if err != nil {
 		message.BroadcastToolEnd("get stock company k", "", err)
 		return "", err

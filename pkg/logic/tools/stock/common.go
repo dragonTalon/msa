@@ -9,9 +9,9 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// fetchStockData 获取股票数据的公共逻辑
+// FetchStockData 获取股票数据的公共逻辑
 // 返回StockCurrentResp和error
-func fetchStockData(stockCode string) (*model.StockCurrentResp, error) {
+func FetchStockData(stockCode string) (*model.StockCurrentResp, error) {
 	if stockCode == "" {
 		return nil, fmt.Errorf("stock code is empty")
 	}

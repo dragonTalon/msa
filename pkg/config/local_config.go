@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	log "github.com/sirupsen/logrus"
+	"msa/pkg/db"
 	"msa/pkg/model"
 	"os"
 	"path/filepath"
@@ -131,6 +132,9 @@ func InitConfig() error {
 		cfg.File = filepath.Join(configDir, LOG_FILE)
 		InitLogger(cfg)
 	}
+
+	// 初始化 SQLite（非阻塞）
+	db.InitGlobalDB()
 
 	return nil
 }

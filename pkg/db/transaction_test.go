@@ -42,9 +42,9 @@ func TestCreateTransaction(t *testing.T) {
 		StockName: "贵州茅台",
 		Type:      model.TransactionTypeBuy,
 		Quantity:  100,
-		Price:     180000, // 1800.00元
+		Price:     180000, // 18.00元
 		Amount:    18000000,
-		Fee:       50,      // 0.50元
+		Fee:       5000,   // 0.50元
 		Status:    model.TransactionStatusPending,
 		Note:      "测试交易",
 	}
