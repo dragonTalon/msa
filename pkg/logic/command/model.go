@@ -13,6 +13,7 @@ import (
 
 func init() {
 	RegisterCommand(&ListModel{})
+	RegisterCommand(&ConfigCommand{})
 	// SetModel 命令已被交互式选择器替代，使用 /models 或 /model 命令
 	// RegisterCommand(&SetModel{})
 }
@@ -80,4 +81,76 @@ func (l *ListModel) ToSelect(items []*model.SelectorItem) (*model.BaseSelector, 
 			return nil
 		},
 	}, nil
+}
+
+// ConfigCommand 配置管理命令
+type ConfigCommand struct{}
+
+func (c *ConfigCommand) Name() string {
+	return "config"
+}
+
+func (c *ConfigCommand) Description() string {
+	return "Show current configuration or open config TUI (run 'msa config' in terminal)"
+}
+
+func (c *ConfigCommand) Run(ctx context.Context, args []string) (*model.CmdResult, error) {
+	cfg := config.GetLocalStoreConfig()
+
+	// 构建配置信息
+	configInfo := fmt.Sprintf(`当前配置:
+
+Provider: %s
+Model: %s
+Base URL: %s
+API Key: %s
+日志级别: %s
+日志文件: %s
+
+💡 提示: 运行 'msa config' 命令打开配置管理界面`,
+		cfg.Provider,
+		cfg.Model,
+		cfg.BaseURL,
+		maskAPIKey(cfg.APIKey),
+		getLogLevelDisplay(cfg),
+		getLogFileDisplay(cfg),
+	)
+
+	return &model.CmdResult{
+		Code: 0,
+		Msg:  "success",
+		Type: "message",
+		Data: configInfo,
+	}, nil
+}
+
+func (c *ConfigCommand) ToSelect(items []*model.SelectorItem) (*model.BaseSelector, error) {
+	return nil, fmt.Errorf("config command does not support selector mode")
+}
+
+// maskAPIKey 隐藏 API Key 显示
+func maskAPIKey(apiKey string) string {
+	if apiKey == "" {
+		return "(未设置)"
+	}
+	if len(apiKey) <= 8 {
+		return apiKey
+	}
+	return apiKey[:4] + "..." + apiKey[len(apiKey)-4:]
+}
+
+// getLogLevelDisplay 获取日志级别显示
+func getLogLevelDisplay(cfg *config.LocalStoreConfig) string {
+	if cfg.LogConfig != nil && cfg.LogConfig.Level != "" {
+		return cfg.LogConfig.Level
+	}
+	return "info (默认)"
+}
+
+// getLogFileDisplay 获取日志文件显示
+func getLogFileDisplay(cfg *config.LocalStoreConfig) string {
+	if cfg.LogConfig != nil && cfg.LogConfig.File != "" {
+		return cfg.LogConfig.File
+	}
+	return "(未设置，输出到标准输出)"
 }

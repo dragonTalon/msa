@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -15,11 +16,23 @@ import (
 	"msa/pkg/tui/style"
 )
 
+var (
+	// configArgs --config 参数的值
+	configArgs []string
+)
+
 var rootCmd = &cobra.Command{
 	Use:   "msa",
 	Short: "My Stock Agent CLI",
 	Long:  style.Logo,
 	RunE:  runRoot,
+}
+
+func init() {
+	rootCmd.PersistentFlags().StringArrayVar(&configArgs, "config", nil, "配置参数（格式：key=value 或文件路径）")
+
+	// 注册 config 子命令
+	rootCmd.AddCommand(ConfigCmd)
 }
 
 // runRoot 根命令执行函数，仅做路由调用
@@ -34,6 +47,12 @@ func Execute() {
 
 // ExecuteWithSignal 执行命令并处理信号
 func ExecuteWithSignal(rootCmd *cobra.Command) {
+	// 解析 --config 参数
+	cliCfg := parseConfigArgs(configArgs)
+	if cliCfg != nil {
+		config.SetCLIConfig(cliCfg)
+	}
+
 	// 初始化配置
 	if err := config.InitConfig(); err != nil {
 		log.Warnf("初始化配置失败: %v", err)
@@ -55,6 +74,66 @@ func ExecuteWithSignal(rootCmd *cobra.Command) {
 		log.Errorf("MSA execute failed: %v", err)
 		log.Fatal(err)
 	}
+}
+
+// parseConfigArgs 解析 --config 参数
+func parseConfigArgs(args []string) *config.LocalStoreConfig {
+	if len(args) == 0 {
+		return nil
+	}
+
+	result := &config.LocalStoreConfig{}
+
+	for _, arg := range args {
+		cfg, err := config.ParseConfigArg(arg)
+		if err != nil {
+			log.Warnf("解析配置参数失败: %s, 错误: %v", arg, err)
+			fmt.Printf("使用说明:\n")
+			fmt.Printf("  --config key=value    设置配置项\n")
+			fmt.Printf("  --config /path/to/file 加载配置文件\n")
+			fmt.Printf("  支持的配置项: provider, apikey, baseurl, loglevel, logfile\n")
+			continue
+		}
+
+		// 合并配置
+		if cfg.Provider != "" {
+			result.Provider = cfg.Provider
+		}
+		if cfg.APIKey != "" {
+			result.APIKey = cfg.APIKey
+		}
+		if cfg.BaseURL != "" {
+			result.BaseURL = cfg.BaseURL
+		}
+		if cfg.Model != "" {
+			result.Model = cfg.Model
+		}
+		if cfg.LogConfig != nil {
+			if result.LogConfig == nil {
+				result.LogConfig = &config.LogConfig{}
+			}
+			if cfg.LogConfig.Level != "" {
+				result.LogConfig.Level = cfg.LogConfig.Level
+			}
+			if cfg.LogConfig.Format != "" {
+				result.LogConfig.Format = cfg.LogConfig.Format
+			}
+			if cfg.LogConfig.Output != "" {
+				result.LogConfig.Output = cfg.LogConfig.Output
+			}
+			if cfg.LogConfig.File != "" {
+				result.LogConfig.File = cfg.LogConfig.File
+			}
+			if cfg.LogConfig.TimeFormat != "" {
+				result.LogConfig.TimeFormat = cfg.LogConfig.TimeFormat
+			}
+			if cfg.LogConfig.ShowColor {
+				result.LogConfig.ShowColor = cfg.LogConfig.ShowColor
+			}
+		}
+	}
+
+	return result
 }
 
 // NotifySignal 创建带信号监听的上下文

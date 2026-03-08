@@ -1,10 +1,61 @@
 package model
 
+import (
+	"fmt"
+	"strings"
+)
+
 type LlmProvider string
 
 const (
 	Siliconflow LlmProvider = "siliconflow"
 )
+
+// ProviderInfo Provider 元信息
+type ProviderInfo struct {
+	ID             LlmProvider
+	DisplayName    string
+	Description    string
+	DefaultBaseURL string
+	KeyPrefix      string
+}
+
+// ProviderRegistry Provider 注册表
+var ProviderRegistry = map[LlmProvider]ProviderInfo{
+	Siliconflow: {
+		ID:             Siliconflow,
+		DisplayName:    "SiliconFlow (硅基流动)",
+		Description:    "国内 LLM API 提供商，兼容 OpenAI 格式",
+		DefaultBaseURL: "https://api.siliconflow.cn/v1",
+		KeyPrefix:      "sk-",
+	},
+}
+
+// GetDisplayName 获取 Provider 的友好显示名称
+func (p LlmProvider) GetDisplayName() string {
+	if info, ok := ProviderRegistry[p]; ok {
+		return info.DisplayName
+	}
+	return string(p)
+}
+
+// GetDefaultBaseURL 获取 Provider 的默认 Base URL
+func (p LlmProvider) GetDefaultBaseURL() string {
+	if info, ok := ProviderRegistry[p]; ok {
+		return info.DefaultBaseURL
+	}
+	return ""
+}
+
+// ValidateAPIKey 验证 API Key 格式
+func (p LlmProvider) ValidateAPIKey(key string) error {
+	if info, ok := ProviderRegistry[p]; ok && info.KeyPrefix != "" {
+		if !strings.HasPrefix(key, info.KeyPrefix) {
+			return fmt.Errorf("API Key 应该以 %s 开头", info.KeyPrefix)
+		}
+	}
+	return nil
+}
 
 type ToolGroup string
 

@@ -140,3 +140,26 @@ func TestSiliconflowProvider_Registered(t *testing.T) {
 		}
 	}
 }
+
+// TestGetRegisteredProviders tests the GetRegisteredProviders function
+func TestGetRegisteredProviders(t *testing.T) {
+	providers := GetRegisteredProviders()
+
+	// Verify Siliconflow is in the list
+	found := false
+	for _, p := range providers {
+		if p == model.Siliconflow {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Errorf("GetRegisteredProviders() should include Siliconflow, got %v", providers)
+	}
+
+	// Verify the list is not empty
+	if len(providers) == 0 {
+		t.Error("GetRegisteredProviders() should return at least one provider")
+	}
+}
