@@ -2,42 +2,42 @@ package agent
 
 import (
 	"context"
-	"time"
 
 	"github.com/cloudwego/eino/components/prompt"
 	"github.com/cloudwego/eino/schema"
 	log "github.com/sirupsen/logrus"
 )
 
-func GetDefaultTemplate(ctx context.Context, question string, history []*schema.Message) ([]*schema.Message, error) {
-	// 构建股票分析专用的消息模板
-	historyTag := false
-	if len(history) > 0 {
-		historyTag = true
-	}
+// BuildQueryMessages 使用 eino 的 prompt.FromMessages + schema.GoTemplate 构建完整的查询消息
+// 流程：SystemMessage(BasePromptTemplate) -> chat_history -> UserMessage(BaseUserPrompt + skill + question)
+func BuildQueryMessages(ctx context.Context, question string, history []*schema.Message, skillPrompt string, vars map[string]any) ([]*schema.Message, error) {
+	hasHistory := len(history) > 0
+
 	template := prompt.FromMessages(schema.GoTemplate,
-		// 系统消息模板 - 定义股票分析助手的角色和行为准则
+		// 系统消息模板 - 角色定义 + 核心规范
 		schema.SystemMessage(BasePromptTemplate),
 
 		// 对话历史占位符（兼容多轮对话）
-		schema.MessagesPlaceholder("chat_history", historyTag),
+		schema.MessagesPlaceholder("chat_history", hasHistory),
 
-		// 用户消息模板 - 接收用户的股票分析问题
-		schema.UserMessage("问题: {{.question}}"),
+		// 用户消息模板 - 技能模块 + 任务要求 + 用户问题
+		schema.UserMessage(BaseUserPrompt),
 	)
 
-	// 格式化模板并填充参数
-	now := time.Now()
-	messages, err := template.Format(ctx, map[string]any{
-		"role":         "专业股票分析助手",
-		"style":        "理性、专业、客观且严谨",
-		"time":         now.Format("2006-01-02 15:04:05"),
-		"weekday":      now.Format("2006年01月02日 星期Monday"),
+	// 合并模板变量
+	templateVars := map[string]any{
 		"question":     question,
+		"skill_prompt": skillPrompt,
 		"chat_history": history,
-	})
+	}
+	// 注入外部传入的变量（role, style, time, weekday 等）
+	for k, v := range vars {
+		templateVars[k] = v
+	}
+
+	messages, err := template.Format(ctx, templateVars)
 	if err != nil {
-		log.Errorf("格式化股票分析模板失败: %v", err)
+		log.Errorf("格式化查询消息模板失败: %v", err)
 		return nil, err
 	}
 	return messages, nil

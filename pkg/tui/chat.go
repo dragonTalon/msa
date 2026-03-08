@@ -49,7 +49,7 @@ const (
 // Chat TUI聊天模型
 type Chat struct {
 	textInput          textinput.Model           // 文本输入组件
-	history            []model.Message           // 历史消息
+	history            []model.Message           // 历史消息（只包含 User 和 Assistant）
 	pendingMsgs        []model.Message           // 待 flush 的消息
 	ctx                context.Context           // 上下文
 	width              int                       // 终端宽度
@@ -58,7 +58,8 @@ type Chat struct {
 	commandList        []string                  // 命令列表
 	streamingMsg       string                    // 流式输出的临时内容
 	isStreaming        bool                      // 是否正在流式输出
-	fullStreamContent  strings.Builder           // 完整的流式内容
+	fullStreamContent  strings.Builder           // 当前 segment 的流式内容
+	allStreamContent   strings.Builder           // 完整的 assistant 回复（跨 segment 累积）
 	streamOutputCh     <-chan *model.StreamChunk // 流式输出 channel
 	streamUnregister   func()                    // 取消订阅函数
 	currentSegment     strings.Builder           // 当前消息段内容
@@ -177,7 +178,6 @@ func (c *Chat) renderPendingMessages() string {
 		case model.RoleUser:
 			sb.WriteString(style.ChatUserMsgStyle.Render("👤 你: "))
 			sb.WriteString(style.ChatNormalMsgStyle.Render(msg.Content))
-			c.history = append(c.history, msg)
 		case model.RoleSystem:
 			sb.WriteString(style.ChatSystemMsgStyle.Render("🔧 系统: "))
 			sb.WriteString(style.ChatNormalMsgStyle.Render(msg.Content))
@@ -308,17 +308,36 @@ func (c *Chat) chatStreamMsg(msg *model.StreamChunk) (tea.Model, tea.Cmd) {
 	}
 
 	if msg.IsDone {
-		fullContent := c.fullStreamContent.String()
-		log.Debugf("流式输出结束，总长度: %d", len(fullContent))
+		// 将当前 segment 内容追加到完整回复
+		if c.fullStreamContent.Len() > 0 {
+			if c.allStreamContent.Len() > 0 {
+				c.allStreamContent.WriteString("\n")
+			}
+			c.allStreamContent.WriteString(c.fullStreamContent.String())
+		}
+
+		// 使用 allStreamContent 作为完整的 assistant 回复存入 history
+		allContent := c.allStreamContent.String()
+		log.Debugf("流式输出结束，总长度: %d", len(allContent))
+
+		// 获取当前 segment 内容用于 UI 显示
+		latestSegmentContent := c.fullStreamContent.String()
+		latestSegmentType := c.currentSegmentType
+
 		c.clearStreamState()
 
-		if fullContent != "" {
+		if allContent != "" {
+			// 完整内容存入 history（包含所有 segment）
 			c.history = append(c.history, model.Message{
 				Role:    model.RoleAssistant,
-				Content: fullContent,
+				Content: allContent,
 				MsgType: model.StreamMsgTypeText,
 			})
-			c.addMessage(model.RoleAssistant, fullContent, model.StreamMsgTypeText)
+		}
+
+		// UI 只显示最后一个 segment
+		if latestSegmentContent != "" {
+			c.addMessage(model.RoleAssistant, latestSegmentContent, latestSegmentType)
 		}
 		return c, c.Flush()
 	}
@@ -333,15 +352,22 @@ func (c *Chat) chatStreamMsg(msg *model.StreamChunk) (tea.Model, tea.Cmd) {
 
 	// 如果当前有流式内容，且新消息类型与当前不同，先flush之前的内容
 	if !isFirst && c.currentSegmentType != "" && c.currentSegmentType != msg.MsgType {
-		// 保存之前的内容
+		// 保存之前的内容到完整回复累积器
 		prevContent := c.fullStreamContent.String()
 		prevMsgType := c.currentSegmentType
 
-		// 清空流式状态
+		if prevContent != "" {
+			if c.allStreamContent.Len() > 0 {
+				c.allStreamContent.WriteString("\n")
+			}
+			c.allStreamContent.WriteString(prevContent)
+		}
+
+		// 清空当前 segment 的流式状态
 		c.fullStreamContent.Reset()
 		c.streamingMsg = ""
 
-		// 将之前的内容添加到消息列表
+		// 将之前的内容添加到 UI 显示
 		if prevContent != "" {
 			c.addMessage(model.RoleAssistant, prevContent, prevMsgType)
 		}
@@ -518,6 +544,7 @@ func (c *Chat) startStreaming() tea.Cmd {
 	c.isStreaming = true
 	c.streamingMsg = style.ChatNormalMsgStyle.Render(thinkingMessage)
 	c.fullStreamContent.Reset()
+	c.allStreamContent.Reset()
 	c.currentSegment.Reset()
 	c.currentSegmentType = ""
 	c.streamSegments = make([]model.Message, 0)
@@ -551,6 +578,7 @@ func (c *Chat) clearStreamState() {
 	c.isStreaming = false
 	c.streamingMsg = ""
 	c.fullStreamContent.Reset()
+	c.allStreamContent.Reset()
 	c.currentSegment.Reset()
 	c.currentSegmentType = ""
 	c.streamSegments = nil
@@ -575,6 +603,12 @@ func (c *Chat) handleEnterKey() (tea.Model, tea.Cmd) {
 		return c, nil
 	}
 
+	// 先将用户消息存入 history（解耦 UI 渲染）
+	c.history = append(c.history, model.Message{
+		Role:    model.RoleUser,
+		Content: input,
+		MsgType: model.StreamMsgTypeText,
+	})
 	c.addMessage(model.RoleUser, input, model.StreamMsgTypeText)
 	c.textInput.Reset()
 

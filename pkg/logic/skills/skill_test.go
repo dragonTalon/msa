@@ -248,3 +248,62 @@ func TestSkillSourceString(t *testing.T) {
 		})
 	}
 }
+
+// TestExtractBody 测试 extractBody 函数
+func TestExtractBody(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "Content with YAML frontmatter",
+			input:    "---\nname: test\npriority: 5\n---\n# Title\nContent here",
+			expected: "# Title\nContent here",
+		},
+		{
+			name:     "Content without YAML frontmatter",
+			input:    "# Title\nNo frontmatter here",
+			expected: "# Title\nNo frontmatter here",
+		},
+		{
+			name:     "Only YAML frontmatter, no body",
+			input:    "---\nname: test\n---\n",
+			expected: "",
+		},
+		{
+			name:     "Empty content",
+			input:    "",
+			expected: "",
+		},
+		{
+			name:     "Only frontmatter markers - no second marker",
+			input:    "------\n",
+			expected: "------\n", // 只有第一个 ---，找不到第二个，返回整个内容
+		},
+		{
+			name:     "No closing frontmatter",
+			input:    "---\nname: test\npriority: 5\n# Content without closing",
+			expected: "---\nname: test\npriority: 5\n# Content without closing",
+		},
+		{
+			name:     "Body with CRLF line endings",
+			input:    "---\r\nname: test\r\n---\r\n# Title\r\nContent",
+			expected: "# Title\r\nContent",
+		},
+		{
+			name:     "Body with multiple newlines after frontmatter",
+			input:    "---\nname: test\n---\n\n\n# Title\n\nContent",
+			expected: "# Title\n\nContent",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := extractBody([]byte(tt.input))
+			if result != tt.expected {
+				t.Errorf("Expected %q, got %q", tt.expected, result)
+			}
+		})
+	}
+}
