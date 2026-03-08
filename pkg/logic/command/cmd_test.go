@@ -159,77 +159,85 @@ func TestGetLikeCommand(t *testing.T) {
 	}
 
 	tests := []struct {
-		name     string
-		input    string
-		wantLen  int
-		contains []string // expected commands in result
+		name       string
+		input      string
+		wantNil    bool     // 期望返回 nil
+		minLen     int      // 最小期望长度（因为全局 commandMap 可能有预注册的命令）
+		contains   []string // 必须包含的命令
+		notContain []string // 必须不包含的命令
 	}{
 		{
-			name:     "empty prefix returns all commands",
+			name:     "empty prefix returns nil",
 			input:    "",
-			wantLen:  0, // empty string returns nil, not all commands
+			wantNil:  true,
 			contains: []string{},
 		},
 		{
-			name:     "prefix s matches search, show, select",
+			name:     "prefix s matches search, show, select, skills",
 			input:    "s",
-			wantLen:  4, // May include other pre-registered commands
-			contains: []string{"search", "show", "select"},
+			minLen:   4, // search, show, select (测试注册) + skills (init 注册)
+			contains: []string{"search", "show", "select", "skills"},
 		},
 		{
 			name:     "prefix se matches search, select",
 			input:    "se",
-			wantLen:  2,
+			minLen:   2,
 			contains: []string{"search", "select"},
 		},
 		{
-			name:     "exact match",
+			name:     "exact match show",
 			input:    "show",
-			wantLen:  1,
+			minLen:   1,
 			contains: []string{"show"},
 		},
 		{
 			name:     "no matches",
 			input:    "xyz",
-			wantLen:  0,
+			wantNil:  true,
 			contains: []string{},
 		},
 		{
 			name:     "with slash prefix",
 			input:    "/s",
-			wantLen:  4, // May include other pre-registered commands
-			contains: []string{"search", "show", "select"},
+			minLen:   4,
+			contains: []string{"search", "show", "select", "skills"},
 		},
 		{
 			name:     "uppercase prefix",
 			input:    "S",
-			wantLen:  4, // May include other pre-registered commands
-			contains: []string{"search", "show", "select"},
+			minLen:   4,
+			contains: []string{"search", "show", "select", "skills"},
 		},
 		{
 			name:     "mixed case prefix",
 			input:    "Se",
-			wantLen:  2, // search, select
+			minLen:   2,
 			contains: []string{"search", "select"},
 		},
 		{
 			name:     "slash with uppercase",
 			input:    "/S",
-			wantLen:  4, // May include other pre-registered commands
-			contains: []string{"search", "show", "select"},
+			minLen:   4,
+			contains: []string{"search", "show", "select", "skills"},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := GetLikeCommand(tt.input)
-			if got == nil {
-				if tt.wantLen > 0 {
-					t.Errorf("GetLikeCommand(%q) = nil, want %d items", tt.input, tt.wantLen)
+			if tt.wantNil {
+				if got != nil && len(got) > 0 {
+					t.Errorf("GetLikeCommand(%q) = %v, want nil or empty", tt.input, got)
 				}
 				return
 			}
-			if len(got) != tt.wantLen {
-				t.Errorf("GetLikeCommand(%q) length = %d, want %d", tt.input, len(got), tt.wantLen)
+			if got == nil {
+				if tt.minLen > 0 {
+					t.Errorf("GetLikeCommand(%q) = nil, want at least %d items", tt.input, tt.minLen)
+				}
+				return
+			}
+			if len(got) < tt.minLen {
+				t.Errorf("GetLikeCommand(%q) length = %d, want at least %d", tt.input, len(got), tt.minLen)
 			}
 			// Check that expected commands are present
 			for _, expected := range tt.contains {
@@ -242,6 +250,14 @@ func TestGetLikeCommand(t *testing.T) {
 				}
 				if !found {
 					t.Errorf("GetLikeCommand(%q) does not contain expected command %q", tt.input, expected)
+				}
+			}
+			// Check that unexpected commands are NOT present
+			for _, unexpected := range tt.notContain {
+				for _, cmd := range got {
+					if cmd == unexpected {
+						t.Errorf("GetLikeCommand(%q) should not contain command %q", tt.input, unexpected)
+					}
 				}
 			}
 		})
