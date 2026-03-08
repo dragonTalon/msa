@@ -54,14 +54,13 @@ func GetChatModel(ctx context.Context) (*react.Agent, error) {
 		APIKey:  cfg.APIKey,
 		BaseURL: cfg.BaseURL,
 	}
-	//TODO 关闭思考
-	//if strings.HasPrefix(cfg.Model, "deepseek-") {
-	//	config.ExtraFields = map[string]any{
-	//		"enable_thinking": true,
-	//	}
-	//} else {
-	//	config.ReasoningEffort = openai.ReasoningEffortLevelMedium
-	//}
+	if strings.HasPrefix(cfg.Model, "deepseek-") {
+		config.ExtraFields = map[string]any{
+			"enable_thinking": true,
+		}
+	} else {
+		config.ReasoningEffort = openai.ReasoningEffortLevelMedium
+	}
 
 	// 创建并缓存 ChatModel
 	chatModel, err := openai.NewChatModel(ctx, config)
@@ -148,7 +147,7 @@ func toolCallChecker(ctx context.Context, sr *schema.StreamReader[*schema.Messag
 				Content: msg.ReasoningContent,
 				MsgType: model.StreamMsgTypeReason,
 			})
-			return false, nil
+			continue
 		}
 		// 广播给所有订阅者
 		streamManager.Broadcast(&msamodel.StreamChunk{
