@@ -2,12 +2,15 @@ package skills
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"msa/pkg/utils"
 	"strings"
 
 	"github.com/cloudwego/eino-ext/components/model/openai"
+	"github.com/cloudwego/eino/components/prompt"
 	"github.com/cloudwego/eino/schema"
+
+	"msa/pkg/model"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -40,15 +43,16 @@ func NewSelector(llm *openai.ChatModel, registry *Registry) *Selector {
 }
 
 // SelectSkills 使用 LLM 选择合适的 Skills
-func (s *Selector) SelectSkills(ctx context.Context, userInput string) (*SelectionResult, error) {
+// history: 对话历史，用于让 LLM 理解上下文（如"它"指代什么）
+func (s *Selector) SelectSkills(ctx context.Context, userInput string, history []model.Message) (*SelectionResult, error) {
 	// 获取可用 skills（过滤禁用的）
 	disabledMap := getDisabledSkillsMap()
 	skills := s.registry.ListAvailable(disabledMap)
 
 	// 构建轻量级 metadata 列表
-	metadatas := make([]SkillMetadata, len(skills))
+	metadataList := make([]SkillMetadata, len(skills))
 	for i, skill := range skills {
-		metadatas[i] = SkillMetadata{
+		metadataList[i] = SkillMetadata{
 			Name:        skill.Name,
 			Description: skill.Description,
 			Priority:    skill.Priority,
@@ -56,33 +60,37 @@ func (s *Selector) SelectSkills(ctx context.Context, userInput string) (*Selecti
 	}
 
 	log.Infof("Skill Selector: selecting skills for input: %s", truncate(userInput, 50))
-	log.Debugf("Available skills: %v", formatSkillsForLog(metadatas))
+	log.Debugf("Available skills: %v", formatSkillsForLog(metadataList))
 
-	// 构建选择 Prompt
-	prompt := s.buildSelectionPrompt(metadatas, userInput)
+	// 构建选择 Prompt（包含最近的对话历史作为上下文）
+	promptMessages, err := s.buildSelectionPrompt(ctx, metadataList, userInput, history)
+	if err != nil {
+		log.Warnf("Failed to build selection prompt, using base skill: %v", err)
+		return &SelectionResult{
+			SelectedSkills: []string{},
+			Reasoning:      "Prompt build failed, using fallback",
+		}, nil
+	}
 
 	// 调用 LLM
-	response, err := s.callLLM(ctx, prompt)
+	response, err := s.callLLM(ctx, promptMessages)
 	if err != nil {
 		log.Warnf("LLM selection failed, using base skill: %v", err)
 		return &SelectionResult{
-			SelectedSkills: []string{"base"},
+			SelectedSkills: []string{},
 			Reasoning:      "LLM selection failed, using fallback",
 		}, nil
 	}
 
 	// 解析结果
 	var result SelectionResult
-	if err := json.Unmarshal([]byte(response), &result); err != nil {
+	if err := utils.ParseJSON(response, &result); err != nil {
 		log.Warnf("Failed to parse LLM response, using base skill: %v", err)
 		return &SelectionResult{
-			SelectedSkills: []string{"base"},
+			SelectedSkills: []string{},
 			Reasoning:      "Parse failed, using fallback",
 		}, nil
 	}
-
-	// 确保 base skill 总是被选中
-	result.SelectedSkills = s.ensureBaseSkill(result.SelectedSkills)
 
 	// 按 priority 排序
 	result.SelectedSkills = s.sortByPriority(result.SelectedSkills, skills)
@@ -93,51 +101,80 @@ func (s *Selector) SelectSkills(ctx context.Context, userInput string) (*Selecti
 	return &result, nil
 }
 
-// buildSelectionPrompt 构建选择 Prompt
-func (s *Selector) buildSelectionPrompt(metadatas []SkillMetadata, userInput string) string {
-	var sb strings.Builder
+// selectionSystemTemplate 系统消息模板
+const selectionSystemTemplate = `你是一个 skill 选择器。根据用户输入和可用的 skills，选择最合适的 skills。
 
-	sb.WriteString("你是一个 skill 选择器。根据用户输入和可用的 skills，选择最合适的 skills。\n\n")
-	sb.WriteString("## 可用 Skills\n\n")
+## 可用 Skills
 
-	for _, meta := range metadatas {
-		sb.WriteString(fmt.Sprintf("### %s (优先级: %d)\n", meta.Name, meta.Priority))
-		sb.WriteString(fmt.Sprintf("%s\n\n", meta.Description))
+{{range .skills}}### {{.Name}} (优先级: {{.Priority}})
+{{.Description}}
+
+{{end}}{{if .history}}## 最近对话上下文
+
+{{range .history}}{{if eq .Role "user"}}用户: {{.Content}}
+{{else if eq .Role "assistant"}}助手: {{.Content}}
+{{end}}{{end}}
+{{end}}## 任务
+
+分析用户输入，返回应该激活的 skills（JSON格式）：
+` + "```json" + `
+{"selected_skills": ["skill-name-1", "skill-name-2"], "reasoning": "选择理由（中文）"}
+` + "```" + `
+
+## 规则
+
+1. 可以选择多个 skills
+2. 如果没有匹配的 skill，只返回 [""]
+3. 高优先级的 skill 优先选择`
+
+// buildSelectionPrompt 使用 eino prompt.FromMessages 构建选择 Prompt
+func (s *Selector) buildSelectionPrompt(ctx context.Context, metadatas []SkillMetadata, userInput string, history []model.Message) ([]*schema.Message, error) {
+	hasHistory := len(history) > 0
+	template := prompt.FromMessages(schema.GoTemplate,
+		schema.SystemMessage(selectionSystemTemplate),
+		schema.UserMessage("## 用户输入\n\n{{.user_input}}"),
+	)
+
+	// 截取最近 6 条历史，并转换为模板可用的结构
+	historySnippet := buildHistorySnippet(history)
+
+	return template.Format(ctx, map[string]any{
+		"skills":      metadatas,
+		"history":     historySnippet,
+		"has_history": hasHistory,
+		"user_input":  userInput,
+	})
+}
+
+// historyItem 用于模板渲染的对话历史条目
+type historyItem struct {
+	Role    string
+	Content string
+}
+
+// buildHistorySnippet 截取最近 6 条历史并转换为模板可用结构
+func buildHistorySnippet(history []model.Message) []historyItem {
+	if len(history) == 0 {
+		return nil
 	}
-
-	sb.WriteString("## 用户输入\n\n")
-	sb.WriteString(userInput)
-	sb.WriteString("\n\n")
-
-	sb.WriteString("## 任务\n\n")
-	sb.WriteString("分析用户输入，返回应该激活的 skills（JSON格式）：\n")
-	sb.WriteString("```json\n")
-	sb.WriteString(`{"selected_skills": ["skill-name-1", "skill-name-2"], "reasoning": "选择理由（中文）"}`)
-	sb.WriteString("\n```\n\n")
-
-	sb.WriteString("## 规则\n\n")
-	sb.WriteString("1. 总是包含 \"base\" skill（基础系统规则）\n")
-	sb.WriteString("2. 可以选择多个 skills\n")
-	sb.WriteString("3. 如果没有匹配的 skill，只返回 [\"base\"]\n")
-	sb.WriteString("4. 高优先级的 skill 优先选择\n")
-
-	return sb.String()
+	startIdx := 0
+	if len(history) > 6 {
+		startIdx = len(history) - 6
+	}
+	items := make([]historyItem, 0, len(history)-startIdx)
+	for _, msg := range history[startIdx:] {
+		switch msg.Role {
+		case model.RoleUser:
+			items = append(items, historyItem{Role: "user", Content: truncate(msg.Content, 200)})
+		case model.RoleAssistant:
+			items = append(items, historyItem{Role: "assistant", Content: truncate(msg.Content, 200)})
+		}
+	}
+	return items
 }
 
 // callLLM 调用 LLM
-func (s *Selector) callLLM(ctx context.Context, prompt string) (string, error) {
-	// 构建消息
-	messages := []*schema.Message{
-		{
-			Role:    schema.System,
-			Content: "You are a skill selection assistant. Respond only with valid JSON.",
-		},
-		{
-			Role:    schema.User,
-			Content: prompt,
-		},
-	}
-
+func (s *Selector) callLLM(ctx context.Context, messages []*schema.Message) (string, error) {
 	// 调用 LLM
 	response, err := s.llm.Generate(ctx, messages)
 	if err != nil {
@@ -167,18 +204,6 @@ func (s *Selector) callLLM(ctx context.Context, prompt string) (string, error) {
 	}
 
 	return content, nil
-}
-
-// ensureBaseSkill 确保 base skill 总是被选中
-func (s *Selector) ensureBaseSkill(skills []string) []string {
-	for _, skill := range skills {
-		if skill == "base" {
-			return skills
-		}
-	}
-
-	// base 不在列表中，添加到开头
-	return append([]string{"base"}, skills...)
 }
 
 // sortByPriority 按 priority 降序排序

@@ -1,59 +1,13 @@
 package skills
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"msa/pkg/model"
 )
-
-// TestSelectorEnsureBaseSkill 测试 ensureBaseSkill 方法
-func TestSelectorEnsureBaseSkill(t *testing.T) {
-	selector := &Selector{}
-
-	tests := []struct {
-		name     string
-		input    []string
-		expected []string
-	}{
-		{
-			name:     "Base already in list",
-			input:    []string{"base", "skill-a", "skill-b"},
-			expected: []string{"base", "skill-a", "skill-b"},
-		},
-		{
-			name:     "Base not in list",
-			input:    []string{"skill-a", "skill-b"},
-			expected: []string{"base", "skill-a", "skill-b"},
-		},
-		{
-			name:     "Empty list",
-			input:    []string{},
-			expected: []string{"base"},
-		},
-		{
-			name:     "Only base",
-			input:    []string{"base"},
-			expected: []string{"base"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := selector.ensureBaseSkill(tt.input)
-
-			if len(result) != len(tt.expected) {
-				t.Errorf("Expected length %d, got %d", len(tt.expected), len(result))
-				return
-			}
-
-			for i, expected := range tt.expected {
-				if result[i] != expected {
-					t.Errorf("At index %d: expected %s, got %s", i, expected, result[i])
-				}
-			}
-		})
-	}
-}
 
 // TestSelectorSortByPriority 测试 sortByPriority 方法
 func TestSelectorSortByPriority(t *testing.T) {
@@ -122,8 +76,24 @@ func TestSelectorBuildSelectionPrompt(t *testing.T) {
 	}
 
 	userInput := "What is the price of AAPL?"
+	ctx := context.Background()
 
-	prompt := selector.buildSelectionPrompt(metadatas, userInput)
+	promptMessages, err := selector.buildSelectionPrompt(ctx, metadatas, userInput, nil)
+	if err != nil {
+		t.Fatalf("buildSelectionPrompt failed: %v", err)
+	}
+
+	if len(promptMessages) == 0 {
+		t.Error("Expected non-empty prompt messages")
+		return
+	}
+
+	// 将消息转换为字符串以便验证内容
+	var contentBuilder strings.Builder
+	for _, msg := range promptMessages {
+		contentBuilder.WriteString(msg.Content)
+	}
+	prompt := contentBuilder.String()
 
 	// 验证包含关键部分
 	requiredStrings := []string{
@@ -372,5 +342,163 @@ func TestSkillMetadataStruct(t *testing.T) {
 
 	if decoded.Name != "test-skill" {
 		t.Errorf("Expected name 'test-skill' after round-trip, got '%s'", decoded.Name)
+	}
+}
+
+// TestBuildHistorySnippet 测试 buildHistorySnippet 函数
+func TestBuildHistorySnippet(t *testing.T) {
+	tests := []struct {
+		name          string
+		history       []model.Message
+		expectedLen   int
+		expectedFirst string
+		expectedLast  string
+	}{
+		{
+			name:          "Empty history",
+			history:       []model.Message{},
+			expectedLen:   0,
+			expectedFirst: "",
+			expectedLast:  "",
+		},
+		{
+			name: "Less than 6 messages",
+			history: []model.Message{
+				{Role: model.RoleUser, Content: "Hello"},
+				{Role: model.RoleAssistant, Content: "Hi there"},
+			},
+			expectedLen:   2,
+			expectedFirst: "Hello",
+			expectedLast:  "Hi there",
+		},
+		{
+			name: "Exactly 6 messages",
+			history: []model.Message{
+				{Role: model.RoleUser, Content: "Msg1"},
+				{Role: model.RoleAssistant, Content: "Msg2"},
+				{Role: model.RoleUser, Content: "Msg3"},
+				{Role: model.RoleAssistant, Content: "Msg4"},
+				{Role: model.RoleUser, Content: "Msg5"},
+				{Role: model.RoleAssistant, Content: "Msg6"},
+			},
+			expectedLen:   6,
+			expectedFirst: "Msg1",
+			expectedLast:  "Msg6",
+		},
+		{
+			name: "More than 6 messages - should take last 6",
+			history: []model.Message{
+				{Role: model.RoleUser, Content: "Msg1"},
+				{Role: model.RoleAssistant, Content: "Msg2"},
+				{Role: model.RoleUser, Content: "Msg3"},
+				{Role: model.RoleAssistant, Content: "Msg4"},
+				{Role: model.RoleUser, Content: "Msg5"},
+				{Role: model.RoleAssistant, Content: "Msg6"},
+				{Role: model.RoleUser, Content: "Msg7"},
+				{Role: model.RoleAssistant, Content: "Msg8"},
+			},
+			expectedLen:   6,
+			expectedFirst: "Msg3", // 最后6条中的第一条
+			expectedLast:  "Msg8", // 最后一条
+		},
+		{
+			name: "Filter out non-user/assistant roles",
+			history: []model.Message{
+				{Role: model.RoleSystem, Content: "System message"},
+				{Role: model.RoleUser, Content: "User message"},
+				{Role: model.RoleLogo, Content: "Logo message"},
+				{Role: model.RoleAssistant, Content: "Assistant message"},
+			},
+			expectedLen:   2,
+			expectedFirst: "User message",
+			expectedLast:  "Assistant message",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := buildHistorySnippet(tt.history)
+
+			if len(result) != tt.expectedLen {
+				t.Errorf("Expected %d items, got %d", tt.expectedLen, len(result))
+				return
+			}
+
+			if tt.expectedLen > 0 {
+				if result[0].Content != tt.expectedFirst {
+					t.Errorf("Expected first content '%s', got '%s'", tt.expectedFirst, result[0].Content)
+				}
+				if result[len(result)-1].Content != tt.expectedLast {
+					t.Errorf("Expected last content '%s', got '%s'", tt.expectedLast, result[len(result)-1].Content)
+				}
+			}
+		})
+	}
+}
+
+// TestTruncate 测试 truncate 辅助函数
+func TestTruncate(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		maxLen   int
+		expected string
+	}{
+		{
+			name:     "Short string - no truncation",
+			input:    "Hello",
+			maxLen:   10,
+			expected: "Hello",
+		},
+		{
+			name:     "Exact length - no truncation",
+			input:    "Hello",
+			maxLen:   5,
+			expected: "Hello",
+		},
+		{
+			name:     "Long string - truncation needed",
+			input:    "Hello World",
+			maxLen:   5,
+			expected: "Hello...",
+		},
+		{
+			name:     "Empty string",
+			input:    "",
+			maxLen:   10,
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := truncate(tt.input, tt.maxLen)
+			if result != tt.expected {
+				t.Errorf("Expected '%s', got '%s'", tt.expected, result)
+			}
+		})
+	}
+}
+
+// TestFormatSkillsForLog 测试 formatSkillsForLog 辅助函数
+func TestFormatSkillsForLog(t *testing.T) {
+	metadatas := []SkillMetadata{
+		{Name: "base", Priority: 10},
+		{Name: "stock", Priority: 8},
+		{Name: "news", Priority: 5},
+	}
+
+	result := formatSkillsForLog(metadatas)
+
+	// 验证格式：name(priority)
+	expected := "base(10), stock(8), news(5)"
+	if result != expected {
+		t.Errorf("Expected '%s', got '%s'", expected, result)
+	}
+
+	// 测试空列表
+	result = formatSkillsForLog([]SkillMetadata{})
+	if result != "" {
+		t.Errorf("Expected empty string for empty list, got '%s'", result)
 	}
 }

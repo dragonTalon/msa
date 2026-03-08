@@ -114,7 +114,13 @@ Custom skill content.`,
 
 	// 测试 Builder
 	builder := NewBuilder(registry)
-	prompt, err := builder.BuildSystemPrompt([]string{"base", "stock"})
+	testVars := PromptVars{
+		Time:    "2025-03-08 18:00:00",
+		Weekday: "2025年03月08日 星期六",
+		Role:    "专业股票分析助手",
+		Style:   "理性、专业、客观且严谨",
+	}
+	prompt, err := builder.BuildSystemPrompt([]string{"base", "stock"}, testVars)
 	if err != nil {
 		t.Fatalf("BuildSystemPrompt failed: %v", err)
 	}
@@ -122,10 +128,9 @@ Custom skill content.`,
 	// 验证 prompt 包含关键内容
 	requiredStrings := []string{
 		"【系统配置】",
-		"## Skill: base",
-		"Base System Rules",
-		"## Skill: stock",
-		"Stock Analysis",
+		"## Skill List",
+		"- name: base",
+		"- name: stock",
 	}
 
 	for _, required := range requiredStrings {

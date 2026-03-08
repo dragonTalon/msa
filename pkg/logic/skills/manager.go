@@ -1,7 +1,6 @@
 package skills
 
 import (
-	"fmt"
 	"path/filepath"
 
 	log "github.com/sirupsen/logrus"
@@ -89,10 +88,6 @@ func (m *Manager) IsDisabled(name string) bool {
 
 // DisableSkill 禁用指定 Skill
 func (m *Manager) DisableSkill(name string) error {
-	if name == "base" {
-		return fmt.Errorf("cannot disable 'base' skill")
-	}
-
 	config, err := loadConfig()
 	if err != nil {
 		config = getDefaultConfig()
