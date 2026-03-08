@@ -1,20 +1,131 @@
+# OpenSpec 配置文件
+# https://github.com/open-s4e/openspec
+
 schema: spec-driven
+version: "1.0"
 
-# Project context (optional)
-# This is shown to AI when creating artifacts.
-# Add your tech stack, conventions, style guides, domain knowledge, etc.
-# Example:
-#   context: |
-#     Tech stack: TypeScript, React, Node.js
-#     We use conventional commits
-#     Domain: e-commerce platform
+# 项目上下文
+# 这些上下文信息会在 AI 创建 artifacts 时展示给它
+# 包含技术栈、编码规范、风格指南、领域知识等
+context: |
+  ## 项目概述
+  MSA (Multi-Strategy Agent) - 基于 AI 的股票交易助手，提供 TUI 终端界面。
+  
+  ## 技术栈
+  - 语言: Go 1.21+
+  - CLI 框架: Cobra
+  - TUI 框架: Bubble Tea (charmbracelet)
+  - UI 样式: Lipgloss
+  - 日志: Logrus
+  - ORM: GORM
+  - 数据库: SQLite (github.com/glebarez/sqlite, 纯 Go 实现)
+  - AI/LLM 框架: Cloudwego Eino
+  - 支持的 LLM 提供商: SiliconFlow, OpenAI, Claude, Ollama
+  
+  ## 编码规范
+  - 遵循 Go 标准命名规范
+  - 错误处理: 返回 error，不要 panic
+  - 日志: 使用 logrus 结构化日志
+  - 所有金额以"毫"为单位存储（1 元 = 10000 毫）
+  - 配置优先级: 命令行参数 > 环境变量 > 配置文件 > 默认值
+  
+  ## 架构说明
+  - cmd/ - CLI 命令路由 (Cobra)
+  - pkg/app/ - 应用启动
+  - pkg/config/ - 配置管理
+  - pkg/db/ - 数据库层 (GORM)
+  - pkg/logic/ - 业务逻辑
+    - agent/ - AI 代理实现
+    - command/ - TUI 命令处理
+    - message/ - 消息/流管理
+    - provider/ - LLM 提供商实现
+    - tools/ - 工具实现（股票、搜索、金融）
+  - pkg/model/ - 数据模型
+  - pkg/service/ - 业务服务
+  - pkg/tui/ - 终端 UI 组件
+  - pkg/utils/ - 工具函数
+  
+  ## 领域知识
+  - 股票交易模拟与虚拟账户
+  - 持仓追踪与盈亏计算
+  - 通过网页抓取获取实时股票数据
+  - 通过 AI 解析自然语言交易指令
+  
+  ## 编译验证方式：
+  - go vet ./... 验证编译问题 不要使用 go build 
 
-# Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always include a "Non-goals" section
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
+# Artifact 规则
+# 为不同类型的 artifact 定义自定义规则
+rules:
+  proposal:
+    - 提案控制在 800 字以内
+    - 必须包含"非目标"章节
+    - 适用时引用相关规格文档
+    - 考虑向后兼容性
+  
+  tasks:
+    - 将任务拆分为不超过 4 小时的子任务
+    - 包含验证步骤
+    - 引用 knowledge/metadata/components.yaml 中的相关组件
+    - 使用 knowledge/metadata/tags.yaml 中的标签
+  
+  fix:
+    - 使用 .templates/fix.md 模板
+    - 必须包含根因分析
+    - 适用时关联相关模式或反模式
+    - 标记适当的组件和严重程度
+  
+  spec:
+    - 遵循格式: 目的、需求（含场景）
+    - 场景使用 Given-When-Then 格式
+    - 每个需求应可测试
+    - 修改行为时引用现有组件
+
+# 知识库配置
+knowledge:
+  enabled: true
+  components_file: knowledge/metadata/components.yaml
+  tags_file: knowledge/metadata/tags.yaml
+  index_file: knowledge/index.yaml
+  
+  # 从归档变更中自动收集
+  collect_from: changes/archive/*/fix.md
+  
+  # 输出目录
+  output:
+    issues: knowledge/issues
+    patterns: knowledge/patterns
+    anti_patterns: knowledge/anti-patterns
+    guides: knowledge/guides
+
+# 变更管理
+changes:
+  # 活跃变更目录
+  active: changes
+  
+  # 归档变更目录
+  archive: changes/archive
+  
+  # fix 文档模板
+  fix_template: .templates/fix.md
+
+# 扩展配置
+extensions:
+  skills_dir: extensions/skills
+  commands_dir: extensions/commands
+
+# Schema 验证
+validation:
+  # 验证规格文档
+  specs: true
+  
+  # 验证 fix 文档
+  fixes: true
+  
+  # 验证知识条目
+  knowledge: true
+
+# OpenSpec CLI 日志配置
+logging:
+  level: info
+  format: json

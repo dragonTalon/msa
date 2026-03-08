@@ -4,21 +4,28 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"strings"
+
+	"github.com/cloudwego/eino-ext/components/model/openai"
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/flow/agent/react"
-	"io"
+	"github.com/cloudwego/eino/schema"
+
 	"msa/pkg/config"
 	msamessage "msa/pkg/logic/message"
+	"msa/pkg/logic/skills"
 	tools2 "msa/pkg/logic/tools"
 	"msa/pkg/model"
 	msamodel "msa/pkg/model"
 
-	"github.com/cloudwego/eino-ext/components/model/openai"
-	"github.com/cloudwego/eino/schema"
 	log "github.com/sirupsen/logrus"
 )
 
-var agentCache *react.Agent
+var (
+	agentCache     *react.Agent
+	chatModelCache *openai.ChatModel
+)
 
 func GetChatModel(ctx context.Context) (*react.Agent, error) {
 	if agentCache != nil {
@@ -37,11 +44,27 @@ func GetChatModel(ctx context.Context) (*react.Agent, error) {
 	if cfg.Model == "" {
 		return nil, fmt.Errorf("openai model is empty, please run `/models choose model` first")
 	}
-	chatModel, err := openai.NewChatModel(ctx, &openai.ChatModelConfig{
+
+	config := &openai.ChatModelConfig{
 		Model:   cfg.Model,
-		APIKey:  cfg.APIKey,  // OpenAI API 密钥
-		BaseURL: cfg.BaseURL, // OpenAI 基础 URL
-	})
+		APIKey:  cfg.APIKey,
+		BaseURL: cfg.BaseURL,
+	}
+	if strings.HasPrefix(cfg.Model, "deepseek-") {
+		config.ExtraFields = map[string]any{
+			"enable_thinking": true,
+		}
+	} else {
+		config.ReasoningEffort = openai.ReasoningEffortLevelMedium
+	}
+
+	// 创建并缓存 ChatModel
+	chatModel, err := openai.NewChatModel(ctx, config)
+	if err != nil {
+		return nil, err
+	}
+	chatModelCache = chatModel
+
 	allTools := tools2.GetAllTools()
 	log.Infof("tools: %v", len(allTools))
 	for _, tool := range allTools {
@@ -69,6 +92,19 @@ func GetChatModel(ctx context.Context) (*react.Agent, error) {
 	}
 	agentCache = agent
 	return agent, nil
+}
+
+// GetChatModelOnly 只返回 ChatModel（用于 Selector）
+func GetChatModelOnly(ctx context.Context) (*openai.ChatModel, error) {
+	if chatModelCache != nil {
+		return chatModelCache, nil
+	}
+	// 触发 GetChatModel 来初始化
+	_, err := GetChatModel(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return chatModelCache, nil
 }
 
 func toolCallChecker(ctx context.Context, sr *schema.StreamReader[*schema.Message]) (bool, error) {
@@ -119,12 +155,75 @@ func toolCallChecker(ctx context.Context, sr *schema.StreamReader[*schema.Messag
 }
 
 // Ask 聊天（异步处理流式数据，通过 StreamOutputManager 广播）
-func Ask(ctx context.Context, messages string, history []model.Message) error {
-	chatModel, err := GetChatModel(ctx)
+// manualSkills: 手动指定的 skills 列表（优先级高于 LLM 自动选择），为空时使用自动选择
+func Ask(ctx context.Context, messages string, history []model.Message, manualSkills []string) error {
+	// 初始化 Skills 系统
+	skillManager := skills.GetManager()
+	if err := skillManager.Initialize(); err != nil {
+		log.Warnf("Failed to initialize skills: %v", err)
+		// 继续执行，使用基础 Prompt
+	}
+
+	var selectedSkills []string
+
+	// 检查是否有手动指定的 skills
+	if len(manualSkills) > 0 {
+		// 使用手动指定的 skills
+		selectedSkills = manualSkills
+		log.Infof("Using manual skills: %v", selectedSkills)
+
+		// 验证 skills 是否存在
+		validSkills := make([]string, 0, len(manualSkills))
+		for _, skillName := range manualSkills {
+			if _, err := skillManager.GetSkill(skillName); err != nil {
+				log.Warnf("Skill '%s' not found, skipping", skillName)
+			} else {
+				validSkills = append(validSkills, skillName)
+			}
+		}
+
+		// 确保 base skill 总是被包含
+		hasBase := false
+		for _, skillName := range validSkills {
+			if skillName == "base" {
+				hasBase = true
+				break
+			}
+		}
+		if !hasBase {
+			validSkills = append([]string{"base"}, validSkills...)
+		}
+
+		selectedSkills = validSkills
+	} else {
+		// 使用 LLM 自动选择
+		chatModel, err := GetChatModelOnly(ctx)
+		if err != nil {
+			return err
+		}
+
+		selector := skills.NewSelector(chatModel, skillManager.GetRegistry())
+		result, err := selector.SelectSkills(ctx, messages)
+		if err != nil {
+			log.Warnf("Skill selection failed: %v, using base skill", err)
+			selectedSkills = []string{"base"}
+		} else {
+			selectedSkills = result.SelectedSkills
+		}
+
+		log.Infof("Auto-selected skills: %v", selectedSkills)
+	}
+
+	// 构建 System Prompt
+	builder := skills.NewBuilder(skillManager.GetRegistry())
+	systemPrompt, err := builder.BuildSystemPrompt(selectedSkills)
 	if err != nil {
+		log.Errorf("Failed to build system prompt: %v", err)
 		return err
 	}
-	historyMsg := make([]*schema.Message, 0, len(history)) // ✅ 使用 0 长度，但预分配容量
+
+	// 准备历史消息
+	historyMsg := make([]*schema.Message, 0, len(history))
 	log.Infof("history: %v", len(history))
 	for _, msg := range history {
 		role := schema.System
@@ -144,17 +243,31 @@ func Ask(ctx context.Context, messages string, history []model.Message) error {
 		})
 	}
 
-	queryMsg, err := GetDefaultTemplate(ctx, messages, historyMsg)
+	// 构建查询消息
+	queryMsg := []*schema.Message{
+		{
+			Role:    schema.System,
+			Content: systemPrompt,
+		},
+	}
+	queryMsg = append(queryMsg, historyMsg...)
+	queryMsg = append(queryMsg, &schema.Message{
+		Role:    schema.User,
+		Content: fmt.Sprintf("问题: %s", messages),
+	})
+
 	log.Infof("queryMsg: %v", queryMsg)
+
+	// 获取 Agent
+	agent, err := GetChatModel(ctx)
 	if err != nil {
-		log.Errorf("获取模板失败: %v", err)
 		return err
 	}
 
 	// 启动异步流式处理
 	go func() {
 		// 发送流式请求
-		_, err := chatModel.Stream(ctx, queryMsg)
+		_, err := agent.Stream(ctx, queryMsg)
 		if err != nil {
 			log.Errorf("流式请求失败: %v", err)
 			// 广播错误

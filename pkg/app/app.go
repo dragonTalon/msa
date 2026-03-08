@@ -2,10 +2,11 @@ package app
 
 import (
 	"context"
-	"msa/pkg/tui"
 
 	tea "github.com/charmbracelet/bubbletea"
-	log "github.com/sirupsen/logrus"
+
+
+	"msa/pkg/tui"
 )
 
 // Run 启动应用主逻辑
