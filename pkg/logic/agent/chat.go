@@ -4,15 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/cloudwego/eino/compose"
+	"github.com/cloudwego/eino/flow/agent/react"
 	"io"
 	"msa/pkg/config"
 	msamessage "msa/pkg/logic/message"
 	tools2 "msa/pkg/logic/tools"
 	"msa/pkg/model"
 	msamodel "msa/pkg/model"
-
-	"github.com/cloudwego/eino/compose"
-	"github.com/cloudwego/eino/flow/agent/react"
 
 	"github.com/cloudwego/eino-ext/components/model/openai"
 	"github.com/cloudwego/eino/schema"
@@ -45,6 +44,14 @@ func GetChatModel(ctx context.Context) (*react.Agent, error) {
 	})
 	allTools := tools2.GetAllTools()
 	log.Infof("tools: %v", len(allTools))
+	for _, tool := range allTools {
+		tInfo, err := tool.Info(ctx)
+		if err != nil {
+			log.Errorf("tool info error: %v", err)
+			continue
+		}
+		log.Infof("tool: %v", tInfo.Name)
+	}
 
 	// 初始化所需的 tools
 	tools := compose.ToolsNodeConfig{

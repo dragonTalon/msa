@@ -6,21 +6,21 @@ import (
 
 // TestFetchStockData_EmptyCode tests fetchStockData with empty stock code
 func TestFetchStockData_EmptyCode(t *testing.T) {
-	result, err := fetchStockData("")
+	result, err := FetchStockData("")
 	if err == nil {
-		t.Error("fetchStockData() with empty code should return error")
+		t.Error("FetchStockData() with empty code should return error")
 	}
 	if result != nil {
-		t.Error("fetchStockData() with empty code should return nil result")
+		t.Error("FetchStockData() with empty code should return nil result")
 	}
 }
 
-// TestFetchStockData_InvalidCode tests fetchStockData with invalid code
+// TestFetchStockData_InvalidCode tests FetchStockData with invalid code
 // Note: This test makes actual HTTP requests, which may fail in CI environments
 // In production, you'd want to mock the HTTP client
 func TestFetchStockData_InvalidCode(t *testing.T) {
 	// Use an invalid stock code format
-	result, err := fetchStockData("invalid_code_12345")
+	result, err := FetchStockData("invalid_code_12345")
 	// This will likely fail with an HTTP error or invalid response
 	// We just verify it doesn't panic
 	_ = result
@@ -31,7 +31,7 @@ func TestFetchStockData_InvalidCode(t *testing.T) {
 func TestFetchStockData_RealAPI_Note(t *testing.T) {
 	t.Skip("Skipping real API test - requires HTTP mock setup")
 
-	// To properly test fetchStockData, we need to:
+	// To properly test FetchStockData, we need to:
 	// 1. Mock the HTTP client (mas_utils.GetRestyClient())
 	// 2. Set up test server responses
 	// 3. Test various scenarios (success, error, invalid JSON)

@@ -116,7 +116,7 @@ cp ~/.msa/msa.sqlite.backup.YYYYMMDD ~/.msa/msa.sqlite
 
 ### Amount Units
 
-**Important**: All monetary amounts are stored in "cents" (分) as integers to avoid floating-point precision issues.
+**Important**: All monetary amounts are stored in "cents" (毫) as integers to avoid floating-point precision issues.
 - `10000` = 100.00 元
 - Display conversion: `amount / 100 = displayed value`
 

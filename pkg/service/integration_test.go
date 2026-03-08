@@ -21,8 +21,8 @@ func TestTransactionCommit(t *testing.T) {
 		StockCode: "600519",
 		StockName: "贵州茅台",
 		Quantity:  10,
-		Price:     180000,
-		Fee:       50,
+		Price:     180000, // 18.00元
+		Fee:       5000,   // 0.50元
 	}
 
 	transID, err := SubmitBuyOrder(database, accountID, order)
@@ -43,11 +43,11 @@ func TestTransactionCommit(t *testing.T) {
 
 	// 2. 账户金额已更新
 	accountAfter, _ := db.GetAccountByID(database, accountID)
-	if accountAfter.AvailableAmt != availableBefore-1800050 {
+	if accountAfter.AvailableAmt != availableBefore-1805000 {
 		t.Errorf("available_amt not updated correctly")
 	}
 
-	if accountAfter.LockedAmt != 1800050 {
+	if accountAfter.LockedAmt != 1805000 {
 		t.Errorf("locked_amt not updated correctly")
 	}
 }
@@ -89,9 +89,9 @@ func TestTransactionRollback(t *testing.T) {
 		StockName: "贵州茅台",
 		Type:      model.TransactionTypeBuy,
 		Quantity:  10,
-		Price:     180000,
+		Price:     180000, // 18.00元
 		Amount:    1800000,
-		Fee:       50,
+		Fee:       5000,   // 0.50元
 		Status:    model.TransactionStatusPending,
 	}
 
@@ -101,7 +101,7 @@ func TestTransactionRollback(t *testing.T) {
 	}
 
 	// 更新账户金额
-	err = db.UpdateAccountAmounts(tx, accountID, -1800050, 1800050)
+	err = db.UpdateAccountAmounts(tx, accountID, -1805000, 1805000)
 	if err != nil {
 		t.Fatalf("UpdateAccountAmounts failed: %v", err)
 	}
@@ -153,7 +153,7 @@ func TestTransactionIntegrity(t *testing.T) {
 			StockName: tt.stockName,
 			Quantity:  tt.quantity,
 			Price:     tt.price,
-			Fee:       50,
+			Fee:       5000, // 0.50元
 		}
 
 		var transID uint
@@ -227,8 +227,8 @@ func TestTransactionErrorHandling(t *testing.T) {
 		StockCode: "600519",
 		StockName: "贵州茅台",
 		Quantity:  10000,
-		Price:     180000,
-		Fee:       50,
+		Price:     180000, // 18.00元
+		Fee:       5000,   // 0.50元
 	}
 
 	transID, err := SubmitBuyOrder(database, accountID, largeOrder)
@@ -260,8 +260,8 @@ func TestConcurrentTransactions(t *testing.T) {
 			StockCode: "600519",
 			StockName: "贵州茅台",
 			Quantity:  10,
-			Price:     180000,
-			Fee:       50,
+			Price:     180000, // 18.00元
+			Fee:       5000,   // 0.50元
 		}
 
 		_, err := SubmitBuyOrder(database, accountID, order)
@@ -293,8 +293,8 @@ func TestTransactionStates(t *testing.T) {
 		StockCode: "600519",
 		StockName: "贵州茅台",
 		Quantity:  10,
-		Price:     180000,
-		Fee:       50,
+		Price:     180000, // 18.00元
+		Fee:       5000,   // 0.50元
 	}
 
 	// PENDING → FILLED
