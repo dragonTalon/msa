@@ -2,9 +2,9 @@ package app
 
 import (
 	"context"
+	log "github.com/sirupsen/logrus"
 
 	tea "github.com/charmbracelet/bubbletea"
-
 
 	"msa/pkg/tui"
 )
