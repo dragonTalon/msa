@@ -3,13 +3,14 @@ package tui
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"msa/pkg/config"
 	"msa/pkg/logic/agent"
 	command "msa/pkg/logic/command"
 	"msa/pkg/logic/message"
 	"msa/pkg/model"
 	"msa/pkg/tui/style"
-	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -17,6 +18,12 @@ import (
 	listStyle "github.com/charmbracelet/lipgloss/list"
 	log "github.com/sirupsen/logrus"
 )
+
+// contextKey 是 context 的键类型
+type contextKey string
+
+// manualSkillsKey 是手动指定 skills 的 context 键（与 cmd/root.go 中定义的相同）
+const manualSkillsKey contextKey = "manualSkills"
 
 const (
 	// UI 相关常量
@@ -35,8 +42,8 @@ const (
 	welcomeMessage      = "欢迎使用 MSA！输入你的理财问题吧..."
 	thinkingMessage     = "⏳ 正在思考..."
 	clearSuccessMessage = "对话已清空，重新开始吧！"
-	helpMessage         = "📋 可用命令:\n  • clear - 清空对话\n  • help/? - 显示帮助\n  • quit/exit - 退出程序"
-	helpHint            = "ESC/Ctrl+C: 退出 | Ctrl+K: 清空 | Enter: 发送"
+	helpMessage         = "📋 可用命令:\n  • clear - 清空对话\n  • /skills - 列出所有可用的 Skills\n  • /skills: <name1>,<name2> - 手动指定 skills\n  • help/? - 显示帮助\n  • quit/exit - 退出程序"
+	helpHint            = "ESC/Ctrl+C: 退出 | Ctrl+K: 清空 | /skills 查看列表 | Enter: 发送"
 )
 
 // Chat TUI聊天模型
@@ -57,6 +64,8 @@ type Chat struct {
 	currentSegment     strings.Builder           // 当前消息段内容
 	currentSegmentType model.StreamMsgType       // 当前消息段类型
 	streamSegments     []model.Message           // 流式输出的消息段
+	sessionSkills      []string                  // 会话级别的手动 skills（来自 CLI --skills）
+	oneTimeSkills      []string                  // 一次性 skills（来自 /skills: 命令，用后即焚）
 }
 
 // maskAPIKey 隐藏 APIKey，只显示前4个和后4个字符
@@ -93,17 +102,42 @@ func NewChat(ctx context.Context) *Chat {
 		modelName = "未设置"
 	}
 
+	// 从 context 中提取手动指定的 skills
+	var manualSkills []string
+	if skills, ok := ctx.Value(manualSkillsKey).([]string); ok && len(skills) > 0 {
+		manualSkills = skills
+		log.Infof("从 CLI 参数获取手动 skills: %v", manualSkills)
+	}
+
+	pendingMsgs := []model.Message{
+		{Role: model.RoleLogo, Content: style.GetStyledLogo()},
+		{Role: model.RoleSystem, Content: fmt.Sprintf("模型供应商: %s", cfg.Provider)},
+		{Role: model.RoleSystem, Content: fmt.Sprintf("模型 : %s", modelName)},
+		{Role: model.RoleSystem, Content: fmt.Sprintf("APIKey : %s", maskAPIKey(cfg.APIKey))},
+		{Role: model.RoleSystem, Content: welcomeMessage},
+	}
+
+	// 如果有手动指定的 skills，显示提示
+	if len(manualSkills) > 0 {
+		pendingMsgs = append(pendingMsgs, model.Message{
+			Role:    model.RoleSystem,
+			Content: fmt.Sprintf("✓ 已手动指定 skills: %v", manualSkills),
+			MsgType: model.StreamMsgTypeText,
+		})
+		pendingMsgs = append(pendingMsgs, model.Message{
+			Role:    model.RoleSystem,
+			Content: "提示: 在此会话中，所有对话都将使用指定的 skills",
+			MsgType: model.StreamMsgTypeText,
+		})
+	}
+
 	return &Chat{
-		textInput: ti,
-		pendingMsgs: []model.Message{
-			{Role: model.RoleLogo, Content: style.GetStyledLogo()},
-			{Role: model.RoleSystem, Content: fmt.Sprintf("模型供应商: %s", cfg.Provider)},
-			{Role: model.RoleSystem, Content: fmt.Sprintf("模型 : %s", modelName)},
-			{Role: model.RoleSystem, Content: fmt.Sprintf("APIKey : %s", maskAPIKey(cfg.APIKey))},
-			{Role: model.RoleSystem, Content: welcomeMessage},
-		},
-		ctx:     ctx,
-		history: make([]model.Message, 0),
+		textInput:     ti,
+		pendingMsgs:   pendingMsgs,
+		ctx:           ctx,
+		history:       make([]model.Message, 0),
+		sessionSkills: manualSkills,
+		oneTimeSkills: nil,
 	}
 }
 
@@ -560,6 +594,11 @@ func (c *Chat) handleEnterKey() (tea.Model, tea.Cmd) {
 		return c, tea.Quit
 	}
 
+	// 处理 /skills: 命令（手动指定 skills）
+	if strings.HasPrefix(input, "/skills:") {
+		return c.handleSkillsCommand(input)
+	}
+
 	// 发起聊天请求
 	return c.startChatRequest(input)
 }
@@ -572,11 +611,65 @@ func (c *Chat) handleClearHistory() (tea.Model, tea.Cmd) {
 	return c, c.Flush()
 }
 
+// handleSkillsCommand 处理 /skills: 命令
+// 格式: /skills: base,stock-analysis 或 /skills: base stock-analysis
+func (c *Chat) handleSkillsCommand(input string) (tea.Model, tea.Cmd) {
+	// 提取 skills 列表
+	skillsStr := strings.TrimPrefix(input, "/skills:")
+	skillsStr = strings.TrimSpace(skillsStr)
+
+	if skillsStr == "" {
+		c.addMessage(model.RoleSystem, "📋 使用方法: /skills: <skill1>,<skill2>...", model.StreamMsgTypeText)
+		c.addMessage(model.RoleSystem, "示例: /skills: base,stock-analysis,output-formats", model.StreamMsgTypeText)
+		c.addMessage(model.RoleSystem, "提示: 可用命令: /skills list - 查看所有可用的 skills", model.StreamMsgTypeText)
+		c.textInput.Reset()
+		return c, c.Flush()
+	}
+
+	// 解析 skills 列表（支持逗号或空格分隔）
+	var skillList []string
+	if strings.Contains(skillsStr, ",") {
+		skillList = strings.Split(skillsStr, ",")
+	} else {
+		skillList = strings.Fields(skillsStr)
+	}
+
+	// 去除空格并验证
+	c.oneTimeSkills = make([]string, 0, len(skillList))
+	for _, skill := range skillList {
+		skill = strings.TrimSpace(skill)
+		if skill != "" {
+			c.oneTimeSkills = append(c.oneTimeSkills, skill)
+		}
+	}
+
+	if len(c.oneTimeSkills) == 0 {
+		c.addMessage(model.RoleSystem, "❌ 未指定任何 skills", model.StreamMsgTypeText)
+		c.textInput.Reset()
+		return c, c.Flush()
+	}
+
+	// 显示确认信息
+	c.addMessage(model.RoleSystem, fmt.Sprintf("✓ 已手动指定 skills: %v", c.oneTimeSkills), model.StreamMsgTypeText)
+	c.addMessage(model.RoleSystem, "提示: 在此消息后直接输入问题，将使用指定的 skills（一次性使用）", model.StreamMsgTypeText)
+	c.textInput.Reset()
+	return c, c.Flush()
+}
+
 // startChatRequest 发起聊天请求
 func (c *Chat) startChatRequest(input string) (tea.Model, tea.Cmd) {
 	c.streamOutputCh, c.streamUnregister = message.RegisterStreamOutput(streamBufferSize)
 
-	err := agent.Ask(c.ctx, input, c.history)
+	// 合并会话级别和一次性 skills（优先使用一次性 skills）
+	var skillsForRequest []string
+	if len(c.oneTimeSkills) > 0 {
+		skillsForRequest = c.oneTimeSkills
+		c.oneTimeSkills = nil // 一次性 skills 用后即焚
+	} else {
+		skillsForRequest = c.sessionSkills
+	}
+
+	err := agent.Ask(c.ctx, input, c.history, skillsForRequest)
 	if err != nil {
 		log.Errorf("聊天请求失败: %v", err)
 		c.clearStreamState()

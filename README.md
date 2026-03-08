@@ -15,6 +15,7 @@ It currently implements core features including AI-powered chat, stock data quer
 - Natural language interaction for stock queries and market analysis
 - Multiple LLM provider support (OpenAI, Claude, SiliconFlow, etc.)
 - Streaming output with real-time responses
+- **Dynamic Skills System** - Modular, reusable prompt templates for domain-specific expertise
 
 ### 📊 Stock Analysis
 - A-share & Hong Kong stock code lookup
@@ -73,6 +74,66 @@ msa chat
 > Screenshots and GIFs coming soon...
 
 ## 📖 Usage
+
+### 🎯 Skills System
+
+MSA features a dynamic Skills system that allows modular, reusable prompt templates for domain-specific expertise. Skills are automatically selected based on conversation context or can be manually specified.
+
+#### Managing Skills
+
+```bash
+# List all available skills
+msa skills list
+
+# Show skill details
+msa skills show base
+
+# Disable a skill
+msa skills disable stock-analysis
+
+# Enable a skill
+msa skills enable stock-analysis
+```
+
+#### Using Skills in Conversation
+
+**Manual skill selection (CLI parameter):**
+```bash
+# Use specific skills for the entire session
+msa --skills=base,stock-analysis,output-formats
+```
+
+**Manual skill selection (in chat):**
+```
+/skills: base,stock-analysis
+What's the technical analysis of AAPL?
+```
+
+**Automatic skill selection:**
+The system automatically selects relevant skills based on your question:
+```
+What's the current price of Tencent?
+# Automatically uses: base, stock-analysis
+```
+
+#### Creating Custom Skills
+
+Create your own skills in `~/.msa/skills/your-skill/SKILL.md`:
+
+```markdown
+---
+name: my-custom-skill
+description: My specialized analysis framework
+version: 1.0.0
+priority: 7
+---
+
+# My Custom Skill
+
+Your specialized knowledge and rules here...
+```
+
+For detailed documentation, see [docs/SKILLS.md](docs/SKILLS.md).
 
 ### Chat Mode
 
@@ -335,6 +396,7 @@ msa/ (Project Root)
     │   ├── command/         # Command handling
     │   ├── message/         # Message management
     │   ├── provider/        # LLM providers
+    │   ├── skills/          # Dynamic Skills system
     │   └── tools/           # Tools
     │       ├── stock/       # Stock tools
     │       ├── search/      # Search tools
@@ -428,6 +490,7 @@ msa/ (Project Root)
 | ORM | [GORM](https://github.com/go-gorm/gorm) |
 | Database | SQLite ([github.com/glebarez/sqlite](https://github.com/glebarez/sqlite), pure Go) |
 | Data Storage | ~/.msa/msa.sqlite |
+| Skills Format | Markdown with YAML frontmatter |
 | Cache | Redis (planned) |
 | AI/LLM | OpenAI / Claude / SiliconFlow / Ollama |
 

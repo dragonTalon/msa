@@ -16,9 +16,17 @@ import (
 	"msa/pkg/tui/style"
 )
 
+// contextKey 是 context 的键类型
+type contextKey string
+
+// manualSkillsKey 是手动指定 skills 的 context 键
+const manualSkillsKey contextKey = "manualSkills"
+
 var (
 	// configArgs --config 参数的值
 	configArgs []string
+	// skillsArgs --skills 参数的值（手动指定 skills）
+	skillsArgs []string
 )
 
 var rootCmd = &cobra.Command{
@@ -30,6 +38,7 @@ var rootCmd = &cobra.Command{
 
 func init() {
 	rootCmd.PersistentFlags().StringArrayVar(&configArgs, "config", nil, "配置参数（格式：key=value 或文件路径）")
+	rootCmd.PersistentFlags().StringSliceVar(&skillsArgs, "skills", nil, "手动指定 skills（逗号分隔，如: base,stock-analysis）")
 
 	// 注册 config 子命令
 	rootCmd.AddCommand(ConfigCmd)
@@ -37,7 +46,15 @@ func init() {
 
 // runRoot 根命令执行函数，仅做路由调用
 func runRoot(cmd *cobra.Command, args []string) error {
-	return app.Run(cmd.Context())
+	ctx := cmd.Context()
+
+	// 如果指定了 --skills 参数，传递到 context
+	if len(skillsArgs) > 0 {
+		ctx = context.WithValue(ctx, manualSkillsKey, skillsArgs)
+		log.Infof("手动指定 skills: %v", skillsArgs)
+	}
+
+	return app.Run(ctx)
 }
 
 // Execute 程序执行入口

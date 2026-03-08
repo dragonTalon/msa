@@ -3,10 +3,13 @@ package command
 import (
 	"context"
 	"fmt"
+	"sort"
+	"strings"
+
 	"msa/pkg/config"
 	"msa/pkg/logic/provider"
+	"msa/pkg/logic/skills"
 	"msa/pkg/model"
-	"sort"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -14,6 +17,7 @@ import (
 func init() {
 	RegisterCommand(&ListModel{})
 	RegisterCommand(&ConfigCommand{})
+	RegisterCommand(&SkillsCommand{})
 	// SetModel 命令已被交互式选择器替代，使用 /models 或 /model 命令
 	// RegisterCommand(&SetModel{})
 }
@@ -153,4 +157,110 @@ func getLogFileDisplay(cfg *config.LocalStoreConfig) string {
 		return cfg.LogConfig.File
 	}
 	return "(未设置，输出到标准输出)"
+}
+
+// SkillsCommand Skills 列表命令
+type SkillsCommand struct{}
+
+func (s *SkillsCommand) Name() string {
+	return "skills"
+}
+
+func (s *SkillsCommand) Description() string {
+	return "List all available Skills"
+}
+
+func (s *SkillsCommand) Run(ctx context.Context, args []string) (*model.CmdResult, error) {
+	// 初始化 Skills Manager
+	manager := skills.GetManager()
+	if err := manager.Initialize(); err != nil {
+		log.Warnf("Failed to initialize skills: %v", err)
+		return &model.CmdResult{
+			Code: 1,
+			Msg:  "failed to initialize skills",
+			Type: "message",
+			Data: "无法加载 Skills: " + err.Error(),
+		}, nil
+	}
+
+	// 获取所有 skills
+	allSkills := manager.ListSkills()
+	disabled := manager.GetDisabledSkills()
+
+	if len(allSkills) == 0 {
+		return &model.CmdResult{
+			Code: 0,
+			Msg:  "success",
+			Type: "message",
+			Data: "没有可用的 Skills",
+		}, nil
+	}
+
+	// 创建禁用 map
+	disabledMap := make(map[string]bool)
+	for _, name := range disabled {
+		disabledMap[name] = true
+	}
+
+	// 按优先级排序
+	sort.Slice(allSkills, func(i, j int) bool {
+		return allSkills[i].Priority > allSkills[j].Priority
+	})
+
+	// 构建输出
+	var lines []string
+	lines = append(lines, "📋 可用 Skills:")
+	lines = append(lines, "")
+	lines = append(lines, fmt.Sprintf("%-20s %-8s %-10s %-10s", "Name", "Priority", "Source", "Status"))
+	lines = append(lines, strings.Repeat("-", 50))
+
+	for _, skill := range allSkills {
+		name := skill.Name
+		priority := formatPriority(skill.Priority)
+		source := formatSource(skill.Source)
+		status := "启用"
+		if disabledMap[name] {
+			status = "禁用"
+		}
+
+		lines = append(lines, fmt.Sprintf("%-20s %-8s %-10s %-10s", name, priority, source, status))
+	}
+
+	lines = append(lines, "")
+	lines = append(lines, fmt.Sprintf("总计: %d 个 Skills", len(allSkills)))
+	lines = append(lines, "")
+	lines = append(lines, "💡 提示:")
+	lines = append(lines, "  • 使用 /skills: <name1>,<name2> 手动指定 Skills")
+	lines = append(lines, "  • 使用 'msa skills show <name>' 查看详情")
+	lines = append(lines, "  • 使用 'msa skills disable/enable <name>' 管理状态")
+
+	return &model.CmdResult{
+		Code: 0,
+		Msg:  "success",
+		Type: "message",
+		Data: strings.Join(lines, "\n"),
+	}, nil
+}
+
+func (s *SkillsCommand) ToSelect(items []*model.SelectorItem) (*model.BaseSelector, error) {
+	return nil, fmt.Errorf("skills command does not support selector mode")
+}
+
+// formatPriority 格式化优先级显示
+func formatPriority(priority int) string {
+	switch {
+	case priority >= 10:
+		return fmt.Sprintf("%d (最高)", priority)
+	case priority >= 8:
+		return fmt.Sprintf("%d (高)", priority)
+	case priority >= 5:
+		return fmt.Sprintf("%d (中)", priority)
+	default:
+		return fmt.Sprintf("%d (低)", priority)
+	}
+}
+
+// formatSource 格式化来源显示
+func formatSource(source skills.SkillSource) string {
+	return source.String()
 }
