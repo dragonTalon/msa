@@ -23,7 +23,7 @@ func setupTestServiceDB(t *testing.T) (*gorm.DB, uint) {
 	}
 
 	userID := "test_user"
-	initialAmount := int64(10000000) // 100000.00元 - 足够用于测试
+	initialAmount := int64(10000000) // 1000.00元 - 足够用于测试
 
 	accountID, err := db.CreateAccount(database, userID, initialAmount)
 	if err != nil {
@@ -42,8 +42,8 @@ func TestSubmitBuyOrder(t *testing.T) {
 		StockCode: "600519",
 		StockName: "贵州茅台",
 		Quantity:  10,
-		Price:     180000, // 1800.00元
-		Fee:       50,      // 0.50元
+		Price:     180000, // 18.00元
+		Fee:       5000,   // 0.50元
 		Note:      "测试买入",
 	}
 
@@ -72,12 +72,12 @@ func TestSubmitBuyOrder(t *testing.T) {
 		t.Fatalf("GetAccountByID failed: %v", err)
 	}
 
-	expectedLocked := int64(1800050) // 10 * 180000 + 50
+	expectedLocked := int64(1805000) // 10 * 180000 + 5000
 	if account.LockedAmt != expectedLocked {
 		t.Errorf("expected locked_amt %d, got %d", expectedLocked, account.LockedAmt)
 	}
 
-	expectedAvailable := int64(10000000 - 1800050)
+	expectedAvailable := int64(10000000 - 1805000)
 	if account.AvailableAmt != expectedAvailable {
 		t.Errorf("expected available_amt %d, got %d", expectedAvailable, account.AvailableAmt)
 	}
@@ -93,8 +93,8 @@ func TestSubmitBuyOrderInsufficientBalance(t *testing.T) {
 		StockCode: "600519",
 		StockName: "贵州茅台",
 		Quantity:  1000,
-		Price:     180000, // 1800.00元
-		Fee:       50,
+		Price:     180000, // 18.00元
+		Fee:       5000,
 	}
 
 	transID, err := SubmitBuyOrder(database, accountID, order)
@@ -136,8 +136,8 @@ func TestSubmitSellOrder(t *testing.T) {
 		StockCode: "600519",
 		StockName: "贵州茅台",
 		Quantity:  10,
-		Price:     180000,
-		Fee:       50,
+		Price:     180000, // 18.00元
+		Fee:       5000,   // 0.50元
 	}
 
 	transID, err := SubmitSellOrder(database, accountID, order)
@@ -176,8 +176,8 @@ func TestFillOrder_Buy(t *testing.T) {
 		StockCode: "600519",
 		StockName: "贵州茅台",
 		Quantity:  10,
-		Price:     180000,
-		Fee:       50,
+		Price:     180000, // 18.00元
+		Fee:       5000,   // 0.50元
 	}
 
 	transID, _ := SubmitBuyOrder(database, accountID, order)
@@ -200,12 +200,12 @@ func TestFillOrder_Buy(t *testing.T) {
 
 	// 验证锁定金额已减少
 	account, _ = db.GetAccountByID(database, accountID)
-	if account.LockedAmt != lockedBefore-1800050 {
-		t.Errorf("locked_amt should decrease by 1800050, got %d", account.LockedAmt)
+	if account.LockedAmt != lockedBefore-1805000 {
+		t.Errorf("locked_amt should decrease by 1805000, got %d", account.LockedAmt)
 	}
 
 	// available_amt 不变
-	if account.AvailableAmt != 10000000-1800050 {
+	if account.AvailableAmt != 10000000-1805000 {
 		t.Errorf("available_amt should not change on fill, got %d", account.AvailableAmt)
 	}
 }
@@ -220,8 +220,8 @@ func TestFillOrder_Sell(t *testing.T) {
 		StockCode: "600519",
 		StockName: "贵州茅台",
 		Quantity:  10,
-		Price:     180000,
-		Fee:       50,
+		Price:     180000, // 18.00元
+		Fee:       5000,   // 0.50元
 	}
 
 	transID, _ := SubmitSellOrder(database, accountID, order)
@@ -238,7 +238,7 @@ func TestFillOrder_Sell(t *testing.T) {
 
 	// 验证可用金额增加
 	account, _ = db.GetAccountByID(database, accountID)
-	expectedIncrease := int64(1799950) // 10 * 180000 - 50
+	expectedIncrease := int64(1795000) // 10 * 180000 - 5000
 	if account.AvailableAmt != availableBefore+expectedIncrease {
 		t.Errorf("available_amt should increase by %d, got %d", expectedIncrease, account.AvailableAmt)
 	}
@@ -254,8 +254,8 @@ func TestCancelOrder_Buy(t *testing.T) {
 		StockCode: "600519",
 		StockName: "贵州茅台",
 		Quantity:  10,
-		Price:     180000,
-		Fee:       50,
+		Price:     180000, // 18.00元
+		Fee:       5000,   // 0.50元
 	}
 
 	transID, _ := SubmitBuyOrder(database, accountID, order)
@@ -282,7 +282,7 @@ func TestCancelOrder_Buy(t *testing.T) {
 		t.Errorf("locked_amt should be 0 after cancel, got %d", account.LockedAmt)
 	}
 
-	if account.AvailableAmt != availableBefore+1800050 {
+	if account.AvailableAmt != availableBefore+1805000 {
 		t.Errorf("available_amt should be restored, got %d", account.AvailableAmt)
 	}
 }
@@ -297,8 +297,8 @@ func TestCancelOrder_Sell(t *testing.T) {
 		StockCode: "600519",
 		StockName: "贵州茅台",
 		Quantity:  10,
-		Price:     180000,
-		Fee:       50,
+		Price:     180000, // 18.00元
+		Fee:       5000,   // 0.50元
 	}
 
 	transID, _ := SubmitSellOrder(database, accountID, order)
@@ -330,8 +330,8 @@ func TestPartialFill(t *testing.T) {
 		StockCode: "600519",
 		StockName: "贵州茅台",
 		Quantity:  100,
-		Price:     180000,
-		Fee:       500,
+		Price:     180000, // 18.00元
+		Fee:       50000,  // 5.00元
 	}
 
 	transID, _ := SubmitBuyOrder(database, accountID, order)
@@ -360,10 +360,10 @@ func TestPartialFill(t *testing.T) {
 
 	// 验证锁定金额调整
 	account, _ = db.GetAccountByID(database, accountID)
-	// 原锁定：100 * 180000 + 500 = 18000500
-	// 剩余锁定：50 * 180000 + 250 = 9000250
-	// 差异：-9000250
-	expectedLocked := lockedBefore - 9000250
+	// 原锁定：100 * 180000 + 50000 = 18050000
+	// 剩余锁定：50 * 180000 + 25000 = 9025000
+	// 差异：-9025000
+	expectedLocked := lockedBefore - 9025000
 	if account.LockedAmt != expectedLocked {
 		t.Errorf("locked_amt should be %d after partial fill, got %d", expectedLocked, account.LockedAmt)
 	}

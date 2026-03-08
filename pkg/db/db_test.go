@@ -85,7 +85,7 @@ func TestCreateAccount(t *testing.T) {
 	defer CloseDB(database)
 
 	userID := "test_user"
-	initialAmount := int64(100000) // 1000.00元
+	initialAmount := int64(100000) // 10.00元
 
 	accountID, err := CreateAccount(database, userID, initialAmount)
 	if err != nil {

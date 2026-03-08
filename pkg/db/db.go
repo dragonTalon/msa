@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"gorm.io/driver/sqlite"
+	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
@@ -69,6 +69,7 @@ func openDB(dbPath string) (*gorm.DB, error) {
 	dsn := dbPath + "?mode=rwc&_journal_mode=WAL&_timeout=5000&_foreign_keys=1&_cache=shared"
 
 	// 打开数据库连接，如果不存在会自动创建
+	// 使用纯 Go SQLite 驱动 glebarez/sqlite，不需要 CGO
 	database, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Silent),
 	})

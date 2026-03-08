@@ -24,7 +24,7 @@ func (ck *CompanyInfo) GetToolInfo() (tool.BaseTool, error) {
 }
 
 func (ck *CompanyInfo) GetName() string {
-	return "get stock current quote"
+	return "get_stock_quote"
 }
 
 func (ck *CompanyInfo) GetDescription() string {
@@ -39,7 +39,7 @@ func GetStockCompanyInfo(ctx context.Context, param *CompanyInfoParam) (string, 
 	log.Infof("GetStockCompanyInfo start")
 
 	// 使用公共函数记录工具调用开始
-	message.BroadcastToolStart("get stock current quote", fmt.Sprintf("stock_code: %s", param.StockCode))
+	message.BroadcastToolStart("get_stock_quote", fmt.Sprintf("stock_code: %s", param.StockCode))
 
 	if param == nil {
 		err := fmt.Errorf("param is nil")
@@ -48,7 +48,7 @@ func GetStockCompanyInfo(ctx context.Context, param *CompanyInfoParam) (string, 
 	}
 
 	// 调用公共函数获取股票数据
-	stockCurrentResp, err := fetchStockData(param.StockCode)
+	stockCurrentResp, err := FetchStockData(param.StockCode)
 	if err != nil {
 		message.BroadcastToolEnd("get stock current quote", "", err)
 		return "", err

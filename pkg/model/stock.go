@@ -8,6 +8,7 @@ import (
 
 type SearchResponse struct {
 	Stock []StockInfo `json:"stock"`
+	Fund  []StockInfo `json:"fund"`
 }
 type StockInfo struct {
 	Code    string      `json:"code"`
