@@ -2,7 +2,6 @@ package agent
 
 import (
 	"context"
-
 	"github.com/cloudwego/eino/components/prompt"
 	"github.com/cloudwego/eino/schema"
 	log "github.com/sirupsen/logrus"
