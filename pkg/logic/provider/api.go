@@ -44,3 +44,12 @@ func GetProvider() LLMProvider {
 	}
 	return nil
 }
+
+// GetRegisteredProviders 获取所有已注册的 Provider 列表
+func GetRegisteredProviders() []model.LlmProvider {
+	providers := make([]model.LlmProvider, 0, len(model.ProviderRegistry))
+	for p := range model.ProviderRegistry {
+		providers = append(providers, p)
+	}
+	return providers
+}

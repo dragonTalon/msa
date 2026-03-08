@@ -355,6 +355,13 @@ func analyzeResult(result *model.CmdResult) string {
 	sb.WriteString("\n")
 
 	switch result.Type {
+	case "message":
+		msg, ok := result.Data.(string)
+		if !ok {
+			return "结果类型错误"
+		}
+		sb.WriteString(msg)
+
 	case "list":
 		list, ok := result.Data.([]string)
 		if !ok {

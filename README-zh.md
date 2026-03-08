@@ -91,12 +91,147 @@ msa chat
 
 ### 配置选项
 
-```bash
-# 查看配置
-msa config show
+MSA 支持多种配置方式，按优先级从高到低为：**命令行参数 > 环境变量 > 配置文件 > 默认值**
 
-# 更新配置
-msa config set
+#### 交互式配置
+
+```bash
+# 启动 TUI 配置界面
+msa config
+```
+
+在 TUI 配置界面中，你可以：
+- 使用方向键选择配置项
+- 按 `Enter` 进入编辑模式
+- 选择 Provider 时自动填充 Base URL
+- 按 `S` 保存配置
+- 按 `R` 重置为默认值
+- 按 `Q` 退出
+
+#### 环境变量配置
+
+```bash
+# 设置 Provider
+export MSA_PROVIDER=siliconflow
+
+# 设置 API Key
+export MSA_API_KEY=sk-xxxxxxxxxxxx
+
+# 设置 Base URL（可选）
+export MSA_BASE_URL=https://api.example.com/v1
+
+# 设置日志级别（可选）
+export MSA_LOG_LEVEL=debug
+
+# 设置日志文件路径（可选）
+export MSA_LOG_FILE=/path/to/msa.log
+```
+
+#### 命令行参数配置
+
+```bash
+# 使用配置文件
+msa --config /path/to/config.json chat
+
+# 使用 key=value 格式
+msa --config apikey=sk-xxx --config loglevel=debug chat
+
+# 混合使用
+msa --config /path/to/config.json --config apikey=sk-xxx chat
+```
+
+#### TUI 中查看配置
+
+在聊天界面中，可以使用以下命令：
+
+```bash
+/config
+```
+
+这会显示当前配置信息，包括 Provider、Model、Base URL、API Key（部分隐藏）、日志级别和日志文件路径。
+
+#### 配置文件位置
+
+配置文件保存在 `~/.msa/msa_config.json`，包含：
+- Provider: LLM 提供商
+- Model: 使用的模型
+- Base URL: API 基础 URL
+- API Key: API 密钥
+- LogConfig: 日志配置（级别、格式、输出、文件路径）
+
+### 配置安全注意事项
+
+⚠️ **重要**：API Key 以明文形式存储在配置文件中。
+
+为确保安全，建议：
+
+```bash
+# 设置配置文件权限，仅当前用户可读写
+chmod 600 ~/.msa/msa_config.json
+
+# 确保配置目录权限正确
+chmod 700 ~/.msa/
+```
+
+**安全建议**：
+- 不要将配置文件提交到版本控制系统
+- 不要在共享环境中使用包含 API Key 的配置
+- 定期轮换 API Key
+- 使用不同的 API Key 用于不同环境
+
+### Provider 扩展指南
+
+MSA 支持扩展新的 LLM Provider。以下是添加步骤：
+
+#### 1. 在 ProviderRegistry 中注册
+
+编辑 `pkg/model/comment.go`，在 `ProviderRegistry` 中添加新的 Provider：
+
+```go
+var ProviderRegistry = map[LlmProvider]ProviderInfo{
+    Siliconflow: {
+        ID:             Siliconflow,
+        DisplayName:    "SiliconFlow (硅基流动)",
+        Description:    "国内 LLM API 提供商，兼容 OpenAI 格式",
+        DefaultBaseURL: "https://api.siliconflow.cn/v1",
+        KeyPrefix:      "sk-",
+    },
+    // 添加新的 Provider
+    YourProvider: {
+        ID:             YourProvider,
+        DisplayName:    "Your Provider Name",
+        Description:    "Provider description",
+        DefaultBaseURL: "https://api.yourprovider.com/v1",
+        KeyPrefix:      "custom-",
+    },
+}
+```
+
+#### 2. 添加 Provider 常量
+
+在 `pkg/model/comment.go` 中添加 Provider 常量：
+
+```go
+const (
+    Siliconflow LlmProvider = "siliconflow"
+    YourProvider LlmProvider = "yourprovider"
+)
+```
+
+#### 3. 更新 GetDisplayName() 和 GetDefaultBaseURL() 方法（如需要）
+
+如果新 Provider 有特殊的显示名称或默认 URL 逻辑，可以在相应方法中添加特殊处理。
+
+#### 4. 验证配置
+
+```bash
+# 重新编译
+go build
+
+# 测试配置
+msa config
+
+# 选择新 Provider 并验证配置保存
 ```
 
 ## 🧪 测试
