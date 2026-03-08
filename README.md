@@ -7,7 +7,7 @@
 
 MSA (My Stock Agent) is a lightweight and flexible open-source stock intelligence agent tool designed for investors and developers.
 
-It integrates core capabilities including stock data collection, multi-dimensional market analysis, strategy backtesting, and automated trading assistance, supporting custom strategy configuration and secondary development. With a modular architecture, MSA lowers the barrier to using quantitative stock tools: it meets individual investors' needs for automated trading while providing developers with an extensible open-source framework.
+It currently implements core features including AI-powered chat, stock data query, market news search, and simulated trading management, with support for multiple LLM providers. Future plans include technical analysis, strategy backtesting, and other advanced features. With a modular architecture, MSA lowers the barrier to using quantitative stock tools: it meets individual investors' needs for intelligent stock analysis while providing developers with an extensible open-source framework.
 
 ## ✨ Features
 
@@ -25,6 +25,13 @@ It integrates core capabilities including stock data collection, multi-dimension
 - Multi-engine support (Google, Bing, etc.)
 - Automatic fallback mechanism ensuring search availability
 - Web content fetching
+
+### 💼 Trading Management
+- SQLite local database storage
+- Account management (create, query, status update)
+- Position tracking with P&L calculation
+- Transaction record management
+- Automatic execution mechanism
 
 ### 🎯 Beautiful TUI
 - Terminal interface built with Bubble Tea
@@ -77,15 +84,154 @@ In chat mode, you can:
 - Query stock information: "What's Tencent's stock code?"
 - Get company info: "Company information for Tencent"
 - Search market news: "Search latest A-share market news"
+- Manage trading accounts: "Create an account with 100,000 yuan initial capital"
+- Query positions: "Show all my current positions"
+- View account summary: "Display my account overview and P&L"
+- Submit trades: "Buy 100 shares of Kweichow Moutai at 1850 yuan"
 
 ### Configuration Options
 
-```bash
-# Show configuration
-msa config show
+MSA supports multiple configuration methods with the following priority: **CLI parameters > Environment variables > Config file > Default values**
 
-# Update configuration
-msa config set
+#### Interactive Configuration
+
+```bash
+# Start TUI configuration interface
+msa config
+```
+
+In the TUI configuration interface, you can:
+- Use arrow keys to select configuration items
+- Press `Enter` to enter edit mode
+- Auto-fill Base URL when selecting Provider
+- Press `S` to save configuration
+- Press `R` to reset to default values
+- Press `Q` to exit
+
+#### Environment Variables
+
+```bash
+# Set Provider
+export MSA_PROVIDER=siliconflow
+
+# Set API Key
+export MSA_API_KEY=sk-xxxxxxxxxxxx
+
+# Set Base URL (optional)
+export MSA_BASE_URL=https://api.example.com/v1
+
+# Set log level (optional)
+export MSA_LOG_LEVEL=debug
+
+# Set log file path (optional)
+export MSA_LOG_FILE=/path/to/msa.log
+```
+
+#### CLI Parameters
+
+```bash
+# Use config file
+msa --config /path/to/config.json chat
+
+# Use key=value format
+msa --config apikey=sk-xxx --config loglevel=debug chat
+
+# Mixed usage
+msa --config /path/to/config.json --config apikey=sk-xxx chat
+```
+
+#### View Configuration in TUI
+
+In the chat interface, use the following command:
+
+```bash
+/config
+```
+
+This displays current configuration including Provider, Model, Base URL, API Key (partially hidden), log level, and log file path.
+
+#### Configuration File Location
+
+Configuration is saved at `~/.msa/msa_config.json`, containing:
+- Provider: LLM provider
+- Model: Model to use
+- Base URL: API base URL
+- API Key: API key
+- LogConfig: Log configuration (level, format, output, file path)
+
+### Configuration Security
+
+⚠️ **Important**: API Keys are stored in plaintext in the configuration file.
+
+For security, it is recommended to:
+
+```bash
+# Set config file permissions (readable/writable by owner only)
+chmod 600 ~/.msa/msa_config.json
+
+# Ensure config directory permissions are correct
+chmod 700 ~/.msa/
+```
+
+**Security recommendations**:
+- Do not commit configuration files to version control
+- Do not use configurations with API Keys in shared environments
+- Rotate API Keys regularly
+- Use different API Keys for different environments
+
+### Provider Extension Guide
+
+MSA supports extending new LLM Providers. Here are the steps to add one:
+
+#### 1. Register in ProviderRegistry
+
+Edit `pkg/model/comment.go` and add the new Provider to `ProviderRegistry`:
+
+```go
+var ProviderRegistry = map[LlmProvider]ProviderInfo{
+    Siliconflow: {
+        ID:             Siliconflow,
+        DisplayName:    "SiliconFlow",
+        Description:    "LLM API provider, OpenAI compatible",
+        DefaultBaseURL: "https://api.siliconflow.cn/v1",
+        KeyPrefix:      "sk-",
+    },
+    // Add new Provider
+    YourProvider: {
+        ID:             YourProvider,
+        DisplayName:    "Your Provider Name",
+        Description:    "Provider description",
+        DefaultBaseURL: "https://api.yourprovider.com/v1",
+        KeyPrefix:      "custom-",
+    },
+}
+```
+
+#### 2. Add Provider Constant
+
+Add the Provider constant in `pkg/model/comment.go`:
+
+```go
+const (
+    Siliconflow LlmProvider = "siliconflow"
+    YourProvider LlmProvider = "yourprovider"
+)
+```
+
+#### 3. Update GetDisplayName() and GetDefaultBaseURL() methods if needed
+
+If the new Provider has special display name or default URL logic, add special handling in the corresponding methods.
+
+#### 4. Verify Configuration
+
+```bash
+# Rebuild
+go build
+
+# Test configuration
+msa config
+
+# Select new Provider and verify configuration is saved
 ```
 
 ## 🗄️ Local Database
@@ -116,9 +262,9 @@ cp ~/.msa/msa.sqlite.backup.YYYYMMDD ~/.msa/msa.sqlite
 
 ### Amount Units
 
-**Important**: All monetary amounts are stored in "cents" (毫) as integers to avoid floating-point precision issues.
-- `10000` = 100.00 元
-- Display conversion: `amount / 100 = displayed value`
+**Important**: All monetary amounts are stored in "毫" (1/10000 of a Yuan) as integers to avoid floating-point precision issues.
+- `10000` = 1.00 元
+- Display conversion: `amount / 10000 = displayed value`
 
 ## 🧪 Testing
 
@@ -160,30 +306,39 @@ msa/ (Project Root)
 └── pkg/                      # Business implementation layer
     ├── app/                 # Application core module
     │   └── app.go           # Application startup
-    ├── tui/                 # Terminal UI module
-    │   ├── style/           # UI styling
-    │   ├── chat.go          # Chat interface
-    │   └── model_selector.go # Model selector
-    ├── config/              # Configuration management
-    │   ├── local_config.go  # Local storage configuration
-    │   └── logger.go        # Logging configuration
     ├── db/                  # Database layer
     │   ├── db.go            # Database initialization
+    │   ├── global.go        # Global database management
     │   ├── migrate.go       # Schema migration
     │   ├── account.go       # Account operations
     │   └── transaction.go   # Transaction operations
     ├── model/               # Data models
     │   ├── account.go       # Account model
-    │   └── transaction.go   # Transaction model
+    │   ├── transaction.go   # Transaction model
+    │   └── stock.go         # Stock data model
     ├── service/             # Business services
     │   ├── account_service.go    # Account service
     │   ├── trade_service.go      # Trading service
     │   └── position_service.go   # Position calculation
+    ├── tui/                 # Terminal UI module
+    │   ├── style/           # UI styling
+    │   ├── config/          # Configuration TUI
+    │   ├── chat.go          # Chat interface
+    │   └── model_selector.go # Model selector
+    ├── config/              # Configuration management
+    │   ├── local_config.go  # Local storage configuration
+    │   ├── env.go           # Environment variables
+    │   ├── validator.go     # Configuration validator
+    │   └── logger.go        # Logging configuration
     ├── logic/               # Business logic
     │   ├── agent/           # AI agent
     │   ├── command/         # Command handling
+    │   ├── message/         # Message management
     │   ├── provider/        # LLM providers
-    │   └── tools/           # Tools (stock, search, etc.)
+    │   └── tools/           # Tools
+    │       ├── stock/       # Stock tools
+    │       ├── search/      # Search tools
+    │       └── finance/     # Finance tools
     └── utils/               # Utility functions
         ├── file.go
         ├── http.go
@@ -208,7 +363,7 @@ msa/ (Project Root)
 - [x] Project structure refactoring
 - [x] Configuration management
 - [x] Logging system
-- [ ] Unit test framework
+- [x] Unit test framework
 - [ ] CI/CD pipeline (GitHub Actions)
 
 ### Phase 2: Core Features (v0.2.x)
@@ -230,11 +385,11 @@ msa/ (Project Root)
   - [ ] `msa analyze <symbol>` - Technical analysis
 
 ### Phase 3: Intelligence (v0.3.x)
-- [ ] **AI/LLM Integration**
-  - [ ] LLM API integration (OpenAI/Claude/Local)
-  - [ ] Natural language stock query
-  - [ ] AI-powered market analysis
-  - [ ] Intelligent Q&A assistant
+- [x] **AI/LLM Integration**
+  - [x] LLM API integration (OpenAI/Claude/Local)
+  - [x] Natural language stock query
+  - [x] AI-powered market analysis
+  - [x] Intelligent Q&A assistant
 - [ ] **Strategy Module**
   - [ ] Strategy DSL definition
   - [ ] Backtesting engine
@@ -270,7 +425,9 @@ msa/ (Project Root)
 | TUI Framework | [Bubble Tea](https://github.com/charmbracelet/bubbletea) |
 | UI Styling | [Lipgloss](https://github.com/charmbracelet/lipgloss) |
 | Logging | [Logrus](https://github.com/sirupsen/logrus) |
-| Database | SQLite / PostgreSQL (planned) |
+| ORM | [GORM](https://github.com/go-gorm/gorm) |
+| Database | SQLite ([github.com/glebarez/sqlite](https://github.com/glebarez/sqlite), pure Go) |
+| Data Storage | ~/.msa/msa.sqlite |
 | Cache | Redis (planned) |
 | AI/LLM | OpenAI / Claude / SiliconFlow / Ollama |
 
