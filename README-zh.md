@@ -7,7 +7,7 @@
 
 MSA 是一个轻量级、灵活的开源股票智能代理工具，为投资者和开发者设计。
 
-它集成了股票数据采集、多维市场分析、策略回测和自动交易辅助等核心能力，支持自定义策略配置和二次开发。采用模块化架构，MSA 降低了使用量化股票工具的门槛：既满足个人投资者对自动交易的需求，又为开发者提供了可扩展的开源框架。
+目前已实现 AI 智能对话、股票数据查询、市场资讯搜索、模拟交易管理等核心功能，支持多种 LLM 提供商。未来计划扩展技术分析、策略回测等高级功能。采用模块化架构，MSA 降低了使用量化股票工具的门槛：既满足个人投资者对智能股票分析的需求，又为开发者提供了可扩展的开源框架。
 
 ## ✨ 功能特性
 
@@ -234,6 +234,38 @@ msa config
 # 选择新 Provider 并验证配置保存
 ```
 
+## 🗄️ 本地数据库
+
+MSA 使用 SQLite 本地数据库存储：
+- **账户**：用户账户及余额追踪
+- **交易记录**：买卖订单及状态追踪
+- **持仓**：持仓计算和盈亏统计
+
+### 数据库位置
+
+数据库文件存储在：
+```
+~/.msa/msa.sqlite
+```
+
+### 数据备份
+
+备份数据：
+```bash
+cp ~/.msa/msa.sqlite ~/.msa/msa.sqlite.backup.$(date +%Y%m%d)
+```
+
+从备份恢复：
+```bash
+cp ~/.msa/msa.sqlite.backup.YYYYMMDD ~/.msa/msa.sqlite
+```
+
+### 金额单位
+
+**重要**：所有金额字段以"毫"为单位存储（1元 = 10000毫），避免浮点数精度问题。
+- `10000` = 1.00 元
+- 显示转换：`amount / 10000 = 显示值`
+
 ## 🧪 测试
 
 项目包含单元测试，覆盖核心业务逻辑和工具函数。
@@ -277,22 +309,36 @@ msa/ (项目根目录)
     ├── db/                  # 数据库模块
     │   ├── db.go            # 数据库连接与初始化
     │   ├── global.go        # 全局数据库管理
+    │   ├── migrate.go       # 数据库迁移
     │   ├── account.go       # 账户数据访问
     │   └── transaction.go   # 交易数据访问
     ├── model/               # 数据模型
+    │   ├── account.go       # 账户模型
+    │   ├── transaction.go   # 交易记录模型
+    │   └── stock.go         # 股票数据模型
     ├── service/             # 业务服务层
+    │   ├── account_service.go    # 账户服务
+    │   ├── trade_service.go      # 交易服务
+    │   └── position_service.go   # 持仓计算
     ├── tui/                 # 终端界面模块
     │   ├── style/           # UI 样式
+    │   ├── config/          # 配置 TUI
     │   ├── chat.go          # 聊天界面
     │   └── model_selector.go # 模型选择器
     ├── config/              # 配置管理模块
     │   ├── local_config.go  # 本地存储配置
+    │   ├── env.go           # 环境变量
+    │   ├── validator.go     # 配置验证器
     │   └── logger.go        # 日志配置
     ├── logic/               # 业务逻辑
     │   ├── agent/           # AI 代理
     │   ├── command/         # 命令处理
+    │   ├── message/         # 消息管理
     │   ├── provider/        # LLM 提供商
-    │   └── tools/           # 工具（股票、搜索、交易等）
+    │   └── tools/           # 工具
+    │       ├── stock/       # 股票工具
+    │       ├── search/      # 搜索工具
+    │       └── finance/     # 金融工具
     └── utils/               # 工具函数
         ├── file.go
         ├── http.go
@@ -317,14 +363,17 @@ msa/ (项目根目录)
 - [x] 项目结构重构
 - [x] 配置管理模块
 - [x] 日志系统
-- [ ] 单元测试框架
+- [x] 单元测试框架
 - [ ] CI/CD 流水线
 
 ### Phase 2: 核心功能 (v0.2.x)
-- [ ] **数据模块**
-  - [ ] 股票数据 API 接入
+- [x] **数据模块**
+  - [x] 股票数据 API 接入
   - [ ] 实时行情订阅
-  - [ ] 历史数据存储（SQLite/PostgreSQL）
+  - [x] 历史数据存储（SQLite）
+  - [x] 账户管理
+  - [x] 交易记录
+  - [x] 持仓跟踪
   - [ ] 数据缓存层（Redis）
 - [ ] **分析模块**
   - [ ] 技术指标计算（MA、MACD、RSI、KDJ）
@@ -336,11 +385,11 @@ msa/ (项目根目录)
   - [ ] `msa analyze <symbol>` - 技术分析
 
 ### Phase 3: 智能化 (v0.3.x)
-- [ ] **AI/大模型集成**
-  - [ ] 大模型 API 接入
-  - [ ] 自然语言股票查询
-  - [ ] AI 驱动市场分析
-  - [ ] 智能问答助手
+- [x] **AI/大模型集成**
+  - [x] 大模型 API 接入
+  - [x] 自然语言股票查询
+  - [x] AI 驱动市场分析
+  - [x] 智能问答助手
 - [ ] **策略模块**
   - [ ] 策略 DSL 定义
   - [ ] 回测引擎
@@ -377,9 +426,9 @@ msa/ (项目根目录)
 | UI 样式 | [Lipgloss](https://github.com/charmbracelet/lipgloss) |
 | 日志 | [Logrus](https://github.com/sirupsen/logrus) |
 | ORM | [GORM](https://github.com/go-gorm/gorm) |
-| 数据库 | SQLite (github.com/glebarez/sqlite, 纯 Go 实现) |
-| 数据存储 | ~/.msa/msa.db |
-| 缓存 | Redis（计划中）|
+| 数据库 | SQLite ([github.com/glebarez/sqlite](https://github.com/glebarez/sqlite), 纯 Go 实现) |
+| 数据存储 | ~/.msa/msa.sqlite |
+| 缓存 | Redis（计划中） |
 | AI/LLM | OpenAI / Claude / SiliconFlow / Ollama |
 
 ## 🤝 贡献指南

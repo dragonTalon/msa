@@ -206,7 +206,6 @@ status: "resolved"
 
 ```diff
 - // 路径为 ~/.msa/msa.sqlite
-+ // 路径为 ~/.msa/msa.db
 ```
 
 ```diff
@@ -220,7 +219,7 @@ status: "resolved"
 ## 验证
 
 ### 验证步骤
-1. 重命名 `~/.msa/msa.sqlite` 为 `~/.msa/msa.db`
+1. 重命名 `~/.msa/msa.db` 为 `~/.msa/msa.sqlite`
 2. 运行 `go build`
 3. 运行 `./msa --help`
 

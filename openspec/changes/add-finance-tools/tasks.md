@@ -47,7 +47,7 @@
   - [x] 实现 `MsaTool` 接口
   - [x] 实现 `GetAccount(ctx, param)` 函数
   - [x] 调用 `getActiveAccount()` 获取账户
-  - [x] 格式化金额信息（分转元）
+  - [x] 格式化金额信息（毫转元）
   - [x] 返回账户完整信息的 JSON
   - [x] 处理无活跃账户的情况
 
@@ -70,7 +70,7 @@
   - [x] 调用 `service.GetAllPositions()` 获取持仓
   - [x] 调用 `fetchAllPrices()` 获取实时价格
   - [x] 价格失败时降级处理（显示 N/A）
-  - [x] 格式化持仓信息（分转元）
+  - [x] 格式化持仓信息（毫转元）
   - [x] 计算盈亏金额和比例
   - [x] 返回持仓列表 JSON
 
@@ -94,7 +94,7 @@
   - [x] 实现 `SubmitBuyOrder(ctx, param)` 函数
   - [x] 检查 DB 是否可用
   - [x] 调用 `getActiveAccount()` 获取账户
-  - [x] 转换价格单位（元→分）
+  - [x] 转换价格单位（元→毫）
   - [x] 调用 `service.SubmitBuyOrder()` 创建订单
   - [x] 立即调用 `service.FillOrder()` 自动成交
   - [x] 处理成交失败的情况
@@ -149,7 +149,7 @@
 
 - [x] 7.4 手动验证
   - [x] 启动 CLI，检查日志中的 SQLite 初始化消息
-  - [x] 验证 `~/.msa/msa.db` 文件已创建
+  - [x] 验证 `~/.msa/msa.sqlite` 文件已创建
   - [ ] 通过 AI Agent 对话测试每个 tool
   - [x] 验证 DB 不可用时程序仍能启动
   - [x] 验证价格 API 失败时的降级行为（fetchAllPrices 跳过失败股票）

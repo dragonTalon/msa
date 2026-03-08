@@ -54,7 +54,7 @@
   - 创建 `pkg/model/account.go`
   - 定义 `Account` 结构体
   - 定义 `AccountStatus` 常量（ACTIVE、FROZEN、CLOSED）
-  - 实现金额转换方法（分 ↔ 元）
+  - 实现金额转换方法（毫 ↔ 元）
 
 - [x] 3.2 创建 Transaction 数据模型
   - 创建 `pkg/model/transaction.go`
@@ -215,7 +215,7 @@
 
 - [x] 10.1 添加代码注释
   - 为导出函数添加文档注释
-  - 说明金额单位（分）和转换方法
+  - 说明金额单位（毫）和转换方法
 
 - [x] 10.2 更新 README（如需要）
   - 说明数据库文件位置
