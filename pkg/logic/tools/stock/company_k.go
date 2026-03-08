@@ -24,7 +24,7 @@ func (ck *CompanyK) GetToolInfo() (tool.BaseTool, error) {
 }
 
 func (ck *CompanyK) GetName() string {
-	return "get stock company k"
+	return "get_stock_company_k"
 }
 
 func (ck *CompanyK) GetDescription() string {

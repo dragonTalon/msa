@@ -91,12 +91,15 @@ func (s *Selector) SelectSkills(ctx context.Context, userInput string, history [
 			Reasoning:      "Parse failed, using fallback",
 		}, nil
 	}
+	if len(result.SelectedSkills) == 0 {
+		log.Warnf("LLM response is empty, using base skill %s", utils.ToJSONString(result))
+	}
+
+	log.Infof("Skill Selector: selected skills: %v", len(result.SelectedSkills))
+	log.Debugf("Reasoning: %s", result.Reasoning)
 
 	// 按 priority 排序
 	result.SelectedSkills = s.sortByPriority(result.SelectedSkills, skills)
-
-	log.Infof("Skill Selector: selected skills: %v", result.SelectedSkills)
-	log.Debugf("Reasoning: %s", result.Reasoning)
 
 	return &result, nil
 }

@@ -54,13 +54,14 @@ func GetChatModel(ctx context.Context) (*react.Agent, error) {
 		APIKey:  cfg.APIKey,
 		BaseURL: cfg.BaseURL,
 	}
-	if strings.HasPrefix(cfg.Model, "deepseek-") {
-		config.ExtraFields = map[string]any{
-			"enable_thinking": true,
-		}
-	} else {
-		config.ReasoningEffort = openai.ReasoningEffortLevelMedium
-	}
+	//TODO 关闭思考
+	//if strings.HasPrefix(cfg.Model, "deepseek-") {
+	//	config.ExtraFields = map[string]any{
+	//		"enable_thinking": true,
+	//	}
+	//} else {
+	//	config.ReasoningEffort = openai.ReasoningEffortLevelMedium
+	//}
 
 	// 创建并缓存 ChatModel
 	chatModel, err := openai.NewChatModel(ctx, config)
@@ -141,6 +142,7 @@ func toolCallChecker(ctx context.Context, sr *schema.StreamReader[*schema.Messag
 			return true, nil
 		}
 		if msg.ReasoningContent != "" {
+			log.Infof("reasoning content: %v", msg.ReasoningContent)
 			// 广播给所有订阅者
 			streamManager.Broadcast(&msamodel.StreamChunk{
 				Content: msg.ReasoningContent,
@@ -168,13 +170,14 @@ func Ask(ctx context.Context, messages string, history []model.Message, manualSk
 	skillManager := skills.GetManager()
 	selectedSkills, err := selectSkillsViaSubAgent(ctx, messages, history, manualSkills, skillManager)
 	if err != nil {
+		log.Errorf("selectSkillsViaSubAgent error: %v", err)
 		return err
 	}
 
 	// ===== 第二步：根据 skills 构建 system prompt，并通过 eino 模板拼接消息 =====
 	// 构建 skill 信息文本（注入到 system prompt 中）
 	skillPromptText := buildSkillPromptText(skillManager, selectedSkills)
-
+	log.Debugf("skillPromptText: %v", skillPromptText)
 	// 过滤并截取历史消息，转为 eino schema.Message
 	filteredHistory := filterAndTrimHistory(history, maxHistoryRounds)
 	historyMessages := convertToSchemaMessages(filteredHistory)
