@@ -141,10 +141,20 @@ func InitConfig() error {
 		log.Info("运行 'msa config' 修复配置问题")
 	}
 
-	// 6. 更新缓存
+	// 6. 如果配置文件不存在，创建默认配置文件
+	configPath = filepath.Join(configDir, CONFIG_FILE)
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		defaultCfg := GetDefaultConfig()
+		data, err := json.MarshalIndent(defaultCfg, "", "  ")
+		if err == nil {
+			os.WriteFile(configPath, data, 0644)
+		}
+	}
+
+	// 7. 更新缓存
 	configCache = finalCfg
 
-	// 7. 初始化日志系统
+	// 8. 初始化日志系统
 	if finalCfg.LogConfig != nil {
 		// 确保日志路径设置
 		if finalCfg.LogConfig.File == "" {
