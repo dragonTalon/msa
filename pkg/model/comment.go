@@ -70,6 +70,8 @@ const (
 	StockToolGroup ToolGroup = "stock"
 	// 搜索工具组
 	SearchToolGroup ToolGroup = "search"
+	// Skill 工具组
+	SkillToolGroup ToolGroup = "skill"
 )
 
 type Pair struct {

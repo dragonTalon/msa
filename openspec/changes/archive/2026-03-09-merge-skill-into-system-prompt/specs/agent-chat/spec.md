@@ -1,15 +1,16 @@
-# 规格：agent-chat
+## REMOVED Requirements
 
-对话能力与 Skill 系统的集成规格。
+### Requirement: 集成 Skill 选择流程
+**Reason**: 前置 sub-agent 选择流程整体移除，skill 选择由 agent 自主完成。
+**Migration**: 删除 `selectSkillsViaSubAgent` 调用及相关函数。
 
-## Purpose
+### Requirement: 用户手动指定 Skills（在集成 Skill 选择流程的 Scenario 中）
+**Reason**: manualSkills 机制随前置选择器一起移除。
+**Migration**: 删除 TUI 层的 sessionSkills/oneTimeSkills/`/skills:` 命令及 cmd/root.go 的 --skills 参数。
 
-定义 agent 对话功能如何与 Skill 系统集成：通过 system prompt 注入 skill 元数据，由 agent 自主判断并按需调用 `get_skill_content` 获取完整流程。
-
-## Requirements
+## ADDED Requirements
 
 ### Requirement: Skill 元数据注入 System Prompt
-
 系统 SHALL 在每次构建对话消息时，将所有可用 skill 的元数据（name、description、priority）静态注入 BasePromptTemplate（SystemMessage）。
 
 #### Scenario: 正常构建消息
@@ -28,10 +29,7 @@
 - **THEN** 系统 SHALL 正常工作，system prompt 中 skill 列表为空
 - **AND** agent 继续使用基础 prompt 处理问题
 
----
-
 ### Requirement: Ask 函数签名简化
-
 `Ask` 函数 SHALL 移除 `manualSkills []string` 参数。
 
 #### Scenario: 调用 Ask
@@ -43,29 +41,3 @@
 - **WHEN** 构建 user message
 - **THEN** BaseUserPrompt SHALL 只包含用户问题占位符 `{{.question}}`
 - **AND** 不包含 `{{.skill_prompt}}` 占位符
-
----
-
-### Requirement: 错误处理
-
-Skill 内容加载失败时必须优雅降级，不影响对话功能。
-
-#### Scenario: Skill 内容加载失败
-- **WHEN** `get_skill_content` tool 调用失败时
-- **THEN** 系统必须返回错误信息给 agent
-- **AND** agent 应继续使用通用规范处理用户问题
-
-#### Scenario: 所有 Skills 加载失败
-- **WHEN** skills 目录初始化失败时
-- **THEN** 系统必须记录警告日志
-- **AND** 保证基本对话功能可用（system prompt 中 skill 列表为空）
-
----
-
-### Requirement: 日志记录
-
-对话流程中的 Skill 相关操作必须记录适当的日志。
-
-#### Scenario: 记录消息构建
-- **WHEN** `BuildQueryMessages` 被调用
-- **THEN** 系统必须记录 INFO 日志，包含消息总数
