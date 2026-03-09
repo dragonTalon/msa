@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"msa/pkg/utils"
 	"strings"
 	"time"
 
@@ -23,13 +24,10 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var (
-	agentCache     *react.Agent
-	chatModelCache *openai.ChatModel
-)
+var agentCache *react.Agent
 
 // maxHistoryRounds 最大保留的对话轮数（一轮 = 一条 User + 一条 Assistant）
-const maxHistoryRounds = 10
+const maxHistoryRounds = 20
 
 func GetChatModel(ctx context.Context) (*react.Agent, error) {
 	if agentCache != nil {
@@ -49,25 +47,23 @@ func GetChatModel(ctx context.Context) (*react.Agent, error) {
 		return nil, fmt.Errorf("openai model is empty, please run `/models choose model` first")
 	}
 
-	config := &openai.ChatModelConfig{
+	modelConfig := &openai.ChatModelConfig{
 		Model:   cfg.Model,
 		APIKey:  cfg.APIKey,
 		BaseURL: cfg.BaseURL,
 	}
 	if strings.HasPrefix(cfg.Model, "deepseek-") {
-		config.ExtraFields = map[string]any{
+		modelConfig.ExtraFields = map[string]any{
 			"enable_thinking": true,
 		}
 	} else {
-		config.ReasoningEffort = openai.ReasoningEffortLevelMedium
+		modelConfig.ReasoningEffort = openai.ReasoningEffortLevelMedium
 	}
 
-	// 创建并缓存 ChatModel
-	chatModel, err := openai.NewChatModel(ctx, config)
+	chatModel, err := openai.NewChatModel(ctx, modelConfig)
 	if err != nil {
 		return nil, err
 	}
-	chatModelCache = chatModel
 
 	allTools := tools2.GetAllTools()
 	log.Infof("tools: %v", len(allTools))
@@ -80,7 +76,6 @@ func GetChatModel(ctx context.Context) (*react.Agent, error) {
 		log.Infof("tool: %v", tInfo.Name)
 	}
 
-	// 初始化所需的 tools
 	tools := compose.ToolsNodeConfig{
 		Tools: allTools,
 	}
@@ -98,19 +93,6 @@ func GetChatModel(ctx context.Context) (*react.Agent, error) {
 	return agent, nil
 }
 
-// GetChatModelOnly 只返回 ChatModel（用于 Selector 等前置 sub-agent）
-func GetChatModelOnly(ctx context.Context) (*openai.ChatModel, error) {
-	if chatModelCache != nil {
-		return chatModelCache, nil
-	}
-	// 触发 GetChatModel 来初始化
-	_, err := GetChatModel(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return chatModelCache, nil
-}
-
 func toolCallChecker(ctx context.Context, sr *schema.StreamReader[*schema.Message]) (bool, error) {
 	defer sr.Close()
 
@@ -120,13 +102,11 @@ func toolCallChecker(ctx context.Context, sr *schema.StreamReader[*schema.Messag
 		msg, err := sr.Recv()
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				// 发送结束标记
 				streamManager.Broadcast(&msamodel.StreamChunk{
 					IsDone: true,
 				})
 				break
 			}
-			// 发送错误
 			streamManager.Broadcast(&msamodel.StreamChunk{
 				Err:    err,
 				IsDone: true,
@@ -134,22 +114,18 @@ func toolCallChecker(ctx context.Context, sr *schema.StreamReader[*schema.Messag
 			return false, err
 		}
 
-		// 检查是否有 tool call
 		isToolCall := len(msg.ToolCalls) > 0
 		if isToolCall {
 			log.Infof("tool call: %v", msg.ToolCalls)
 			return true, nil
 		}
 		if msg.ReasoningContent != "" {
-			log.Infof("reasoning content: %v", msg.ReasoningContent)
-			// 广播给所有订阅者
 			streamManager.Broadcast(&msamodel.StreamChunk{
 				Content: msg.ReasoningContent,
 				MsgType: model.StreamMsgTypeReason,
 			})
 			continue
 		}
-		// 广播给所有订阅者
 		streamManager.Broadcast(&msamodel.StreamChunk{
 			Content: msg.Content,
 			MsgType: model.StreamMsgTypeText,
@@ -161,29 +137,22 @@ func toolCallChecker(ctx context.Context, sr *schema.StreamReader[*schema.Messag
 
 // Ask 聊天（异步处理流式数据，通过 StreamOutputManager 广播）
 // 流程：
-//  1. 同步调用 sub-agent（Selector）获取需要使用的 skills
-//  2. 根据 skills 构建完整的 system prompt，通过 prompt.FromMessages 拼接消息模板
+//  1. 初始化 skills，确保 get_skill_content tool 可正常使用
+//  2. 根据 skill 元数据构建 system prompt，通过 BuildQueryMessages 拼接消息
 //  3. 异步调用 agent.Stream 获取流式结果
-func Ask(ctx context.Context, messages string, history []model.Message, manualSkills []string) error {
-	// ===== 第一步：通过 sub-agent 同步获取需要使用的 skills =====
+func Ask(ctx context.Context, messages string, history []model.Message) error {
+	// ===== 第一步：初始化 skills =====
 	skillManager := skills.GetManager()
-	selectedSkills, err := selectSkillsViaSubAgent(ctx, messages, history, manualSkills, skillManager)
-	if err != nil {
-		log.Errorf("selectSkillsViaSubAgent error: %v", err)
-		return err
+	if err := skillManager.Initialize(); err != nil {
+		log.Warnf("skills initialize warning: %v", err)
 	}
 
-	// ===== 第二步：根据 skills 构建 system prompt，并通过 eino 模板拼接消息 =====
-	// 构建 skill 信息文本（注入到 system prompt 中）
-	skillPromptText := buildSkillPromptText(skillManager, selectedSkills)
-	log.Debugf("skillPromptText: %v", skillPromptText)
-	// 过滤并截取历史消息，转为 eino schema.Message
+	// ===== 第二步：构建消息 =====
 	filteredHistory := filterAndTrimHistory(history, maxHistoryRounds)
 	historyMessages := convertToSchemaMessages(filteredHistory)
 
-	// 使用 prompt.FromMessages 构建消息模板
 	now := time.Now()
-	queryMsg, err := BuildQueryMessages(ctx, messages, historyMessages, skillPromptText, map[string]any{
+	queryMsg, err := BuildQueryMessages(ctx, messages, historyMessages, map[string]any{
 		"role":    "专业股票分析助手",
 		"style":   "理性、专业、客观且严谨",
 		"time":    now.Format("2006-01-02 15:04:05"),
@@ -194,7 +163,8 @@ func Ask(ctx context.Context, messages string, history []model.Message, manualSk
 		return err
 	}
 
-	log.Infof("queryMsg: %v", queryMsg)
+	log.Infof("queryMsg count: %d", len(queryMsg))
+	log.Infof("query  msg\n %s", utils.ToJSONString(queryMsg))
 
 	// ===== 第三步：获取 Agent 并异步调用 Stream =====
 	agent, err := GetChatModel(ctx)
@@ -215,72 +185,6 @@ func Ask(ctx context.Context, messages string, history []model.Message, manualSk
 	}()
 
 	return nil
-}
-
-// selectSkillsViaSubAgent 通过前置 sub-agent 同步获取需要使用的 skills
-// 如果 manualSkills 不为空，则直接使用手动指定的 skills（跳过 LLM 选择）
-func selectSkillsViaSubAgent(ctx context.Context, userInput string, history []model.Message, manualSkills []string, skillManager *skills.Manager) ([]string, error) {
-	// 初始化 Skills 系统
-	if err := skillManager.Initialize(); err != nil {
-		log.Errorf("Failed to initialize skills: %v", err)
-		return nil, err
-	}
-
-	// 手动指定 skills：验证后直接返回
-	if len(manualSkills) > 0 {
-		validSkills := validateAndEnsureBase(manualSkills, skillManager)
-		log.Infof("[Sub-Agent] Using manual skills: %v", validSkills)
-		return validSkills, nil
-	}
-
-	// 通过 sub-agent (Selector) 调用 LLM Generate 自动选择 skills
-	chatModel, err := GetChatModelOnly(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	selector := skills.NewSelector(chatModel, skillManager.GetRegistry())
-	result, err := selector.SelectSkills(ctx, userInput, history)
-	if err != nil {
-		log.Warnf("[Sub-Agent] Skill selection failed: %v, fallback to base skill", err)
-		return []string{}, nil
-	}
-
-	log.Infof("[Sub-Agent] Auto-selected skills: %v, reasoning: %s", result.SelectedSkills, result.Reasoning)
-	return result.SelectedSkills, nil
-}
-
-// validateAndEnsureBase 验证手动指定的 skills 并确保包含 base
-func validateAndEnsureBase(manualSkills []string, skillManager *skills.Manager) []string {
-	validSkills := make([]string, 0, len(manualSkills))
-	for _, skillName := range manualSkills {
-		if _, err := skillManager.GetSkill(skillName); err != nil {
-			log.Warnf("Skill '%s' not found, skipping", skillName)
-		} else {
-			validSkills = append(validSkills, skillName)
-		}
-	}
-	return validSkills
-}
-
-// buildSkillPromptText 根据选中的 skills 构建 skill 描述文本，注入到 system prompt
-func buildSkillPromptText(skillManager *skills.Manager, selectedSkills []string) string {
-	registry := skillManager.GetRegistry()
-	var sb strings.Builder
-	sb.WriteString("\n## Skill List")
-	for _, skillName := range selectedSkills {
-		skill, err := registry.Get(skillName)
-		if err != nil || skill == nil {
-			log.Warnf("Skill not found when building prompt: %s", skillName)
-			continue
-		}
-		content, err := skill.GetContent()
-		if err != nil {
-			return ""
-		}
-		sb.WriteString(fmt.Sprintf("\n- name: %s\n  describe: %s\n  content: %s", skill.Name, skill.Description, content))
-	}
-	return sb.String()
 }
 
 // convertToSchemaMessages 将 model.Message 切片转为 eino schema.Message 切片
@@ -306,7 +210,6 @@ func convertToSchemaMessages(history []model.Message) []*schema.Message {
 
 // filterAndTrimHistory 过滤历史消息，只保留 User 和 Assistant 角色，并限制最大轮数
 func filterAndTrimHistory(history []model.Message, maxRounds int) []model.Message {
-	// 先过滤：只保留 User 和 Assistant
 	filtered := make([]model.Message, 0, len(history))
 	for _, msg := range history {
 		if msg.Role == model.RoleUser || msg.Role == model.RoleAssistant {
@@ -314,7 +217,6 @@ func filterAndTrimHistory(history []model.Message, maxRounds int) []model.Messag
 		}
 	}
 
-	// 再修剪：限制最大轮数（一轮约 2 条消息）
 	maxMessages := maxRounds * 2
 	if len(filtered) > maxMessages {
 		filtered = filtered[len(filtered)-maxMessages:]

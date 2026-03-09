@@ -3,8 +3,11 @@ package tools
 import (
 	"msa/pkg/logic/tools/finance"
 	"msa/pkg/logic/tools/search"
+	skilltools "msa/pkg/logic/tools/skill"
 	"msa/pkg/logic/tools/stock"
 )
+
+var _ MsaTool = (*skilltools.SkillContentTool)(nil)
 
 var _ MsaTool = (*stock.CompanyCode)(nil)
 var _ MsaTool = (*stock.CompanyK)(nil)
@@ -25,6 +28,7 @@ func init() {
 	registerStock()
 	registerSearch()
 	registerFinance()
+	registerSkill()
 }
 
 func registerStock() {
@@ -47,4 +51,8 @@ func registerFinance() {
 	RegisterTool(&finance.SubmitBuyOrderTool{})
 	RegisterTool(&finance.SubmitSellOrderTool{})
 	RegisterTool(&finance.GetTransactionsTool{})
+}
+
+func registerSkill() {
+	RegisterTool(&skilltools.SkillContentTool{})
 }
