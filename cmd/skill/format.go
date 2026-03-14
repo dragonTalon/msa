@@ -1,35 +1,10 @@
-package cmd
+package cmd_skill
 
 import (
 	"fmt"
 
-	"github.com/spf13/cobra"
-
 	"msa/pkg/logic/skills"
 )
-
-var skillsCmd = &cobra.Command{
-	Use:   "skills",
-	Short: "管理 Skills（技能）",
-	Long:  `管理 Skills 命令，用于列出、查看、启用和禁用系统技能。`,
-	RunE:  runSkills,
-}
-
-func init() {
-	// 添加子命令
-	skillsCmd.AddCommand(skillsListCmd)
-	skillsCmd.AddCommand(skillsShowCmd)
-	skillsCmd.AddCommand(skillsDisableCmd)
-	skillsCmd.AddCommand(skillsEnableCmd)
-
-	// 注册到根命令
-	rootCmd.AddCommand(skillsCmd)
-}
-
-func runSkills(cmd *cobra.Command, args []string) error {
-	// 默认执行 list 命令
-	return skillsListCmd.RunE(cmd, args)
-}
 
 // formatPriority 格式化优先级显示
 func formatPriority(priority int) string {
