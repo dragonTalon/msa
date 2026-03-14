@@ -77,6 +77,26 @@ var (
 	ChatHelpStyle = lipgloss.NewStyle().
 			Faint(true).
 			MarginTop(1)
+
+	// ==================== 命令建议样式 ====================
+	// CommandSuggestionSelectedStyle 选中项样式
+	CommandSuggestionSelectedStyle = lipgloss.NewStyle().
+					Foreground(lipgloss.Color("#FFD700")).
+					Bold(true)
+
+	// CommandSuggestionNormalStyle 普通项样式
+	CommandSuggestionNormalStyle = lipgloss.NewStyle().
+					Foreground(lipgloss.Color("#AAAAAA"))
+
+	// CommandSuggestionDescStyle 描述文本样式
+	CommandSuggestionDescStyle = lipgloss.NewStyle().
+					Foreground(lipgloss.Color("#666666")).
+					Italic(true)
+
+	// CommandSuggestionHintStyle 快捷键提示样式
+	CommandSuggestionHintStyle = lipgloss.NewStyle().
+					Foreground(lipgloss.Color("#555555")).
+					Faint(true)
 )
 
 // ==================== 表格样式 ====================
