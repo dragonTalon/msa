@@ -16,6 +16,7 @@ It currently implements core features including AI-powered chat, stock data quer
 - Multiple LLM provider support (OpenAI, Claude, SiliconFlow, etc.)
 - Streaming output with real-time responses
 - **Dynamic Skills System** - Modular, reusable prompt templates for domain-specific expertise
+- **🧠 Memory System** - AI remembers your preferences and conversation history
 
 ### 📊 Stock Analysis
 - A-share & Hong Kong stock code lookup
@@ -38,6 +39,14 @@ It currently implements core features including AI-powered chat, stock data quer
 - Terminal interface built with Bubble Tea
 - Markdown rendering support
 - Smooth and intuitive user experience
+
+### 🧠 Memory System (NEW!)
+- **Automatic Session Recording** - All conversations are automatically saved
+- **AI Knowledge Extraction** - Extracts user preferences, concepts, strategies from conversations
+- **Smart Memory Injection** - AI uses your memory to provide personalized responses
+- **Memory Browser** - View history sessions, knowledge base, and search memories
+- **Privacy Protection** - Automatically filters sensitive information (API keys, passwords)
+- **Local Storage** - All data stored locally in `~/.msa/remember/`
 
 ## 🚀 Quick Start
 
@@ -149,6 +158,65 @@ In chat mode, you can:
 - Query positions: "Show all my current positions"
 - View account summary: "Display my account overview and P&L"
 - Submit trades: "Buy 100 shares of Kweichow Moutai at 1850 yuan"
+- **Access memory browser**: `/remember`
+
+### 🧠 Memory System
+
+MSA now includes a powerful memory system that automatically learns from your conversations:
+
+**Features:**
+- 📝 **Automatic Recording** - All conversations are automatically saved
+- 🧠 **AI Knowledge Extraction** - Extracts preferences, concepts, strategies from your chats
+- 🤖 **Smart Memory Injection** - AI uses your memory to provide personalized responses
+- 🔍 **Memory Browser** - View history, search through conversations and knowledge
+
+**Open Memory Browser:**
+```
+/remember
+```
+
+**Memory Browser Features:**
+1. **History Sessions** - Browse all past conversations
+2. **Knowledge Base** - View extracted knowledge (user profile, watchlist, concepts, strategies, Q&A)
+3. **Search** - Full-text search across all sessions and knowledge
+4. **Statistics** - View usage statistics
+
+**Resume Previous Session:**
+When you exit a chat session, MSA displays a session ID that you can use to resume later:
+```
+────────────────────────────────────────
+会话已保存: abc-123-def-456
+提示: 使用 "msa --resume abc-123-def-456" 恢复此会话
+────────────────────────────────────────
+```
+
+To resume a previous session:
+```bash
+# Using the session ID from exit message
+msa --resume abc-123-def-456
+
+# Or using the short form
+msa -r abc-123-def-456
+```
+
+When you resume a session:
+- ✅ Historical messages are loaded into the conversation context
+- ✅ AI remembers your previous preferences and knowledge
+- ✅ You can continue the conversation seamlessly
+- ✅ All extracted knowledge from the session is available
+
+**Privacy & Security:**
+- All data stored locally in `~/.msa/remember/`
+- Automatic filtering of sensitive information (API keys, passwords)
+- No cloud synchronization - complete privacy
+
+**Disable Memory System:**
+```bash
+export MSA_MEMORY_ENABLED=false
+msa chat
+```
+
+For detailed documentation, see [docs/memory-guide.md](docs/memory-guide.md).
 
 ### Configuration Options
 
@@ -191,6 +259,9 @@ export MSA_LOG_FILE=/path/to/msa.log
 #### CLI Parameters
 
 ```bash
+# Resume a previous session
+msa --resume <session-id>
+
 # Use config file
 msa --config /path/to/config.json chat
 
@@ -200,6 +271,13 @@ msa --config apikey=sk-xxx --config loglevel=debug chat
 # Mixed usage
 msa --config /path/to/config.json --config apikey=sk-xxx chat
 ```
+
+**Available CLI Parameters:**
+
+| Parameter | Short | Description | Example |
+|-----------|-------|-------------|---------|
+| `--config` | - | Set configuration (file or key=value) | `--config apikey=sk-xxx` |
+| `--resume` | `-r` | Resume a previous session by ID | `--resume abc-123-def-456` |
 
 #### View Configuration in TUI
 

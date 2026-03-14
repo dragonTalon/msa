@@ -13,6 +13,7 @@ import (
 	"msa/pkg/app"
 	"msa/pkg/config"
 	"msa/pkg/db"
+	"msa/pkg/logic/memory"
 	"msa/pkg/tui/style"
 )
 
@@ -22,6 +23,9 @@ type contextKey string
 var (
 	// configArgs --config 参数的值
 	configArgs []string
+
+	// resumeSession --resume 参数的会话ID值
+	resumeSession string
 )
 
 var rootCmd = &cobra.Command{
@@ -33,6 +37,8 @@ var rootCmd = &cobra.Command{
 
 func init() {
 	rootCmd.PersistentFlags().StringArrayVar(&configArgs, "config", nil, "配置参数（格式：key=value 或文件路径）")
+	rootCmd.PersistentFlags().StringVar(&resumeSession, "resume", "", "恢复指定会话（会话ID）")
+	rootCmd.PersistentFlags().StringVar(&resumeSession, "r", "", "恢复指定会话的简写（会话ID）")
 
 	// 注册 config 子命令
 	rootCmd.AddCommand(ConfigCmd)
@@ -41,6 +47,19 @@ func init() {
 // runRoot 根命令执行函数，仅做路由调用
 func runRoot(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
+
+	// 如果指定了 resume 参数，恢复会话
+	if resumeSession != "" {
+		log.Infof("正在恢复会话: %s", resumeSession)
+		manager := memory.GetManager()
+		if _, err := manager.LoadSession(resumeSession); err != nil {
+			log.Warnf("恢复会话失败: %v", err)
+			fmt.Printf("⚠️  恢复会话失败: %v\n", err)
+			fmt.Println("将继续启动新会话...")
+			// 继续启动新会话，不退出
+		}
+	}
+
 	return app.Run(ctx)
 }
 
