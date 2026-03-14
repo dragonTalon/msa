@@ -12,7 +12,7 @@ import (
 	"msa/pkg/logic/message"
 	"msa/pkg/model"
 	tuimemory "msa/pkg/tui/memory"
-
+	"msa/pkg/tui/style"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -42,29 +42,31 @@ const (
 	thinkingMessage     = "⏳ 正在思考..."
 	clearSuccessMessage = "对话已清空，重新开始吧！"
 	helpMessage         = "📋 可用命令:\n  • clear - 清空对话\n  • /skills - 列出所有可用的 Skills\n  • help/? - 显示帮助\n  • quit/exit - 退出程序"
-	helpHint            = "ESC/Ctrl+C: 退出 | Ctrl+K: 清空 | /skills 查看列表 | Enter: 发送"
+	helpHint            = "ESC/Ctrl+C: 退出 | Ctrl+K: 清空 | Tab: 命令补全 | Enter: 发送"
 )
 
 // Chat TUI聊天模型
 type Chat struct {
-	textInput          textinput.Model           // 文本输入组件
-	history            []model.Message           // 历史消息（只包含 User 和 Assistant）
-	pendingMsgs        []model.Message           // 待 flush 的消息
-	ctx                context.Context           // 上下文
-	width              int                       // 终端宽度
-	height             int                       // 终端高度
-	isCommandMode      bool                      // 是否处于命令模式
-	commandList        []string                  // 命令列表
-	streamingMsg       string                    // 流式输出的临时内容
-	isStreaming        bool                      // 是否正在流式输出
-	fullStreamContent  strings.Builder           // 当前 segment 的流式内容
-	allStreamContent   strings.Builder           // 完整的 assistant 回复（跨 segment 累积）
-	streamOutputCh     <-chan *model.StreamChunk // 流式输出 channel
-	streamUnregister   func()                    // 取消订阅函数
-	currentSegment     strings.Builder           // 当前消息段内容
-	currentSegmentType model.StreamMsgType       // 当前消息段类型
-	streamSegments     []model.Message           // 流式输出的消息段
-	memoryInitialized  bool                      // 记忆系统是否已初始化
+	textInput            textinput.Model             // 文本输入组件
+	history              []model.Message             // 历史消息（只包含 User 和 Assistant）
+	pendingMsgs          []model.Message             // 待 flush 的消息
+	ctx                  context.Context             // 上下文
+	width                int                         // 终端宽度
+	height               int                         // 终端高度
+	isCommandMode        bool                        // 是否处于命令模式
+	commandList          []string                    // 命令列表
+	commandSelectedIndex int                         // 命令建议选中索引
+	commandSuggestions   []command.CommandSuggestion // 命令建议列表（带描述）
+	streamingMsg         string                      // 流式输出的临时内容
+	isStreaming          bool                        // 是否正在流式输出
+	fullStreamContent    strings.Builder             // 当前 segment 的流式内容
+	allStreamContent     strings.Builder             // 完整的 assistant 回复（跨 segment 累积）
+	streamOutputCh       <-chan *model.StreamChunk   // 流式输出 channel
+	streamUnregister     func()                      // 取消订阅函数
+	currentSegment       strings.Builder             // 当前消息段内容
+	currentSegmentType   model.StreamMsgType         // 当前消息段类型
+	streamSegments       []model.Message             // 流式输出的消息段
+	memoryInitialized    bool                        // 记忆系统是否已初始化
 }
 
 // maskAPIKey 隐藏 APIKey，只显示前4个和后4个字符
@@ -121,11 +123,13 @@ func NewChat(ctx context.Context) *Chat {
 	}
 
 	return &Chat{
-		textInput:         ti,
-		pendingMsgs:       pendingMsgs,
-		ctx:               ctx,
-		history:           make([]model.Message, 0),
-		memoryInitialized: memoryInitialized,
+		textInput:            ti,
+		pendingMsgs:          pendingMsgs,
+		ctx:                  ctx,
+		history:              make([]model.Message, 0),
+		commandSelectedIndex: 0,
+		commandSuggestions:   make([]command.CommandSuggestion, 0),
+		memoryInitialized:    memoryInitialized,
 	}
 }
 
@@ -254,6 +258,29 @@ func (c *Chat) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyCtrlK:
 			return c.handleClearHistory()
 
+		case tea.KeyTab:
+			// Tab 补全命令
+			if c.isCommandMode && len(c.commandSuggestions) > 0 {
+				selected := c.commandSuggestions[c.commandSelectedIndex]
+				c.textInput.SetValue("/" + selected.Name + " ")
+				c.textInput.CursorEnd()
+				c.isCommandMode = false
+				c.commandSuggestions = nil
+				return c, nil
+			}
+
+		case tea.KeyUp:
+			// 在命令模式下向上选择
+			if c.isCommandMode && len(c.commandSuggestions) > 0 && c.commandSelectedIndex > 0 {
+				c.commandSelectedIndex--
+			}
+
+		case tea.KeyDown:
+			// 在命令模式下向下选择
+			if c.isCommandMode && len(c.commandSuggestions) > 0 && c.commandSelectedIndex < len(c.commandSuggestions)-1 {
+				c.commandSelectedIndex++
+			}
+
 		default:
 			// 如果正在流式输出，不更新输入框
 			if !c.isStreaming {
@@ -261,9 +288,16 @@ func (c *Chat) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// 检测命令模式
 				if strings.HasPrefix(c.textInput.Value(), "/") {
 					c.isCommandMode = true
-					c.commandList = command.GetLikeCommand(c.textInput.Value())
+					c.commandSuggestions = command.GetCommandSuggestions(c.textInput.Value())
+					c.commandSelectedIndex = 0
+					// 保持 commandList 兼容性
+					c.commandList = make([]string, len(c.commandSuggestions))
+					for i, s := range c.commandSuggestions {
+						c.commandList[i] = s.Name
+					}
 				} else {
 					c.isCommandMode = false
+					c.commandSuggestions = nil
 				}
 			}
 		}
@@ -288,12 +322,31 @@ func (c *Chat) View() string {
 	sb.WriteString(inputBox)
 
 	// 显示命令提示
-	if c.isCommandMode && len(c.commandList) > 0 {
-		styles := listStyle.New()
-		for _, cmdStr := range c.commandList {
-			styles.Item("/" + cmdStr)
+	if c.isCommandMode && len(c.commandSuggestions) > 0 {
+		sb.WriteString("\n")
+		sb.WriteString(style.ChatSystemMsgStyle.Render("匹配的命令:"))
+		sb.WriteString("\n")
+		for i, suggestion := range c.commandSuggestions {
+			var line string
+			if i == c.commandSelectedIndex {
+				// 选中项：高亮显示
+				nameStyle := style.CommandSuggestionSelectedStyle
+				descStyle := style.CommandSuggestionDescStyle
+				line = fmt.Sprintf("  > %s  %s",
+					nameStyle.Render("/"+suggestion.Name),
+					descStyle.Render(suggestion.Description))
+			} else {
+				// 普通项
+				nameStyle := style.CommandSuggestionNormalStyle
+				descStyle := style.CommandSuggestionDescStyle
+				line = fmt.Sprintf("    %s  %s",
+					nameStyle.Render("/"+suggestion.Name),
+					descStyle.Render(suggestion.Description))
+			}
+			sb.WriteString(line + "\n")
 		}
-		sb.WriteString("\n" + fmt.Sprintf("%s", styles))
+		// 快捷键提示
+		sb.WriteString(style.CommandSuggestionHintStyle.Render("Tab: 补全 │ ↑↓: 选择 │ Enter: 执行 │ Esc: 取消"))
 	}
 
 	// 帮助提示
