@@ -8,6 +8,7 @@ version: "1.0"
 # 这些上下文信息会在 AI 创建 artifacts 时展示给它
 # 包含技术栈、编码规范、风格指南、领域知识等
 context: |
+  优先使用中文沟通
   ## 项目概述
   MSA (Multi-Strategy Agent) - 基于 AI 的股票交易助手，提供 TUI 终端界面。
   

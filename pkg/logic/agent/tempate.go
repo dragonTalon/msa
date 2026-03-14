@@ -7,6 +7,7 @@ import (
 	"github.com/cloudwego/eino/schema"
 	log "github.com/sirupsen/logrus"
 
+	"msa/pkg/logic/memory"
 	"msa/pkg/logic/skills"
 )
 
@@ -18,13 +19,25 @@ type SkillMeta struct {
 }
 
 // BuildQueryMessages 使用 eino 的 prompt.FromMessages + schema.GoTemplate 构建完整的查询消息
-// 流程：SystemMessage(BasePromptTemplate + skills) -> chat_history -> UserMessage(question)
+// 流程：SystemMessage(BasePromptTemplate + skills + memory) -> chat_history -> UserMessage(question)
 func BuildQueryMessages(ctx context.Context, question string, history []*schema.Message, vars map[string]any) ([]*schema.Message, error) {
 	hasHistory := len(history) > 0
 
+	// 获取记忆知识（如果可用）
+	memoryKnowledge := memory.GetKnowledgeForPrompt()
+	if memoryKnowledge != "" {
+		log.Debugf("知识已加载，长度: %d 字符", len(memoryKnowledge))
+	}
+
+	// 构建系统提示：基础模板 + 记忆知识
+	systemPrompt := BasePromptTemplate
+	if memoryKnowledge != "" {
+		systemPrompt = BasePromptTemplate + "\n\n" + memoryKnowledge
+	}
+
 	template := prompt.FromMessages(schema.GoTemplate,
-		// 系统消息模板 - 角色定义 + 核心规范 + skill 列表
-		schema.SystemMessage(BasePromptTemplate),
+		// 系统消息模板 - 角色定义 + 核心规范 + skill 列表 + 记忆知识
+		schema.SystemMessage(systemPrompt),
 
 		// 对话历史占位符（兼容多轮对话）
 		schema.MessagesPlaceholder("chat_history", hasHistory),

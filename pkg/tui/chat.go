@@ -8,9 +8,11 @@ import (
 	"msa/pkg/config"
 	"msa/pkg/logic/agent"
 	command "msa/pkg/logic/command"
+	"msa/pkg/logic/memory"
 	"msa/pkg/logic/message"
 	"msa/pkg/model"
-	"msa/pkg/tui/style"
+	tuimemory "msa/pkg/tui/memory"
+
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -62,6 +64,7 @@ type Chat struct {
 	currentSegment     strings.Builder           // 当前消息段内容
 	currentSegmentType model.StreamMsgType       // 当前消息段类型
 	streamSegments     []model.Message           // 流式输出的消息段
+	memoryInitialized  bool                      // 记忆系统是否已初始化
 }
 
 // maskAPIKey 隐藏 APIKey，只显示前4个和后4个字符
@@ -80,6 +83,17 @@ func NewChat(ctx context.Context) *Chat {
 	// 初始化 Markdown 渲染器
 	if err := style.InitMarkdownRenderer(80); err != nil {
 		log.Warnf("初始化 Markdown 渲染器失败: %v", err)
+	}
+
+	// 初始化记忆系统
+	memoryInitialized := false
+	if memory.IsMemoryEnabled() {
+		if err := memory.InitChatMemory(ctx); err != nil {
+			log.Warnf("初始化记忆系统失败: %v", err)
+		} else {
+			memoryInitialized = true
+			log.Info("记忆系统已初始化")
+		}
 	}
 
 	// 初始化文本输入组件
@@ -107,10 +121,11 @@ func NewChat(ctx context.Context) *Chat {
 	}
 
 	return &Chat{
-		textInput:   ti,
-		pendingMsgs: pendingMsgs,
-		ctx:         ctx,
-		history:     make([]model.Message, 0),
+		textInput:         ti,
+		pendingMsgs:       pendingMsgs,
+		ctx:               ctx,
+		history:           make([]model.Message, 0),
+		memoryInitialized: memoryInitialized,
 	}
 }
 
@@ -209,6 +224,23 @@ func (c *Chat) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		log.Debugf("捕获按键: %s, Type: %v", msg.String(), msg.Type)
 		switch msg.Type {
 		case tea.KeyCtrlC, tea.KeyEsc:
+			// 结束记忆会话并获取会话ID
+			var sessionID string
+			if c.memoryInitialized {
+				var err error
+				sessionID, err = memory.EndChatMemory()
+				if err != nil {
+					log.Warnf("结束记忆会话失败: %v", err)
+				}
+			}
+			// 显示会话ID和恢复提示
+			if sessionID != "" {
+				fmt.Println() // 添加空行
+				fmt.Println("────────────────────────────────────────")
+				fmt.Printf("会话已保存: %s\n", sessionID)
+				fmt.Printf("提示: 使用 \"msa --resume %s\" 恢复此会话\n", sessionID)
+				fmt.Println("────────────────────────────────────────")
+			}
 			return c, tea.Quit
 
 		case tea.KeyEnter:
@@ -305,6 +337,13 @@ func (c *Chat) chatStreamMsg(msg *model.StreamChunk) (tea.Model, tea.Cmd) {
 				Content: allContent,
 				MsgType: model.StreamMsgTypeText,
 			})
+
+			// 记录助手消息到记忆系统
+			if c.memoryInitialized {
+				if err := memory.AddChatMessage("assistant", allContent); err != nil {
+					log.Debugf("记录助手消息到记忆失败: %v", err)
+				}
+			}
 		}
 
 		// UI 只显示最后一个 segment
@@ -506,6 +545,14 @@ func (c *Chat) commandHandler(input string) (tea.Model, tea.Cmd) {
 		return selectorView, nil
 	}
 
+	// 如果命令返回的是 memory-browser 类型，则打开记忆浏览器
+	if runResult.Type == "memory-browser" {
+		memoryHome := tuimemory.GetMemoryHomeModel()
+		memoryHome.SetParentModel(c) // 设置父模型为 Chat
+		c.textInput.Reset()
+		return memoryHome, nil
+	}
+
 	c.addMessage(model.RoleSystem, analyzeResult(runResult), model.StreamMsgTypeText)
 	c.textInput.Reset()
 	return c, c.Flush()
@@ -583,6 +630,13 @@ func (c *Chat) handleEnterKey() (tea.Model, tea.Cmd) {
 	})
 	c.addMessage(model.RoleUser, input, model.StreamMsgTypeText)
 	c.textInput.Reset()
+
+	// 记录用户消息到记忆系统
+	if c.memoryInitialized {
+		if err := memory.AddChatMessage("user", input); err != nil {
+			log.Debugf("记录用户消息到记忆失败: %v", err)
+		}
+	}
 
 	// 处理命令
 	if strings.HasPrefix(input, "/") {
