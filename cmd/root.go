@@ -10,6 +10,9 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
+	"msa/cmd/config"
+	"msa/cmd/skill"
+	"msa/cmd/version"
 	"msa/pkg/app"
 	"msa/pkg/config"
 	"msa/pkg/db"
@@ -40,8 +43,10 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&resumeSession, "resume", "", "恢复指定会话（会话ID）")
 	rootCmd.PersistentFlags().StringVar(&resumeSession, "r", "", "恢复指定会话的简写（会话ID）")
 
-	// 注册 config 子命令
-	rootCmd.AddCommand(ConfigCmd)
+	// 注册子命令
+	AddCommand(cmd_config.NewCommand())
+	AddCommand(cmd_skill.NewCommand())
+	AddCommand(cmd_version.NewCommand())
 }
 
 // runRoot 根命令执行函数，仅做路由调用

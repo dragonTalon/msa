@@ -1,4 +1,4 @@
-package cmd
+package cmd_skill
 
 import (
 	"fmt"
@@ -8,12 +8,16 @@ import (
 	"msa/pkg/logic/skills"
 )
 
-var skillsEnableCmd = &cobra.Command{
-	Use:   "enable <name>",
-	Short: "启用 Skill",
-	Long:  `启用被禁用的 Skill，使其在对话中可以被选择。`,
-	Args:  cobra.ExactArgs(1),
-	RunE:  runSkillsEnable,
+func newEnableCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "enable <name>",
+		Short: "启用 Skill",
+		Long:  `启用被禁用的 Skill，使其在对话中可以被选择。`,
+		Args:  cobra.ExactArgs(1),
+		RunE:  runSkillsEnable,
+	}
+
+	return cmd
 }
 
 func runSkillsEnable(cmd *cobra.Command, args []string) error {

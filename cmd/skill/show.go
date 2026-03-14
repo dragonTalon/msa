@@ -1,4 +1,4 @@
-package cmd
+package cmd_skill
 
 import (
 	"fmt"
@@ -8,12 +8,16 @@ import (
 	"msa/pkg/logic/skills"
 )
 
-var skillsShowCmd = &cobra.Command{
-	Use:   "show <name>",
-	Short: "查看 Skill 详情",
-	Long:  `查看指定 Skill 的详细信息，包括元数据、内容、来源目录和状态。`,
-	Args:  cobra.ExactArgs(1),
-	RunE:  runSkillsShow,
+func newShowCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "show <name>",
+		Short: "查看 Skill 详情",
+		Long:  `查看指定 Skill 的详细信息，包括元数据、内容、来源目录和状态。`,
+		Args:  cobra.ExactArgs(1),
+		RunE:  runSkillsShow,
+	}
+
+	return cmd
 }
 
 func runSkillsShow(cmd *cobra.Command, args []string) error {
@@ -72,21 +76,6 @@ func runSkillsShow(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("\n总字符数: %d\n", len(content))
-
-	return nil
-}
-
-func listAvailableSkillsBrief(manager *skills.Manager) error {
-	allSkills := manager.ListSkills()
-
-	if len(allSkills) == 0 {
-		fmt.Println("  (没有可用的 Skills)")
-		return nil
-	}
-
-	for _, skill := range allSkills {
-		fmt.Printf("  - %s (优先级: %d)\n", skill.Name, skill.Priority)
-	}
 
 	return nil
 }

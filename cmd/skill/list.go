@@ -1,4 +1,4 @@
-package cmd
+package cmd_skill
 
 import (
 	"encoding/json"
@@ -15,18 +15,22 @@ var (
 	outputJSONFmt bool
 )
 
-var skillsListCmd = &cobra.Command{
-	Use:   "list",
-	Short: "列出所有 Skills",
-	Long:  `列出所有可用的 Skills，包括内置 Skills 和用户自定义 Skills。`,
-	RunE:  runSkillsList,
+func newListCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "list",
+		Short: "列出所有 Skills",
+		Long:  `列出所有可用的 Skills，包括内置 Skills 和用户自定义 Skills。`,
+		RunE:  runSkillsList,
+	}
+
+	cmd.Flags().BoolVar(&showBuiltin, "builtin", false, "只显示内置 Skills")
+	cmd.Flags().BoolVar(&showUser, "user", false, "只显示用户自定义 Skills")
+	cmd.Flags().BoolVar(&outputJSONFmt, "json", false, "以 JSON 格式输出")
+
+	return cmd
 }
 
-func init() {
-	skillsListCmd.Flags().BoolVar(&showBuiltin, "builtin", false, "只显示内置 Skills")
-	skillsListCmd.Flags().BoolVar(&showUser, "user", false, "只显示用户自定义 Skills")
-	skillsListCmd.Flags().BoolVar(&outputJSONFmt, "json", false, "以 JSON 格式输出")
-}
+var listRunE = runSkillsList
 
 func runSkillsList(cmd *cobra.Command, args []string) error {
 	manager := skills.GetManager()
