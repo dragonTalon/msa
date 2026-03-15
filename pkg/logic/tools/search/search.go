@@ -62,9 +62,9 @@ func WebSearch(ctx context.Context, param *model.WebSearchParams) (string, error
 
 	// 参数校验
 	if param.Query == "" {
-		err := fmt.Errorf("搜索查询不能为空 | search query cannot be empty")
-		message.BroadcastToolEnd("web_search", "", err)
-		return "", err
+		errMsg := "搜索查询不能为空 | search query cannot be empty"
+		message.BroadcastToolEnd("web_search", "", fmt.Errorf("%s", errMsg))
+		return buildSearchErrorResponse(param.Query, errMsg), nil
 	}
 
 	// 初始化搜索路由器（懒加载单例）
@@ -102,6 +102,18 @@ func WebSearch(ctx context.Context, param *model.WebSearchParams) (string, error
 	}
 
 	return resultJSON, nil
+}
+
+// buildSearchErrorResponse 构建搜索错误响应
+func buildSearchErrorResponse(query string, errMsg string) string {
+	response := &model.WebSearchResponse{
+		Query:   query,
+		Status:  "failed",
+		Error:   "invalid_param",
+		Message: errMsg,
+		Results: []model.SearchResultItem{},
+	}
+	return mas_utils.ToJSONString(response)
 }
 
 // GetDefaultRouter 获取默认路由器（用于测试）

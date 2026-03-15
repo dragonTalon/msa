@@ -58,16 +58,16 @@ func FetchPageContent(ctx context.Context, param *model.FetchPageParams) (string
 
 	// 参数校验
 	if param.URL == "" {
-		err := fmt.Errorf("URL 不能为空 | URL cannot be empty")
-		message.BroadcastToolEnd("fetch_page_content", "", err)
-		return "", err
+		errMsg := "URL 不能为空 | URL cannot be empty"
+		message.BroadcastToolEnd("fetch_page_content", "", fmt.Errorf("%s", errMsg))
+		return buildErrorResponse(param.URL, errMsg), nil
 	}
 
 	// 验证 URL 格式
 	if _, err := url.Parse(param.URL); err != nil {
-		err = fmt.Errorf("无效的 URL 格式: %w | invalid URL format: %w", err, err)
-		message.BroadcastToolEnd("fetch_page_content", "", err)
-		return "", err
+		errMsg := fmt.Sprintf("无效的 URL 格式: %v | invalid URL format: %v", err, err)
+		message.BroadcastToolEnd("fetch_page_content", "", fmt.Errorf("%s", errMsg))
+		return buildErrorResponse(param.URL, errMsg), nil
 	}
 
 	// 使用共享的浏览器实例（懒加载单例，线程安全）
@@ -79,16 +79,18 @@ func FetchPageContent(ctx context.Context, param *model.FetchPageParams) (string
 	html, err := defaultFetcherTool.browser.GetPageHTML(ctx, param.URL)
 	if err != nil {
 		log.Errorf("获取页面失败: %v", err)
+		errMsg := fmt.Sprintf("获取页面失败: %v", err)
 		message.BroadcastToolEnd("fetch_page_content", "", err)
-		return "", err
+		return buildErrorResponse(param.URL, errMsg), nil
 	}
 
 	// 提取内容
 	title, content, err := defaultFetcherTool.extractor.Extract(html)
 	if err != nil {
 		log.Errorf("提取内容失败: %v", err)
+		errMsg := fmt.Sprintf("提取内容失败: %v", err)
 		message.BroadcastToolEnd("fetch_page_content", "", err)
-		return "", err
+		return buildErrorResponse(param.URL, errMsg), nil
 	}
 
 	// 设置默认长度限制
@@ -120,6 +122,7 @@ func FetchPageContent(ctx context.Context, param *model.FetchPageParams) (string
 		Content:     content,
 		HasMore:     hasMore,
 		TotalLength: totalLength,
+		Success:     true,
 	}
 
 	resultJSON := mas_utils.ToJSONString(response)
@@ -127,6 +130,16 @@ func FetchPageContent(ctx context.Context, param *model.FetchPageParams) (string
 	log.Debugf("页面抓取成功，返回 %d/%d 字符", returnedLength, totalLength)
 
 	return resultJSON, nil
+}
+
+// buildErrorResponse 构建错误响应
+func buildErrorResponse(url string, errMsg string) string {
+	response := &model.FetchPageResponse{
+		URL:      url,
+		Success:  false,
+		ErrorMsg: errMsg,
+	}
+	return mas_utils.ToJSONString(response)
 }
 
 // 全局默认抓取工具实例
