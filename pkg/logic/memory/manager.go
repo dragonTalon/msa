@@ -2,12 +2,14 @@ package memory
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"msa/pkg/config"
 	"msa/pkg/model"
 )
 
@@ -41,6 +43,7 @@ type SessionManager struct {
 	Messages  []model.MemoryMessage  // 消息列表
 	Context   *model.SessionContext  // 会话上下文
 	ShortTerm *model.ShortTermMemory // 短期记忆
+	Tags      []string               // 会话标签
 }
 
 // ==================== 单例模式 ====================
@@ -102,6 +105,7 @@ func (m *Manager) Initialize() error {
 			Messages:  []model.MemoryMessage{},
 			UpdatedAt: time.Now(),
 		},
+		Tags: []string{},
 	}
 
 	m.initialized = true
@@ -125,6 +129,28 @@ func (m *Manager) GetSessionID() string {
 		return m.currentSession.ID
 	}
 	return ""
+}
+
+// AddSessionTag 为当前会话添加标签
+func (m *Manager) AddSessionTag(tag string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if !m.initialized || m.currentSession == nil {
+		return fmt.Errorf("会话未初始化")
+	}
+
+	// 检查标签是否已存在（幂等操作）
+	for _, t := range m.currentSession.Tags {
+		if strings.EqualFold(t, tag) {
+			return nil
+		}
+	}
+
+	// 添加标签
+	m.currentSession.Tags = append(m.currentSession.Tags, tag)
+	log.Infof("为当前会话 %s 添加标签: %s", m.currentSession.ID, tag)
+	return nil
 }
 
 // ==================== 消息记录 ====================
@@ -163,13 +189,63 @@ func (m *Manager) AddMessage(msg model.MemoryMessage) error {
 func (m *Manager) updateContext(msg model.MemoryMessage) {
 	content := msg.Content
 
-	// TODO: 提取股票代码
-	// TODO: 检测使用的工具
-	// TODO: 检测交易操作
-	// TODO: 生成标签候选
+	// 提取股票代码（A股格式：6位数字，以0、3、6开头）
+	stockPattern := regexp.MustCompile(`\b([036]\d{5})\b`)
+	stockMatches := stockPattern.FindAllString(content, -1)
+	for _, code := range stockMatches {
+		if !containsString(m.currentSession.Context.StockCodes, code) {
+			m.currentSession.Context.StockCodes = append(m.currentSession.Context.StockCodes, code)
+		}
+	}
 
-	// 这里简化处理，实际应该使用正则表达式或 AI 提取
-	_ = content
+	// 检测使用的工具（基于消息内容中的工具名称模式）
+	toolPattern := regexp.MustCompile(`(?:调用工具|使用工具|tool[:：])\s*([a-z_]+)`)
+	toolMatches := toolPattern.FindAllStringSubmatch(content, -1)
+	for _, match := range toolMatches {
+		if len(match) > 1 && !containsString(m.currentSession.Context.ToolsUsed, match[1]) {
+			m.currentSession.Context.ToolsUsed = append(m.currentSession.Context.ToolsUsed, match[1])
+		}
+	}
+
+	// 检测交易操作关键词
+	tradingKeywords := []string{"买入", "卖出", "建仓", "清仓", "加仓", "减仓", "止损", "止盈"}
+	for _, keyword := range tradingKeywords {
+		if strings.Contains(content, keyword) {
+			if !containsString(m.currentSession.Context.Actions, keyword) {
+				m.currentSession.Context.Actions = append(m.currentSession.Context.Actions, keyword)
+			}
+		}
+	}
+
+	// 生成话题标签候选
+	topicKeywords := map[string]string{
+		"涨停":   "涨停分析",
+		"跌停":   "跌停分析",
+		"财报":   "财报分析",
+		"业绩":   "业绩分析",
+		"分红":   "分红话题",
+		"回购":   "回购话题",
+		"新股":   "新股话题",
+		"技术分析": "技术分析",
+		"基本面":  "基本面分析",
+	}
+	for keyword, topic := range topicKeywords {
+		if strings.Contains(content, keyword) {
+			if !containsString(m.currentSession.Context.Topics, topic) {
+				m.currentSession.Context.Topics = append(m.currentSession.Context.Topics, topic)
+			}
+		}
+	}
+}
+
+// containsString 检查字符串切片是否包含指定字符串
+func containsString(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
 }
 
 // updateShortTermMemory 更新短期记忆
@@ -207,8 +283,8 @@ func (m *Manager) EndSession() error {
 		MessageCount: len(m.currentSession.Messages),
 		Context:      m.currentSession.Context,
 		Summary:      m.generateSummary(),
-		Tags:         m.generateTags(),
-		Model:        "", // TODO: 从配置获取
+		Tags:         append(m.generateTags(), m.currentSession.Tags...),
+		Model:        config.GetLocalStoreConfig().Model,
 	}
 
 	// 同步保存完整会话

@@ -2,6 +2,7 @@ package tools
 
 import (
 	"msa/pkg/logic/tools/finance"
+	"msa/pkg/logic/tools/knowledge"
 	"msa/pkg/logic/tools/search"
 	skilltools "msa/pkg/logic/tools/skill"
 	"msa/pkg/logic/tools/stock"
@@ -24,11 +25,18 @@ var _ MsaTool = (*finance.SubmitBuyOrderTool)(nil)
 var _ MsaTool = (*finance.SubmitSellOrderTool)(nil)
 var _ MsaTool = (*finance.GetTransactionsTool)(nil)
 
+var _ MsaTool = (*knowledge.ReadKnowledgeFileTool)(nil)
+var _ MsaTool = (*knowledge.WriteKnowledgeFileTool)(nil)
+var _ MsaTool = (*knowledge.ListKnowledgeFilesTool)(nil)
+var _ MsaTool = (*knowledge.QuerySessionsByDateTool)(nil)
+var _ MsaTool = (*knowledge.AddSessionTagTool)(nil)
+
 func init() {
 	registerStock()
 	registerSearch()
 	registerFinance()
 	registerSkill()
+	registerKnowledge()
 }
 
 func registerStock() {
@@ -55,4 +63,12 @@ func registerFinance() {
 
 func registerSkill() {
 	RegisterTool(&skilltools.SkillContentTool{})
+}
+
+func registerKnowledge() {
+	RegisterTool(&knowledge.ReadKnowledgeFileTool{})
+	RegisterTool(&knowledge.WriteKnowledgeFileTool{})
+	RegisterTool(&knowledge.ListKnowledgeFilesTool{})
+	RegisterTool(&knowledge.QuerySessionsByDateTool{})
+	RegisterTool(&knowledge.AddSessionTagTool{})
 }
