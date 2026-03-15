@@ -9,7 +9,7 @@ import (
 	msadb "msa/pkg/db"
 	"msa/pkg/logic/message"
 	"msa/pkg/model"
-	"msa/pkg/service"
+	"msa/pkg/logic/finsvc"
 )
 
 // GetPositionsParam 查询持仓参数
@@ -75,14 +75,14 @@ func GetPositions(ctx context.Context, param *GetPositionsParam) (string, error)
 		return "", err
 	}
 
-	// 转换为 service.PriceMap 格式
-	priceMap := make(service.PriceMap)
+	// 转换为 finsvc.PriceMap 格式
+	priceMap := make(finsvc.PriceMap)
 	for code, price := range prices {
 		priceMap[code] = price
 	}
 
 	// 获取所有持仓
-	positions, err := service.GetAllPositions(database, account.ID, priceMap)
+	positions, err := finsvc.GetAllPositions(database, account.ID, priceMap)
 	if err != nil {
 		message.BroadcastToolEnd("get_positions", "", err)
 		return "", err
@@ -165,7 +165,7 @@ func GetAccountSummary(ctx context.Context, param *GetAccountSummaryParam) (stri
 	}
 
 	// 批量获取价格
-	priceMap := make(service.PriceMap)
+	priceMap := make(finsvc.PriceMap)
 	if len(stockCodes) > 0 {
 		prices, err := fetchAllPrices(stockCodes)
 		if err != nil {
@@ -179,7 +179,7 @@ func GetAccountSummary(ctx context.Context, param *GetAccountSummaryParam) (stri
 	}
 
 	// 计算总市值
-	totalValue, err := service.GetAccountTotalValue(database, account.ID, priceMap)
+	totalValue, err := finsvc.GetAccountTotalValue(database, account.ID, priceMap)
 	if err != nil {
 		message.BroadcastToolEnd("get_account_summary", "", err)
 		return "", err

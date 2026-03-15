@@ -16,12 +16,10 @@ import (
 	"msa/pkg/app"
 	"msa/pkg/config"
 	"msa/pkg/db"
+	"msa/pkg/extcli"
 	"msa/pkg/logic/memory"
 	"msa/pkg/tui/style"
 )
-
-// contextKey 是 context 的键类型
-type contextKey string
 
 var (
 	// configArgs --config 参数的值
@@ -29,6 +27,12 @@ var (
 
 	// resumeSession --resume 参数的会话ID值
 	resumeSession string
+
+	// question -q/--question 参数的值（单轮对话）
+	question string
+
+	// modelOverride -m/--model 参数的值（模型覆盖）
+	modelOverride string
 )
 
 var rootCmd = &cobra.Command{
@@ -42,6 +46,8 @@ func init() {
 	rootCmd.PersistentFlags().StringArrayVar(&configArgs, "config", nil, "配置参数（格式：key=value 或文件路径）")
 	rootCmd.PersistentFlags().StringVar(&resumeSession, "resume", "", "恢复指定会话（会话ID）")
 	rootCmd.PersistentFlags().StringVar(&resumeSession, "r", "", "恢复指定会话的简写（会话ID）")
+	rootCmd.PersistentFlags().StringVarP(&question, "question", "q", "", "单轮对话问题（不进入TUI）")
+	rootCmd.PersistentFlags().StringVarP(&modelOverride, "model", "m", "", "指定模型（覆盖配置文件）")
 
 	// 注册子命令
 	AddCommand(cmd_config.NewCommand())
@@ -52,6 +58,18 @@ func init() {
 // runRoot 根命令执行函数，仅做路由调用
 func runRoot(cmd *cobra.Command, args []string) error {
 	ctx := cmd.Context()
+
+	// 如果指定了 -q 参数（即使为空），执行 CLI 单轮对话
+	if cmd.Flags().Changed("question") {
+		// 检查参数互斥
+		if resumeSession != "" {
+			fmt.Println("⚠️  警告：-q 和 --resume 不能同时使用，将忽略 --resume 参数")
+		}
+
+		exitCode := extcli.Run(ctx, question, modelOverride)
+		os.Exit(exitCode)
+		return nil
+	}
 
 	// 如果指定了 resume 参数，恢复会话
 	if resumeSession != "" {

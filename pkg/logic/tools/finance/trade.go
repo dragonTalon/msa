@@ -10,7 +10,7 @@ import (
 	msadb "msa/pkg/db"
 	"msa/pkg/logic/message"
 	"msa/pkg/model"
-	"msa/pkg/service"
+	"msa/pkg/logic/finsvc"
 )
 
 // SubmitBuyOrderParam 提交买入订单参数
@@ -66,7 +66,7 @@ func SubmitBuyOrder(ctx context.Context, param *SubmitBuyOrderParam) (string, er
 	}
 
 	// 构建订单
-	order := service.Order{
+	order := finsvc.Order{
 		StockCode: param.StockCode,
 		StockName: param.StockName,
 		Quantity:  param.Quantity,
@@ -76,7 +76,7 @@ func SubmitBuyOrder(ctx context.Context, param *SubmitBuyOrderParam) (string, er
 	}
 
 	// 提交订单
-	transID, err := service.SubmitBuyOrder(database, account.ID, order)
+	transID, err := finsvc.SubmitBuyOrder(database, account.ID, order)
 	if err != nil {
 		message.BroadcastToolEnd("submit_buy_order", "", err)
 		return "", err
@@ -96,7 +96,7 @@ func SubmitBuyOrder(ctx context.Context, param *SubmitBuyOrderParam) (string, er
 	}
 
 	// 自动成交
-	if err := service.FillOrder(database, transID); err != nil {
+	if err := finsvc.FillOrder(database, transID); err != nil {
 		result := fmt.Sprintf("订单已创建（ID: %d），但成交失败：%v", transID, err)
 		message.BroadcastToolEnd("submit_buy_order", result, err)
 		return "", fmt.Errorf("订单创建成功但成交失败: %w", err)
@@ -157,7 +157,7 @@ func SubmitSellOrder(ctx context.Context, param *SubmitSellOrderParam) (string, 
 	}
 
 	// 验证持仓充足
-	position, err := service.GetPosition(database, account.ID, param.StockCode)
+	position, err := finsvc.GetPosition(database, account.ID, param.StockCode)
 	if err != nil {
 		message.BroadcastToolEnd("submit_sell_order", "", err)
 		return "", err
@@ -182,7 +182,7 @@ func SubmitSellOrder(ctx context.Context, param *SubmitSellOrderParam) (string, 
 	}
 
 	// 构建订单
-	order := service.Order{
+	order := finsvc.Order{
 		StockCode: param.StockCode,
 		StockName: param.StockName,
 		Quantity:  param.Quantity,
@@ -192,14 +192,14 @@ func SubmitSellOrder(ctx context.Context, param *SubmitSellOrderParam) (string, 
 	}
 
 	// 提交订单
-	transID, err := service.SubmitSellOrder(database, account.ID, order)
+	transID, err := finsvc.SubmitSellOrder(database, account.ID, order)
 	if err != nil {
 		message.BroadcastToolEnd("submit_sell_order", "", err)
 		return "", err
 	}
 
 	// 自动成交
-	if err := service.FillOrder(database, transID); err != nil {
+	if err := finsvc.FillOrder(database, transID); err != nil {
 		result := fmt.Sprintf("订单已创建（ID: %d），但成交失败：%v", transID, err)
 		message.BroadcastToolEnd("submit_sell_order", result, err)
 		return "", fmt.Errorf("订单创建成功但成交失败: %w", err)
