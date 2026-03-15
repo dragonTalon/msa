@@ -9,7 +9,7 @@ import (
 	"gorm.io/gorm"
 	msadb "msa/pkg/db"
 	"msa/pkg/model"
-	"msa/pkg/service"
+	"msa/pkg/logic/finsvc"
 )
 
 // setupTestDB 创建测试用的临时数据库
@@ -84,14 +84,14 @@ func TestIntegration_BuyOrderFlow(t *testing.T) {
 	}
 
 	// 提交买入订单
-	order := service.Order{
+	order := finsvc.Order{
 		StockCode: "600519",
 		StockName: "贵州茅台",
 		Quantity:  100,
 		Price:     model.YuanToHao(10.50),
 		Fee:       model.YuanToHao(0.05),
 	}
-	txID, err := service.SubmitBuyOrder(db, account.ID, order)
+	txID, err := finsvc.SubmitBuyOrder(db, account.ID, order)
 	if err != nil {
 		t.Fatalf("Failed to submit buy order: %v", err)
 	}
@@ -107,7 +107,7 @@ func TestIntegration_BuyOrderFlow(t *testing.T) {
 	}
 
 	// 自动成交
-	err = service.FillOrder(db, txID)
+	err = finsvc.FillOrder(db, txID)
 	if err != nil {
 		t.Fatalf("Failed to fill order: %v", err)
 	}
@@ -157,24 +157,24 @@ func TestIntegration_SellOrderFlow(t *testing.T) {
 	// 先买入建立持仓
 	price := model.YuanToHao(10.50)
 	quantity := int64(100)
-	buyOrder := service.Order{
+	buyOrder := finsvc.Order{
 		StockCode: "600519",
 		StockName: "贵州茅台",
 		Quantity:  quantity,
 		Price:     price,
 		Fee:       model.YuanToHao(0.05),
 	}
-	txID1, err := service.SubmitBuyOrder(db, account.ID, buyOrder)
+	txID1, err := finsvc.SubmitBuyOrder(db, account.ID, buyOrder)
 	if err != nil {
 		t.Fatalf("Failed to submit buy order: %v", err)
 	}
-	err = service.FillOrder(db, txID1)
+	err = finsvc.FillOrder(db, txID1)
 	if err != nil {
 		t.Fatalf("Failed to fill buy order: %v", err)
 	}
 
 	// 获取持仓
-	positions, err := service.GetAllPositions(db, account.ID, nil)
+	positions, err := finsvc.GetAllPositions(db, account.ID, nil)
 	if err != nil {
 		t.Fatalf("Failed to get positions: %v", err)
 	}
@@ -189,26 +189,26 @@ func TestIntegration_SellOrderFlow(t *testing.T) {
 
 	// 提交卖出订单
 	sellPrice := model.YuanToHao(11.00)
-	sellOrder := service.Order{
+	sellOrder := finsvc.Order{
 		StockCode: "600519",
 		StockName: "贵州茅台",
 		Quantity:  quantity / 2,
 		Price:     sellPrice,
 		Fee:       model.YuanToHao(0.05),
 	}
-	txID2, err := service.SubmitSellOrder(db, account.ID, sellOrder)
+	txID2, err := finsvc.SubmitSellOrder(db, account.ID, sellOrder)
 	if err != nil {
 		t.Fatalf("Failed to submit sell order: %v", err)
 	}
 
 	// 自动成交
-	err = service.FillOrder(db, txID2)
+	err = finsvc.FillOrder(db, txID2)
 	if err != nil {
 		t.Fatalf("Failed to fill sell order: %v", err)
 	}
 
 	// 验证持仓已减少
-	positions, err = service.GetAllPositions(db, account.ID, nil)
+	positions, err = finsvc.GetAllPositions(db, account.ID, nil)
 	if err != nil {
 		t.Fatalf("Failed to get positions after sell: %v", err)
 	}
@@ -246,14 +246,14 @@ func TestIntegration_InsufficientBalance(t *testing.T) {
 	}
 
 	// 尝试买入 1000 股，每股 10 元，需要 10000 元，余额不足
-	order := service.Order{
+	order := finsvc.Order{
 		StockCode: "600519",
 		StockName: "贵州茅台",
 		Quantity:  1000,
 		Price:     model.YuanToHao(10),
 		Fee:       model.YuanToHao(0.05),
 	}
-	_, err = service.SubmitBuyOrder(db, account.ID, order)
+	_, err = finsvc.SubmitBuyOrder(db, account.ID, order)
 	// SubmitBuyOrder 在余额不足时不返回错误，而是创建 REJECTED 记录
 	// 我们验证返回的是交易 ID
 	if err != nil {
@@ -298,27 +298,27 @@ func TestIntegration_AccountTotalValue(t *testing.T) {
 	// 买入股票
 	price := model.YuanToHao(10.00)
 	quantity := int64(100)
-	order := service.Order{
+	order := finsvc.Order{
 		StockCode: "600519",
 		StockName: "贵州茅台",
 		Quantity:  quantity,
 		Price:     price,
 		Fee:       model.YuanToHao(0.05),
 	}
-	txID, err := service.SubmitBuyOrder(db, accountID, order)
+	txID, err := finsvc.SubmitBuyOrder(db, accountID, order)
 	if err != nil {
 		t.Fatalf("Failed to submit buy order: %v", err)
 	}
-	err = service.FillOrder(db, txID)
+	err = finsvc.FillOrder(db, txID)
 	if err != nil {
 		t.Fatalf("Failed to fill order: %v", err)
 	}
 
 	// 计算总价值
-	priceMap := make(service.PriceMap)
+	priceMap := make(finsvc.PriceMap)
 	priceMap["600519"] = model.YuanToHao(11.00) // 当前价格涨到 11 元
 
-	totalValue, err := service.GetAccountTotalValue(db, accountID, priceMap)
+	totalValue, err := finsvc.GetAccountTotalValue(db, accountID, priceMap)
 	if err != nil {
 		t.Fatalf("Failed to get total value: %v", err)
 	}

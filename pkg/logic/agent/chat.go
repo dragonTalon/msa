@@ -26,6 +26,11 @@ import (
 
 var agentCache *react.Agent
 
+// ResetCache 清除 agent 缓存，用于模型切换时重新初始化
+func ResetCache() {
+	agentCache = nil
+}
+
 // maxHistoryRounds 最大保留的对话轮数（一轮 = 一条 User + 一条 Assistant）
 const maxHistoryRounds = 20
 
