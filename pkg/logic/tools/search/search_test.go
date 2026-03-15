@@ -2,6 +2,7 @@ package search
 
 import (
 	"context"
+	"encoding/json"
 	"msa/pkg/model"
 	"testing"
 )
@@ -64,11 +65,23 @@ func TestWebSearch_EmptyQuery(t *testing.T) {
 	}
 
 	result, err := WebSearch(ctx, params)
-	if err == nil {
-		t.Error("WebSearch() with empty query should return error")
+	// 新行为：不返回 error，而是返回包含错误信息的 JSON
+	if err != nil {
+		t.Errorf("WebSearch() should not return error, got: %v", err)
 	}
-	if result != "" {
-		t.Error("WebSearch() with empty query should return empty result")
+	if result == "" {
+		t.Error("WebSearch() with empty query should return error JSON result")
+	}
+	// 验证返回的 JSON 包含失败状态
+	var response model.WebSearchResponse
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		t.Errorf("Failed to parse result JSON: %v", err)
+	}
+	if response.Status != "failed" {
+		t.Errorf("Expected status 'failed', got: %s", response.Status)
+	}
+	if response.Message == "" {
+		t.Error("Expected error message in response")
 	}
 }
 
@@ -130,5 +143,93 @@ func TestWebSearchResponse_Struct(t *testing.T) {
 
 	if response.Query != "test" {
 		t.Error("WebSearchResponse struct not working correctly")
+	}
+}
+
+// TestFetchPageContent_EmptyURL tests FetchPageContent with empty URL
+func TestFetchPageContent_EmptyURL(t *testing.T) {
+	ctx := context.Background()
+	params := &model.FetchPageParams{
+		URL: "",
+	}
+
+	result, err := FetchPageContent(ctx, params)
+	// 新行为：不返回 error，而是返回包含错误信息的 JSON
+	if err != nil {
+		t.Errorf("FetchPageContent() should not return error, got: %v", err)
+	}
+	if result == "" {
+		t.Error("FetchPageContent() with empty URL should return error JSON result")
+	}
+	// 验证返回的 JSON 包含失败状态
+	var response model.FetchPageResponse
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		t.Errorf("Failed to parse result JSON: %v", err)
+	}
+	if response.Success {
+		t.Error("Expected success to be false")
+	}
+	if response.ErrorMsg == "" {
+		t.Error("Expected error message in response")
+	}
+}
+
+// TestFetchPageContent_InvalidURL tests FetchPageContent with invalid URL
+func TestFetchPageContent_InvalidURL(t *testing.T) {
+	ctx := context.Background()
+	params := &model.FetchPageParams{
+		URL: "not-a-valid-url",
+	}
+
+	result, err := FetchPageContent(ctx, params)
+	// 新行为：不返回 error，而是返回包含错误信息的 JSON
+	if err != nil {
+		t.Errorf("FetchPageContent() should not return error, got: %v", err)
+	}
+	if result == "" {
+		t.Error("FetchPageContent() with invalid URL should return error JSON result")
+	}
+	// 验证返回的 JSON 包含失败状态
+	var response model.FetchPageResponse
+	if err := json.Unmarshal([]byte(result), &response); err != nil {
+		t.Errorf("Failed to parse result JSON: %v", err)
+	}
+	if response.Success {
+		t.Error("Expected success to be false")
+	}
+}
+
+// TestFetchPageResponse_Struct tests the FetchPageResponse struct
+func TestFetchPageResponse_Struct(t *testing.T) {
+	// Verify the struct compiles correctly with new fields
+	response := &model.FetchPageResponse{
+		URL:         "https://example.com",
+		Title:       "Test Page",
+		Content:     "Test content",
+		HasMore:     false,
+		TotalLength: 12,
+		Success:     true,
+		ErrorMsg:    "",
+	}
+
+	if response.URL != "https://example.com" {
+		t.Error("FetchPageResponse struct not working correctly")
+	}
+	if !response.Success {
+		t.Error("Expected Success to be true")
+	}
+
+	// Test error response
+	errorResponse := &model.FetchPageResponse{
+		URL:      "https://example.com",
+		Success:  false,
+		ErrorMsg: "connection timeout",
+	}
+
+	if errorResponse.Success {
+		t.Error("Expected Success to be false for error response")
+	}
+	if errorResponse.ErrorMsg != "connection timeout" {
+		t.Error("Expected error message in response")
 	}
 }

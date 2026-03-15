@@ -36,4 +36,6 @@ type FetchPageResponse struct {
 	Content     string `json:"content" jsonschema:"description=页面内容 | Page content"`
 	HasMore     bool   `json:"has_more" jsonschema:"description=是否还有更多内容 | Whether there is more content"`
 	TotalLength int    `json:"total_length" jsonschema:"description=内容总长度 | Total content length"`
+	Success     bool   `json:"success" jsonschema:"description=是否成功 | Whether the request was successful"`
+	ErrorMsg    string `json:"error_msg,omitempty" jsonschema:"description=错误信息 | Error message if failed"`
 }

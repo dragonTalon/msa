@@ -196,7 +196,7 @@ func (b *BrowserManager) runInTab(outerCtx context.Context, timeout time.Duratio
 // GetPageHTML 获取页面完整 HTML（复用浏览器，每次使用独立 Tab）
 func (b *BrowserManager) GetPageHTML(ctx context.Context, url string) (string, error) {
 	var html string
-	err := b.runInTab(ctx, 30*time.Second,
+	err := b.runInTab(ctx, 60*time.Second,
 		chromedp.Navigate(url),
 		// 使用 WaitVisible 比 WaitReady 更稳定，确保 body 真正可见
 		chromedp.WaitVisible("body", chromedp.ByQuery),
@@ -216,7 +216,7 @@ func (b *BrowserManager) GetPageHTML(ctx context.Context, url string) (string, e
 // GetPageText 获取页面文本内容（复用浏览器，每次使用独立 Tab）
 func (b *BrowserManager) GetPageText(ctx context.Context, url string) (string, error) {
 	var text string
-	err := b.runInTab(ctx, 30*time.Second,
+	err := b.runInTab(ctx, 60*time.Second,
 		chromedp.Navigate(url),
 		chromedp.WaitVisible("body", chromedp.ByQuery),
 		chromedp.Sleep(time.Duration(800+rand.Intn(700))*time.Millisecond),
