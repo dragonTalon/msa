@@ -6,20 +6,17 @@ import (
 	"strings"
 	"sync"
 
-	log "github.c
-
 	log "github.com/sirupsen/logrus"
 
-"
-	"msa/pkg/logic
 	"msa/pkg/config"
 	"msa/pkg/logic/agent"
+	"msa/pkg/logic/memory"
 	"msa/pkg/logic/message"
 	"msa/pkg/model"
 )
 
 const (
-ferSize = 100
+	streamBufferSize = 100
 )
 
 // streamCollector 用于收集流式输出的完整内容
@@ -54,9 +51,21 @@ func (c *streamCollector) getContent() string {
 	if c.reasonContent.Len() > 0 {
 		result.WriteString("【思考过程】\n")
 		result.WriteString(c.reasonContent.String())
-		resul
-	streamBufferSize = 100
-)
+		result.WriteString("\n\n")
+	}
+
+	// 再添加正文内容
+	result.WriteString(c.textContent.String())
+
+	return result.String()
+}
+
+// hasContent 检查是否有实际内容
+func (c *streamCollector) hasContent() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.textContent.Len() > 0 || c.reasonContent.Len() > 0
+}
 
 // Run 执行 CLI 单轮对话
 // 返回退出码：0 成功，1 失败
@@ -103,15 +112,6 @@ func Run(ctx context.Context, question string, modelOverride string) int {
 	// 5. 清除 agent 缓存以使用新配置
 	agent.ResetCache()
 
-	// 6. 注册流式输出
-	streamCh, unregister := message.RegisterStreamOutput(streamBufferSize)
-	defer unregister()
-
-	// 7. 发起对话请求
-	if err := agent.Ask(ctx, question, nil); err != nil {
-		log.Errorf("对话请求失败: %v", err)
-		return 1
-	}
 	// 6. 初始化记忆系统
 	memoryInitialized := false
 	if memory.IsMemoryEnabled() {
@@ -131,18 +131,18 @@ func Run(ctx context.Context, question string, modelOverride string) int {
 	}
 
 	// 8. 注册流式输出
-	// 8. 流式输出处理
-	return processStreamOutput(streamCh)
-}
+	streamCh, unregister := message.RegisterStreamOutput(streamBufferSize)
+	defer unregister()
+
 	// 创建流式内容收集器
 	collector := &streamCollector{}
 
 	// 9. 发起对话请求
-// processStreamOutput 处理流式输出
-func processStreamOutput(streamCh <-chan *model.StreamChunk) int {
-	for chunk := range streamCh {
-		if chunk.Err != nil {
-			log.Errorf("流式输出错误: %v", chunk.Err)
+	if err := agent.Ask(ctx, question, nil); err != nil {
+		log.Errorf("对话请求失败: %v", err)
+		return 1
+	}
+
 	// 10. 流式输出处理
 	exitCode := processStreamOutputWithCollector(streamCh, collector)
 
@@ -154,7 +154,7 @@ func processStreamOutput(streamCh <-chan *model.StreamChunk) int {
 				log.Debugf("记录助手消息到记忆失败: %v", err)
 			}
 		}
-		if chunk.IsDone {
+
 		// 12. 结束记忆会话
 		if sessionID, err := memory.EndChatMemory(); err != nil {
 			log.Debugf("结束记忆会话失败: %v", err)
@@ -168,33 +168,40 @@ func processStreamOutput(streamCh <-chan *model.StreamChunk) int {
 
 // processStreamOutputWithCollector 处理流式输出并收集内容
 func processStreamOutputWithCollector(streamCh <-chan *model.StreamChunk, collector *streamCollector) int {
-			return 0
-		}
-
-log.Errorf("流式输出错误: %v", chunk.Err)
+	for chunk := range streamCh {
+		if chunk.Err != nil {
+			log.Errorf("流式输出错误: %v", chunk.Err)
 			// 如果错误消息标记为完成，退出循环
 			if chunk.IsDone {
 				fmt.Printf("\n❌ 对话出错: %v\n", chunk.Err)
-				retu
-		// 根据消息类型输出
+				return 1
+			}
+			continue
+		}
+
+		if chunk.IsDone {
+			// 流式输出完成
+			log.Info("CLI 单轮对话完成")
+			return 0
+		}
+
+		// 根据消息类型输出和收集
 		switch chunk.MsgType {
 		case model.StreamMsgTypeText:
 			fmt.Print(chunk.Content)
+			collector.append(chunk.Content, model.StreamMsgTypeText)
 		case model.StreamMsgTypeReason:
 			fmt.Print(chunk.Content)
+			collector.append(chunk.Content, model.StreamMsgTypeReason)
 		case model.StreamMsgTypeTool:
 			fmt.Print(chunk.Content)
+			collector.append(chunk.Content, model.StreamMsgTypeTool)
 		default:
-		// 根据消息类型输出和收集
+			// 忽略其他类型
 		}
 	}
 
-eText)
-		case model
 	// channel 关闭，正常退出
-
-			fmt.Print(chunk.Cont
 	log.Info("流式通道关闭，正常退出")
-hunk.Cont
 	return 0
 }
