@@ -6,7 +6,6 @@ import (
 	"msa/pkg/logic/message"
 	internal "msa/pkg/logic/tools/search/internal"
 	"msa/pkg/model"
-	mas_utils "msa/pkg/utils"
 	"net/url"
 	"sync"
 
@@ -60,14 +59,14 @@ func FetchPageContent(ctx context.Context, param *model.FetchPageParams) (string
 	if param.URL == "" {
 		errMsg := "URL 不能为空 | URL cannot be empty"
 		message.BroadcastToolEnd("fetch_page_content", "", fmt.Errorf("%s", errMsg))
-		return buildErrorResponse(param.URL, errMsg), nil
+		return model.NewErrorResult(errMsg), nil
 	}
 
 	// 验证 URL 格式
 	if _, err := url.Parse(param.URL); err != nil {
 		errMsg := fmt.Sprintf("无效的 URL 格式: %v | invalid URL format: %v", err, err)
 		message.BroadcastToolEnd("fetch_page_content", "", fmt.Errorf("%s", errMsg))
-		return buildErrorResponse(param.URL, errMsg), nil
+		return model.NewErrorResult(errMsg), nil
 	}
 
 	// 使用共享的浏览器实例（懒加载单例，线程安全）
@@ -81,7 +80,7 @@ func FetchPageContent(ctx context.Context, param *model.FetchPageParams) (string
 		log.Errorf("获取页面失败: %v", err)
 		errMsg := fmt.Sprintf("获取页面失败: %v", err)
 		message.BroadcastToolEnd("fetch_page_content", "", err)
-		return buildErrorResponse(param.URL, errMsg), nil
+		return model.NewErrorResult(errMsg), nil
 	}
 
 	// 提取内容
@@ -90,7 +89,7 @@ func FetchPageContent(ctx context.Context, param *model.FetchPageParams) (string
 		log.Errorf("提取内容失败: %v", err)
 		errMsg := fmt.Sprintf("提取内容失败: %v", err)
 		message.BroadcastToolEnd("fetch_page_content", "", err)
-		return buildErrorResponse(param.URL, errMsg), nil
+		return model.NewErrorResult(errMsg), nil
 	}
 
 	// 设置默认长度限制
@@ -116,30 +115,18 @@ func FetchPageContent(ctx context.Context, param *model.FetchPageParams) (string
 	}
 
 	// 构建响应
-	response := &model.FetchPageResponse{
+	data := &model.FetchPageData{
 		URL:         param.URL,
 		Title:       title,
 		Content:     content,
 		HasMore:     hasMore,
 		TotalLength: totalLength,
-		Success:     true,
 	}
 
-	resultJSON := mas_utils.ToJSONString(response)
 	message.BroadcastToolEnd("fetch_page_content", fmt.Sprintf("获取 %d 字符（共 %d 字符）", returnedLength, totalLength), nil)
 	log.Debugf("页面抓取成功，返回 %d/%d 字符", returnedLength, totalLength)
 
-	return resultJSON, nil
-}
-
-// buildErrorResponse 构建错误响应
-func buildErrorResponse(url string, errMsg string) string {
-	response := &model.FetchPageResponse{
-		URL:      url,
-		Success:  false,
-		ErrorMsg: errMsg,
-	}
-	return mas_utils.ToJSONString(response)
+	return model.NewSuccessResult(data, fmt.Sprintf("获取 %d 字符（共 %d 字符）", returnedLength, totalLength)), nil
 }
 
 // 全局默认抓取工具实例

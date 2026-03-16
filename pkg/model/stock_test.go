@@ -74,22 +74,17 @@ func TestWebSearchParams_JSONSerialization(t *testing.T) {
 	}
 }
 
-// TestWebSearchResponse_Struct tests the WebSearchResponse struct
-func TestWebSearchResponse_Struct(t *testing.T) {
-	response := WebSearchResponse{
-		Query:     "test query",
-		Results:   []SearchResultItem{},
-		RequestID: "req-123",
-		Status:    "success",
-		Error:     "",
-		Message:   "test message",
+// TestWebSearchData_Struct tests the WebSearchData struct
+func TestWebSearchData_Struct(t *testing.T) {
+	data := WebSearchData{
+		Query:      "test query",
+		Results:    []SearchResultItem{},
+		RequestID:  "req-123",
+		UsedEngine: "google",
 	}
 
-	if response.Query != "test query" {
-		t.Errorf("Query = %v, want 'test query'", response.Query)
-	}
-	if response.Status != "success" {
-		t.Errorf("Status = %v, want 'success'", response.Status)
+	if data.Query != "test query" {
+		t.Errorf("Query = %v, want 'test query'", data.Query)
 	}
 }
 
@@ -125,9 +120,9 @@ func TestFetchPageParams_Struct(t *testing.T) {
 	}
 }
 
-// TestFetchPageResponse_Struct tests the FetchPageResponse struct
-func TestFetchPageResponse_Struct(t *testing.T) {
-	response := FetchPageResponse{
+// TestFetchPageData_Struct tests the FetchPageData struct
+func TestFetchPageData_Struct(t *testing.T) {
+	data := FetchPageData{
 		URL:         "https://example.com",
 		Title:       "Example Page",
 		Content:     "Page content",
@@ -135,14 +130,14 @@ func TestFetchPageResponse_Struct(t *testing.T) {
 		TotalLength: 10000,
 	}
 
-	if response.URL != "https://example.com" {
-		t.Errorf("URL = %v, want 'https://example.com'", response.URL)
+	if data.URL != "https://example.com" {
+		t.Errorf("URL = %v, want 'https://example.com'", data.URL)
 	}
-	if !response.HasMore {
+	if !data.HasMore {
 		t.Error("HasMore should be true")
 	}
-	if response.TotalLength != 10000 {
-		t.Errorf("TotalLength = %v, want 10000", response.TotalLength)
+	if data.TotalLength != 10000 {
+		t.Errorf("TotalLength = %v, want 10000", data.TotalLength)
 	}
 }
 

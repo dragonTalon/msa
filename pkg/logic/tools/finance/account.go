@@ -36,6 +36,16 @@ func (t *CreateAccountTool) GetToolGroup() model.ToolGroup {
 	return model.FinanceToolGroup
 }
 
+// AccountData 账户数据
+type AccountData struct {
+	ID            int64  `json:"id"`
+	InitialAmount string `json:"initial_amount"`
+	AvailableAmt  string `json:"available_amt"`
+	LockedAmt     string `json:"locked_amt,omitempty"`
+	Status        string `json:"status"`
+	CreatedAt     string `json:"created_at,omitempty"`
+}
+
 // CreateAccount 创建账户
 func CreateAccount(ctx context.Context, param *CreateAccountParam) (string, error) {
 	message.BroadcastToolStart("create_account", fmt.Sprintf("初始金额: %.2f 元", param.InitialAmount))
@@ -44,7 +54,7 @@ func CreateAccount(ctx context.Context, param *CreateAccountParam) (string, erro
 	if database == nil {
 		err := fmt.Errorf("数据库未初始化")
 		message.BroadcastToolEnd("create_account", "", err)
-		return "", err
+		return model.NewErrorResult(err.Error()), nil
 	}
 
 	// 检查是否已存在活跃账户
@@ -55,35 +65,32 @@ func CreateAccount(ctx context.Context, param *CreateAccountParam) (string, erro
 	if count > 0 {
 		err := fmt.Errorf("已存在活跃账户，不支持多账户")
 		message.BroadcastToolEnd("create_account", "", err)
-		return "", err
+		return model.NewErrorResult(err.Error()), nil
 	}
 
 	// 创建账户
 	accountID, err := db.CreateAccount(database, "default", model.YuanToHao(param.InitialAmount))
 	if err != nil {
 		message.BroadcastToolEnd("create_account", "", err)
-		return "", err
+		return model.NewErrorResult(err.Error()), nil
 	}
 
 	// 查询创建的账户
 	account, err := db.GetAccountByID(database, accountID)
 	if err != nil {
 		message.BroadcastToolEnd("create_account", "", err)
-		return "", err
+		return model.NewErrorResult(err.Error()), nil
 	}
 
-	result := fmt.Sprintf("账户创建成功！\n"+
-		"账户ID: %d\n"+
-		"初始金额: %s 元\n"+
-		"可用余额: %s 元\n"+
-		"状态: %s",
-		account.ID,
-		formatHaoToYuan(account.InitialAmount),
-		formatHaoToYuan(account.AvailableAmt),
-		account.Status)
+	data := &AccountData{
+		ID:            int64(account.ID),
+		InitialAmount: formatHaoToYuan(account.InitialAmount),
+		AvailableAmt:  formatHaoToYuan(account.AvailableAmt),
+		Status:        string(account.Status),
+	}
 
-	message.BroadcastToolEnd("create_account", result, nil)
-	return result, nil
+	message.BroadcastToolEnd("create_account", "账户创建成功", nil)
+	return model.NewSuccessResult(data, "账户创建成功"), nil
 }
 
 // GetAccountParam 查询账户参数
@@ -116,31 +123,26 @@ func GetAccount(ctx context.Context, param *GetAccountParam) (string, error) {
 	if database == nil {
 		err := fmt.Errorf("数据库未初始化")
 		message.BroadcastToolEnd("get_account", "", err)
-		return "", err
+		return model.NewErrorResult(err.Error()), nil
 	}
 
 	account, err := getActiveAccount(database)
 	if err != nil {
 		message.BroadcastToolEnd("get_account", "", err)
-		return "", err
+		return model.NewErrorResult(err.Error()), nil
 	}
 
-	result := fmt.Sprintf("账户信息：\n"+
-		"账户ID: %d\n"+
-		"初始金额: %s 元\n"+
-		"可用余额: %s 元\n"+
-		"锁定金额: %s 元\n"+
-		"状态: %s\n"+
-		"创建时间: %s",
-		account.ID,
-		formatHaoToYuan(account.InitialAmount),
-		formatHaoToYuan(account.AvailableAmt),
-		formatHaoToYuan(account.LockedAmt),
-		account.Status,
-		account.CreatedAt.Format("2006-01-02 15:04:05"))
+	data := &AccountData{
+		ID:            int64(account.ID),
+		InitialAmount: formatHaoToYuan(account.InitialAmount),
+		AvailableAmt:  formatHaoToYuan(account.AvailableAmt),
+		LockedAmt:     formatHaoToYuan(account.LockedAmt),
+		Status:        string(account.Status),
+		CreatedAt:     account.CreatedAt.Format("2006-01-02 15:04:05"),
+	}
 
-	message.BroadcastToolEnd("get_account", result, nil)
-	return result, nil
+	message.BroadcastToolEnd("get_account", "查询账户成功", nil)
+	return model.NewSuccessResult(data, "查询账户成功"), nil
 }
 
 // UpdateAccountStatusParam 修改账户状态参数
@@ -175,13 +177,13 @@ func UpdateAccountStatus(ctx context.Context, param *UpdateAccountStatusParam) (
 	if database == nil {
 		err := fmt.Errorf("数据库未初始化")
 		message.BroadcastToolEnd("update_account_status", "", err)
-		return "", err
+		return model.NewErrorResult(err.Error()), nil
 	}
 
 	account, err := getActiveAccount(database)
 	if err != nil {
 		message.BroadcastToolEnd("update_account_status", "", err)
-		return "", err
+		return model.NewErrorResult(err.Error()), nil
 	}
 
 	var result string
@@ -190,14 +192,14 @@ func UpdateAccountStatus(ctx context.Context, param *UpdateAccountStatusParam) (
 		err = db.UpdateAccountStatus(database, account.ID, model.AccountStatusFrozen)
 		if err != nil {
 			message.BroadcastToolEnd("update_account_status", "", err)
-			return "", err
+			return model.NewErrorResult(err.Error()), nil
 		}
 		result = "账户已冻结"
 	case "unfreeze":
 		err = db.UpdateAccountStatus(database, account.ID, model.AccountStatusActive)
 		if err != nil {
 			message.BroadcastToolEnd("update_account_status", "", err)
-			return "", err
+			return model.NewErrorResult(err.Error()), nil
 		}
 		result = "账户已解冻"
 	case "close":
@@ -207,20 +209,20 @@ func UpdateAccountStatus(ctx context.Context, param *UpdateAccountStatusParam) (
 				formatHaoToYuan(account.AvailableAmt),
 				formatHaoToYuan(account.LockedAmt))
 			message.BroadcastToolEnd("update_account_status", "", err)
-			return "", err
+			return model.NewErrorResult(err.Error()), nil
 		}
 		err = db.UpdateAccountStatus(database, account.ID, model.AccountStatusClosed)
 		if err != nil {
 			message.BroadcastToolEnd("update_account_status", "", err)
-			return "", err
+			return model.NewErrorResult(err.Error()), nil
 		}
 		result = "账户已关闭"
 	default:
 		err := fmt.Errorf("无效的操作类型: %s，支持的类型: freeze/unfreeze/close", param.Action)
 		message.BroadcastToolEnd("update_account_status", "", err)
-		return "", err
+		return model.NewErrorResult(err.Error()), nil
 	}
 
 	message.BroadcastToolEnd("update_account_status", result, nil)
-	return result, nil
+	return model.NewSuccessResult(nil, result), nil
 }

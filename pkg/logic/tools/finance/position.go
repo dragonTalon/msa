@@ -7,9 +7,9 @@ import (
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"
 	msadb "msa/pkg/db"
+	"msa/pkg/logic/finsvc"
 	"msa/pkg/logic/message"
 	"msa/pkg/model"
-	"msa/pkg/logic/finsvc"
 )
 
 // GetPositionsParam 查询持仓参数
@@ -34,6 +34,24 @@ func (t *GetPositionsTool) GetToolGroup() model.ToolGroup {
 	return model.FinanceToolGroup
 }
 
+// PositionItem 持仓项
+type PositionItem struct {
+	StockCode    string `json:"stock_code"`
+	StockName    string `json:"stock_name"`
+	Quantity     int64  `json:"quantity"`
+	Cost         string `json:"cost"`
+	CurrentPrice string `json:"current_price"`
+	Value        string `json:"value"`
+	PnL          string `json:"pnl"`
+	PnLStatus    string `json:"pnl_status"`
+}
+
+// PositionsData 持仓数据
+type PositionsData struct {
+	Total int            `json:"total"`
+	Items []PositionItem `json:"items"`
+}
+
 // GetPositions 获取持仓列表
 func GetPositions(ctx context.Context, param *GetPositionsParam) (string, error) {
 	message.BroadcastToolStart("get_positions", "")
@@ -42,13 +60,13 @@ func GetPositions(ctx context.Context, param *GetPositionsParam) (string, error)
 	if database == nil {
 		err := fmt.Errorf("数据库未初始化")
 		message.BroadcastToolEnd("get_positions", "", err)
-		return "", err
+		return model.NewErrorResult(err.Error()), nil
 	}
 
 	account, err := getActiveAccount(database)
 	if err != nil {
 		message.BroadcastToolEnd("get_positions", "", err)
-		return "", err
+		return model.NewErrorResult(err.Error()), nil
 	}
 
 	// 获取所有持仓股票代码
@@ -59,20 +77,19 @@ func GetPositions(ctx context.Context, param *GetPositionsParam) (string, error)
 		Pluck("stock_code", &stockCodes).Error
 	if err != nil {
 		message.BroadcastToolEnd("get_positions", "", err)
-		return "", err
+		return model.NewErrorResult(err.Error()), nil
 	}
 
 	if len(stockCodes) == 0 {
-		result := "当前无持仓"
-		message.BroadcastToolEnd("get_positions", result, nil)
-		return result, nil
+		message.BroadcastToolEnd("get_positions", "当前无持仓", nil)
+		return model.NewSuccessResult(&PositionsData{Total: 0, Items: []PositionItem{}}, "当前无持仓"), nil
 	}
 
 	// 批量获取价格
 	prices, err := fetchAllPrices(stockCodes)
 	if err != nil {
 		message.BroadcastToolEnd("get_positions", "", err)
-		return "", err
+		return model.NewErrorResult(err.Error()), nil
 	}
 
 	// 转换为 finsvc.PriceMap 格式
@@ -85,33 +102,40 @@ func GetPositions(ctx context.Context, param *GetPositionsParam) (string, error)
 	positions, err := finsvc.GetAllPositions(database, account.ID, priceMap)
 	if err != nil {
 		message.BroadcastToolEnd("get_positions", "", err)
-		return "", err
+		return model.NewErrorResult(err.Error()), nil
 	}
 
 	if len(positions) == 0 {
-		result := "当前无持仓"
-		message.BroadcastToolEnd("get_positions", result, nil)
-		return result, nil
+		message.BroadcastToolEnd("get_positions", "当前无持仓", nil)
+		return model.NewSuccessResult(&PositionsData{Total: 0, Items: []PositionItem{}}, "当前无持仓"), nil
 	}
 
-	// 格式化输出
-	result := fmt.Sprintf("持仓列表（共 %d 只）：\n\n", len(positions))
+	// 构建返回数据
+	items := make([]PositionItem, 0, len(positions))
 	for _, pos := range positions {
 		pnlStatus := "亏损"
 		if pos.PnL >= 0 {
 			pnlStatus = "盈利"
 		}
-		result += fmt.Sprintf("%s (%s)\n", pos.StockName, pos.StockCode)
-		result += fmt.Sprintf("  持仓数量: %d 股\n", pos.Quantity)
-		result += fmt.Sprintf("  持仓成本: %s 元\n", formatHaoToYuan(pos.Cost))
-		result += fmt.Sprintf("  当前价格: %s 元/股\n", formatHaoToYuan(pos.CurrentPrice))
-		result += fmt.Sprintf("  持仓市值: %s 元\n", formatHaoToYuan(pos.Value))
-		result += fmt.Sprintf("  盈亏: %s 元 (%s)\n", formatHaoToYuan(pos.PnL), pnlStatus)
-		result += "\n"
+		items = append(items, PositionItem{
+			StockCode:    pos.StockCode,
+			StockName:    pos.StockName,
+			Quantity:     pos.Quantity,
+			Cost:         formatHaoToYuan(pos.Cost),
+			CurrentPrice: formatHaoToYuan(pos.CurrentPrice),
+			Value:        formatHaoToYuan(pos.Value),
+			PnL:          formatHaoToYuan(pos.PnL),
+			PnLStatus:    pnlStatus,
+		})
+	}
+
+	data := &PositionsData{
+		Total: len(positions),
+		Items: items,
 	}
 
 	message.BroadcastToolEnd("get_positions", fmt.Sprintf("获取 %d 只持仓", len(positions)), nil)
-	return result, nil
+	return model.NewSuccessResult(data, fmt.Sprintf("获取 %d 只持仓", len(positions))), nil
 }
 
 // GetAccountSummaryParam 查询账户总览参数
@@ -136,6 +160,18 @@ func (t *GetAccountSummaryTool) GetToolGroup() model.ToolGroup {
 	return model.FinanceToolGroup
 }
 
+// AccountSummaryData 账户总览数据
+type AccountSummaryData struct {
+	TotalAssets   string  `json:"total_assets"`
+	AvailableAmt  string  `json:"available_amt"`
+	LockedAmt     string  `json:"locked_amt"`
+	PositionValue string  `json:"position_value"`
+	InitialAmount string  `json:"initial_amount"`
+	TotalPnL      string  `json:"total_pnl"`
+	PnLRatio      float64 `json:"pnl_ratio"`
+	PnLStatus     string  `json:"pnl_status"`
+}
+
 // GetAccountSummary 获取账户总览
 func GetAccountSummary(ctx context.Context, param *GetAccountSummaryParam) (string, error) {
 	message.BroadcastToolStart("get_account_summary", "")
@@ -144,13 +180,13 @@ func GetAccountSummary(ctx context.Context, param *GetAccountSummaryParam) (stri
 	if database == nil {
 		err := fmt.Errorf("数据库未初始化")
 		message.BroadcastToolEnd("get_account_summary", "", err)
-		return "", err
+		return model.NewErrorResult(err.Error()), nil
 	}
 
 	account, err := getActiveAccount(database)
 	if err != nil {
 		message.BroadcastToolEnd("get_account_summary", "", err)
-		return "", err
+		return model.NewErrorResult(err.Error()), nil
 	}
 
 	// 获取所有持仓股票代码
@@ -161,7 +197,7 @@ func GetAccountSummary(ctx context.Context, param *GetAccountSummaryParam) (stri
 		Pluck("stock_code", &stockCodes).Error
 	if err != nil {
 		message.BroadcastToolEnd("get_account_summary", "", err)
-		return "", err
+		return model.NewErrorResult(err.Error()), nil
 	}
 
 	// 批量获取价格
@@ -182,7 +218,7 @@ func GetAccountSummary(ctx context.Context, param *GetAccountSummaryParam) (stri
 	totalValue, err := finsvc.GetAccountTotalValue(database, account.ID, priceMap)
 	if err != nil {
 		message.BroadcastToolEnd("get_account_summary", "", err)
-		return "", err
+		return model.NewErrorResult(err.Error()), nil
 	}
 
 	// 计算总盈亏
@@ -192,20 +228,22 @@ func GetAccountSummary(ctx context.Context, param *GetAccountSummaryParam) (stri
 		pnlRatio = float64(pnl) / float64(account.InitialAmount) * 100
 	}
 
-	// 格式化输出
 	pnlStatus := "亏损"
 	if pnl >= 0 {
 		pnlStatus = "盈利"
 	}
 
-	result := fmt.Sprintf("账户总览：\n\n")
-	result += fmt.Sprintf("总资产: %s 元\n", formatHaoToYuan(totalValue))
-	result += fmt.Sprintf("可用余额: %s 元\n", formatHaoToYuan(account.AvailableAmt))
-	result += fmt.Sprintf("锁定金额: %s 元\n", formatHaoToYuan(account.LockedAmt))
-	result += fmt.Sprintf("持仓市值: %s 元\n", formatHaoToYuan(totalValue-account.AvailableAmt-account.LockedAmt))
-	result += fmt.Sprintf("总成本: %s 元\n", formatHaoToYuan(account.InitialAmount))
-	result += fmt.Sprintf("总盈亏: %s 元 (%.2f%%，%s)\n", formatHaoToYuan(pnl), pnlRatio, pnlStatus)
+	data := &AccountSummaryData{
+		TotalAssets:   formatHaoToYuan(totalValue),
+		AvailableAmt:  formatHaoToYuan(account.AvailableAmt),
+		LockedAmt:     formatHaoToYuan(account.LockedAmt),
+		PositionValue: formatHaoToYuan(totalValue - account.AvailableAmt - account.LockedAmt),
+		InitialAmount: formatHaoToYuan(account.InitialAmount),
+		TotalPnL:      formatHaoToYuan(pnl),
+		PnLRatio:      pnlRatio,
+		PnLStatus:     pnlStatus,
+	}
 
-	message.BroadcastToolEnd("get_account_summary", result, nil)
-	return result, nil
+	message.BroadcastToolEnd("get_account_summary", "获取账户总览成功", nil)
+	return model.NewSuccessResult(data, "获取账户总览成功"), nil
 }

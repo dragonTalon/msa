@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"msa/pkg/logic/message"
 	"msa/pkg/model"
-	mas_utils "msa/pkg/utils"
 
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"
@@ -44,31 +43,20 @@ func GetStockCompanyInfo(ctx context.Context, param *CompanyInfoParam) (string, 
 	if param == nil {
 		err := fmt.Errorf("param is nil")
 		message.BroadcastToolEnd("get stock current quote", "", err)
-		return "", err
+		return model.NewErrorResult(err.Error()), nil
 	}
 
 	// 调用公共函数获取股票数据
 	stockCurrentResp, err := FetchStockData(param.StockCode)
 	if err != nil {
 		message.BroadcastToolEnd("get stock current quote", "", err)
-		return "", err
+		return model.NewErrorResult(err.Error()), nil
 	}
 
 	// 输出详细的行情信息
 	log.Infof("日期: %s", stockCurrentResp.Date)
-	log.Infof("每手股数: %s", stockCurrentResp.Lot2Share)
 	log.Infof("当前价: %s", stockCurrentResp.CurrentPrice)
-	log.Infof("昨收: %s", stockCurrentResp.PrevClose)
-	log.Infof("开盘价: %s", stockCurrentResp.CurrentStartPrice)
-	log.Infof("成交量(手): %s", stockCurrentResp.VolumeByLot)
-	log.Infof("最高价: %s", stockCurrentResp.CurrentMaxPrice)
-	log.Infof("最低价: %s", stockCurrentResp.CurrentMinPrice)
-	log.Infof("市盈率: %s", stockCurrentResp.PERatio)
-	log.Infof("振幅: %s", stockCurrentResp.Amplitude)
-	log.Infof("52周最高价: %s", stockCurrentResp.WeekHighIn52)
-	log.Infof("52周最低价: %s", stockCurrentResp.WeekLowIn52)
 
-	result := mas_utils.ToJSONString(stockCurrentResp)
 	message.BroadcastToolEnd("get stock current quote", fmt.Sprintf("获取股票行情成功, 当前价: %s", stockCurrentResp.CurrentPrice), nil)
-	return result, nil
+	return model.NewSuccessResult(stockCurrentResp, fmt.Sprintf("获取股票行情成功, 当前价: %s", stockCurrentResp.CurrentPrice)), nil
 }

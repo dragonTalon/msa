@@ -1,6 +1,7 @@
 package knowledge
 
 import (
+	"msa/pkg/model"
 	"testing"
 	"time"
 )
@@ -243,37 +244,40 @@ func TestValidateTag(t *testing.T) {
 	}
 }
 
-func TestFormatSessionsResult(t *testing.T) {
+func TestQuerySessionsData(t *testing.T) {
 	tests := []struct {
 		name     string
 		date     time.Time
-		sessions []interface{} // 简化测试，使用空列表
 		tag      string
 		contains []string
 	}{
 		{
 			name:     "空会话列表",
 			date:     time.Date(2026, 3, 15, 0, 0, 0, 0, time.Local),
-			sessions: nil,
 			tag:      "",
-			contains: []string{"2026-03-15", "未找到符合条件的会话"},
+			contains: []string{"2026-03-15"},
 		},
 		{
 			name:     "带标签过滤",
 			date:     time.Date(2026, 3, 15, 0, 0, 0, 0, time.Local),
-			sessions: nil,
 			tag:      "morning-session",
-			contains: []string{"2026-03-15", "标签过滤", "morning-session"},
+			contains: []string{"2026-03-15", "morning-session"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := formatSessionsResult(tt.date, nil, tt.tag)
+			data := &QuerySessionsData{
+				Date:     tt.date.Format("2006-01-02"),
+				Tag:      tt.tag,
+				Total:    0,
+				Sessions: []SessionItem{},
+			}
+			result := model.NewSuccessResult(data, "找到 0 个会话")
 
 			for _, s := range tt.contains {
 				if !containsString(result, s) {
-					t.Errorf("formatSessionsResult() result missing %q", s)
+					t.Errorf("result missing %q", s)
 				}
 			}
 		})

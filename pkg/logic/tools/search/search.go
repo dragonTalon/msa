@@ -9,7 +9,6 @@ import (
 	"msa/pkg/logic/message"
 	internal "msa/pkg/logic/tools/search/internal"
 	"msa/pkg/model"
-	mas_utils "msa/pkg/utils"
 	"sync"
 )
 
@@ -64,7 +63,7 @@ func WebSearch(ctx context.Context, param *model.WebSearchParams) (string, error
 	if param.Query == "" {
 		errMsg := "搜索查询不能为空 | search query cannot be empty"
 		message.BroadcastToolEnd("web_search", "", fmt.Errorf("%s", errMsg))
-		return buildSearchErrorResponse(param.Query, errMsg), nil
+		return model.NewErrorResult(errMsg), nil
 	}
 
 	// 初始化搜索路由器（懒加载单例）
@@ -76,44 +75,25 @@ func WebSearch(ctx context.Context, param *model.WebSearchParams) (string, error
 	// 执行搜索（支持自动降级）
 	searchResult := defaultSearchRouter.Search(ctx, param.Query, 10)
 
-	// 构建响应
-	response := &model.WebSearchResponse{
-		Query:     param.Query,
-		Results:   searchResult.Results,
-		RequestID: searchResult.RequestID,
-		Status:    searchResult.Status,
-		Error:     searchResult.Error,
-		Message:   searchResult.Message,
-	}
-
-	// 记录结果
-	resultJSON := mas_utils.ToJSONString(response)
-
 	if searchResult.Status == "success" {
+		data := &model.WebSearchData{
+			Query:      param.Query,
+			Results:    searchResult.Results,
+			RequestID:  searchResult.RequestID,
+			UsedEngine: searchResult.UsedEngine,
+		}
 		message.BroadcastToolEnd("web_search",
 			fmt.Sprintf("找到 %d 条结果 (引擎: %s)", len(searchResult.Results), searchResult.UsedEngine), nil)
 		log.Debugf("搜索成功，返回 %d 条结果 (引擎: %s, RequestID: %s)",
 			len(searchResult.Results), searchResult.UsedEngine, searchResult.RequestID)
-	} else {
-		// 失败不返回错误，而是通过 status 字段告知
-		message.BroadcastToolEnd("web_search",
-			fmt.Sprintf("搜索失败: %s", searchResult.Message), nil)
-		log.Warnf("搜索失败: %s (RequestID: %s)", searchResult.Error, searchResult.RequestID)
+		return model.NewSuccessResult(data, fmt.Sprintf("找到 %d 条结果", len(searchResult.Results))), nil
 	}
 
-	return resultJSON, nil
-}
-
-// buildSearchErrorResponse 构建搜索错误响应
-func buildSearchErrorResponse(query string, errMsg string) string {
-	response := &model.WebSearchResponse{
-		Query:   query,
-		Status:  "failed",
-		Error:   "invalid_param",
-		Message: errMsg,
-		Results: []model.SearchResultItem{},
-	}
-	return mas_utils.ToJSONString(response)
+	// 失败不返回错误，而是通过 error_msg 字段告知
+	message.BroadcastToolEnd("web_search",
+		fmt.Sprintf("搜索失败: %s", searchResult.Message), nil)
+	log.Warnf("搜索失败: %s (RequestID: %s)", searchResult.Error, searchResult.RequestID)
+	return model.NewErrorResult(searchResult.Message), nil
 }
 
 // GetDefaultRouter 获取默认路由器（用于测试）

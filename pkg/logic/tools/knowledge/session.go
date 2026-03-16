@@ -40,6 +40,23 @@ func (t *QuerySessionsByDateTool) GetToolGroup() model.ToolGroup {
 	return model.KnowledgeToolGroup
 }
 
+// SessionItem 会话项
+type SessionItem struct {
+	ID           string   `json:"id"`
+	StartTime    string   `json:"start_time"`
+	MessageCount int      `json:"message_count"`
+	Tags         []string `json:"tags,omitempty"`
+	Summary      string   `json:"summary,omitempty"`
+}
+
+// QuerySessionsData 查询会话数据
+type QuerySessionsData struct {
+	Date     string        `json:"date"`
+	Tag      string        `json:"tag,omitempty"`
+	Total    int           `json:"total"`
+	Sessions []SessionItem `json:"sessions"`
+}
+
 // QuerySessionsByDate 按日期查询 Session
 func QuerySessionsByDate(ctx context.Context, param *QuerySessionsByDateParam) (string, error) {
 	message.BroadcastToolStart("query_sessions_by_date", fmt.Sprintf("日期: %s, 标签: %s", param.Date, param.Tag))
@@ -48,7 +65,7 @@ func QuerySessionsByDate(ctx context.Context, param *QuerySessionsByDateParam) (
 	targetDate, err := parseDate(param.Date)
 	if err != nil {
 		message.BroadcastToolEnd("query_sessions_by_date", "", err)
-		return "", err
+		return model.NewErrorResult(err.Error()), nil
 	}
 
 	// 获取 Memory Manager
@@ -57,14 +74,14 @@ func QuerySessionsByDate(ctx context.Context, param *QuerySessionsByDateParam) (
 	if store == nil {
 		err := fmt.Errorf("记忆系统未初始化")
 		message.BroadcastToolEnd("query_sessions_by_date", "", err)
-		return "", err
+		return model.NewErrorResult(err.Error()), nil
 	}
 
 	// 列出所有会话（获取足够多的会话来筛选）
 	sessions, err := store.ListSessions(0, 100)
 	if err != nil {
 		message.BroadcastToolEnd("query_sessions_by_date", "", err)
-		return "", fmt.Errorf("查询会话失败: %w", err)
+		return model.NewErrorResult(fmt.Sprintf("查询会话失败: %v", err)), nil
 	}
 
 	// 按日期和标签过滤
@@ -85,10 +102,27 @@ func QuerySessionsByDate(ctx context.Context, param *QuerySessionsByDateParam) (
 		filtered = append(filtered, s)
 	}
 
-	// 格式化输出
-	result := formatSessionsResult(targetDate, filtered, param.Tag)
-	message.BroadcastToolEnd("query_sessions_by_date", result, nil)
-	return result, nil
+	// 构建返回数据
+	items := make([]SessionItem, 0, len(filtered))
+	for _, s := range filtered {
+		items = append(items, SessionItem{
+			ID:           s.ID,
+			StartTime:    s.StartTime.Format("15:04:05"),
+			MessageCount: s.MessageCount,
+			Tags:         s.Tags,
+			Summary:      s.Summary,
+		})
+	}
+
+	data := &QuerySessionsData{
+		Date:     targetDate.Format("2006-01-02"),
+		Tag:      param.Tag,
+		Total:    len(filtered),
+		Sessions: items,
+	}
+
+	message.BroadcastToolEnd("query_sessions_by_date", fmt.Sprintf("找到 %d 个会话", len(filtered)), nil)
+	return model.NewSuccessResult(data, fmt.Sprintf("找到 %d 个会话", len(filtered))), nil
 }
 
 // parseDate 解析日期参数
@@ -122,40 +156,6 @@ func containsTag(tags []string, tag string) bool {
 	return false
 }
 
-// formatSessionsResult 格式化会话查询结果
-func formatSessionsResult(date time.Time, sessions []model.SessionIndex, tag string) string {
-	var sb strings.Builder
-
-	sb.WriteString(fmt.Sprintf("日期: %s\n", date.Format("2006-01-02")))
-	if tag != "" {
-		sb.WriteString(fmt.Sprintf("标签过滤: %s\n", tag))
-	}
-	sb.WriteString("\n")
-
-	if len(sessions) == 0 {
-		sb.WriteString("未找到符合条件的会话")
-		return sb.String()
-	}
-
-	sb.WriteString(fmt.Sprintf("找到 %d 个会话：\n\n", len(sessions)))
-
-	for i, s := range sessions {
-		sb.WriteString(fmt.Sprintf("### 会话 %d\n", i+1))
-		sb.WriteString(fmt.Sprintf("- ID: %s\n", s.ID))
-		sb.WriteString(fmt.Sprintf("- 开始时间: %s\n", s.StartTime.Format("15:04:05")))
-		sb.WriteString(fmt.Sprintf("- 消息数: %d\n", s.MessageCount))
-		if len(s.Tags) > 0 {
-			sb.WriteString(fmt.Sprintf("- 标签: %s\n", strings.Join(s.Tags, ", ")))
-		}
-		if s.Summary != "" {
-			sb.WriteString(fmt.Sprintf("- 摘要: %s\n", s.Summary))
-		}
-		sb.WriteString("\n")
-	}
-
-	return sb.String()
-}
-
 // AddSessionTagParam 添加 Session 标签参数
 type AddSessionTagParam struct {
 	SessionID string `json:"sessionId" jsonschema:"description=会话 ID，为空则使用当前会话"`
@@ -181,6 +181,12 @@ func (t *AddSessionTagTool) GetToolGroup() model.ToolGroup {
 	return model.KnowledgeToolGroup
 }
 
+// AddSessionTagData 添加会话标签数据
+type AddSessionTagData struct {
+	SessionID string `json:"session_id"`
+	Tag       string `json:"tag"`
+}
+
 // AddSessionTag 添加 Session 标签
 func AddSessionTag(ctx context.Context, param *AddSessionTagParam) (string, error) {
 	message.BroadcastToolStart("add_session_tag", fmt.Sprintf("会话: %s, 标签: %s", param.SessionID, param.Tag))
@@ -188,7 +194,7 @@ func AddSessionTag(ctx context.Context, param *AddSessionTagParam) (string, erro
 	// 验证标签格式
 	if err := validateTag(param.Tag); err != nil {
 		message.BroadcastToolEnd("add_session_tag", "", err)
-		return "", err
+		return model.NewErrorResult(err.Error()), nil
 	}
 
 	// 标准化标签（转小写）
@@ -205,22 +211,24 @@ func AddSessionTag(ctx context.Context, param *AddSessionTagParam) (string, erro
 		if sessionID == "" {
 			err := fmt.Errorf("当前没有活动会话")
 			message.BroadcastToolEnd("add_session_tag", "", err)
-			return "", err
+			return model.NewErrorResult(err.Error()), nil
 		}
 	}
 
 	// 添加标签到会话
-	// 注意：当前实现中，会话在结束时才保存
-	// 这里需要更新会话的标签，然后持久化
 	err := addTagToSession(manager, sessionID, tag)
 	if err != nil {
 		message.BroadcastToolEnd("add_session_tag", "", err)
-		return "", err
+		return model.NewErrorResult(err.Error()), nil
 	}
 
-	result := fmt.Sprintf("标签 '%s' 已添加到会话 %s", tag, sessionID)
-	message.BroadcastToolEnd("add_session_tag", result, nil)
-	return result, nil
+	data := &AddSessionTagData{
+		SessionID: sessionID,
+		Tag:       tag,
+	}
+
+	message.BroadcastToolEnd("add_session_tag", fmt.Sprintf("标签 '%s' 已添加", tag), nil)
+	return model.NewSuccessResult(data, fmt.Sprintf("标签 '%s' 已添加到会话", tag)), nil
 }
 
 // validateTag 验证标签格式

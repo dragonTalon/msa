@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"sort"
-	"strings"
 
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"
@@ -37,6 +36,13 @@ func (t *ListKnowledgeFilesTool) GetToolGroup() model.ToolGroup {
 	return model.KnowledgeToolGroup
 }
 
+// ListKnowledgeFilesData 列出知识文件数据
+type ListKnowledgeFilesData struct {
+	Directory string     `json:"directory"`
+	Total     int        `json:"total"`
+	Items     []FileInfo `json:"items"`
+}
+
 // ListKnowledgeFiles 列出知识文件
 func ListKnowledgeFiles(ctx context.Context, param *ListKnowledgeFilesParam) (string, error) {
 	message.BroadcastToolStart("list_knowledge_files", fmt.Sprintf("目录: %s", param.Directory))
@@ -52,7 +58,7 @@ func ListKnowledgeFiles(ctx context.Context, param *ListKnowledgeFilesParam) (st
 		safeDir, err := SafePath(param.Directory)
 		if err != nil {
 			message.BroadcastToolEnd("list_knowledge_files", "", err)
-			return "", err
+			return model.NewErrorResult(err.Error()), nil
 		}
 		targetPath = safeDir
 	}
@@ -62,12 +68,11 @@ func ListKnowledgeFiles(ctx context.Context, param *ListKnowledgeFilesParam) (st
 	if err != nil {
 		if os.IsNotExist(err) {
 			// 目录不存在，返回空列表
-			result := "目录不存在或为空"
-			message.BroadcastToolEnd("list_knowledge_files", result, nil)
-			return result, nil
+			message.BroadcastToolEnd("list_knowledge_files", "目录不存在或为空", nil)
+			return model.NewSuccessResult(&ListKnowledgeFilesData{Directory: param.Directory, Total: 0, Items: []FileInfo{}}, "目录不存在或为空"), nil
 		}
 		message.BroadcastToolEnd("list_knowledge_files", "", err)
-		return "", fmt.Errorf("读取目录失败: %w", err)
+		return model.NewErrorResult(fmt.Sprintf("读取目录失败: %v", err)), nil
 	}
 
 	// 收集文件信息
@@ -97,38 +102,12 @@ func ListKnowledgeFiles(ctx context.Context, param *ListKnowledgeFilesParam) (st
 		return files[i].ModTime > files[j].ModTime
 	})
 
-	// 格式化输出
-	result := formatListResult(param.Directory, files)
-	message.BroadcastToolEnd("list_knowledge_files", result, nil)
-	return result, nil
-}
-
-// formatListResult 格式化列表结果
-func formatListResult(directory string, files []FileInfo) string {
-	var sb strings.Builder
-
-	if directory == "" {
-		sb.WriteString("知识库目录：\n\n")
-	} else {
-		sb.WriteString(fmt.Sprintf("目录 %s 内容：\n\n", directory))
+	data := &ListKnowledgeFilesData{
+		Directory: param.Directory,
+		Total:     len(files),
+		Items:     files,
 	}
 
-	if len(files) == 0 {
-		sb.WriteString("（空目录）")
-		return sb.String()
-	}
-
-	sb.WriteString("| 名称 | 类型 | 大小 | 修改时间 |\n")
-	sb.WriteString("|------|------|------|----------|\n")
-
-	for _, f := range files {
-		fileType := "文件"
-		if f.IsDir {
-			fileType = "目录"
-		}
-		sb.WriteString(fmt.Sprintf("| %s | %s | %d | %s |\n", f.Name, fileType, f.Size, f.ModTime))
-	}
-
-	sb.WriteString(fmt.Sprintf("\n共 %d 项", len(files)))
-	return sb.String()
+	message.BroadcastToolEnd("list_knowledge_files", fmt.Sprintf("列出 %d 项", len(files)), nil)
+	return model.NewSuccessResult(data, fmt.Sprintf("列出 %d 项", len(files))), nil
 }
