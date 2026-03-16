@@ -73,14 +73,14 @@ func TestWebSearch_EmptyQuery(t *testing.T) {
 		t.Error("WebSearch() with empty query should return error JSON result")
 	}
 	// 验证返回的 JSON 包含失败状态
-	var response model.WebSearchResponse
+	var response model.ToolResult
 	if err := json.Unmarshal([]byte(result), &response); err != nil {
 		t.Errorf("Failed to parse result JSON: %v", err)
 	}
-	if response.Status != "failed" {
-		t.Errorf("Expected status 'failed', got: %s", response.Status)
+	if response.Success {
+		t.Error("Expected success to be false")
 	}
-	if response.Message == "" {
+	if response.ErrorMsg == "" {
 		t.Error("Expected error message in response")
 	}
 }
@@ -129,20 +129,18 @@ func TestWebSearchParams_Struct(t *testing.T) {
 	}
 }
 
-// TestWebSearchResponse_Struct tests the WebSearchResponse struct
-func TestWebSearchResponse_Struct(t *testing.T) {
+// TestWebSearchData_Struct tests the WebSearchData struct
+func TestWebSearchData_Struct(t *testing.T) {
 	// Verify the struct compiles correctly
-	response := &model.WebSearchResponse{
-		Query:     "test",
-		Results:   nil,
-		RequestID: "123",
-		Status:    "success",
-		Error:     "",
-		Message:   "test message",
+	data := &model.WebSearchData{
+		Query:      "test",
+		Results:    nil,
+		RequestID:  "123",
+		UsedEngine: "google",
 	}
 
-	if response.Query != "test" {
-		t.Error("WebSearchResponse struct not working correctly")
+	if data.Query != "test" {
+		t.Error("WebSearchData struct not working correctly")
 	}
 }
 
@@ -162,7 +160,7 @@ func TestFetchPageContent_EmptyURL(t *testing.T) {
 		t.Error("FetchPageContent() with empty URL should return error JSON result")
 	}
 	// 验证返回的 JSON 包含失败状态
-	var response model.FetchPageResponse
+	var response model.ToolResult
 	if err := json.Unmarshal([]byte(result), &response); err != nil {
 		t.Errorf("Failed to parse result JSON: %v", err)
 	}
@@ -190,7 +188,7 @@ func TestFetchPageContent_InvalidURL(t *testing.T) {
 		t.Error("FetchPageContent() with invalid URL should return error JSON result")
 	}
 	// 验证返回的 JSON 包含失败状态
-	var response model.FetchPageResponse
+	var response model.ToolResult
 	if err := json.Unmarshal([]byte(result), &response); err != nil {
 		t.Errorf("Failed to parse result JSON: %v", err)
 	}
@@ -199,37 +197,18 @@ func TestFetchPageContent_InvalidURL(t *testing.T) {
 	}
 }
 
-// TestFetchPageResponse_Struct tests the FetchPageResponse struct
-func TestFetchPageResponse_Struct(t *testing.T) {
-	// Verify the struct compiles correctly with new fields
-	response := &model.FetchPageResponse{
+// TestFetchPageData_Struct tests the FetchPageData struct
+func TestFetchPageData_Struct(t *testing.T) {
+	// Verify the struct compiles correctly
+	data := &model.FetchPageData{
 		URL:         "https://example.com",
 		Title:       "Test Page",
 		Content:     "Test content",
 		HasMore:     false,
 		TotalLength: 12,
-		Success:     true,
-		ErrorMsg:    "",
 	}
 
-	if response.URL != "https://example.com" {
-		t.Error("FetchPageResponse struct not working correctly")
-	}
-	if !response.Success {
-		t.Error("Expected Success to be true")
-	}
-
-	// Test error response
-	errorResponse := &model.FetchPageResponse{
-		URL:      "https://example.com",
-		Success:  false,
-		ErrorMsg: "connection timeout",
-	}
-
-	if errorResponse.Success {
-		t.Error("Expected Success to be false for error response")
-	}
-	if errorResponse.ErrorMsg != "connection timeout" {
-		t.Error("Expected error message in response")
+	if data.URL != "https://example.com" {
+		t.Error("FetchPageData struct not working correctly")
 	}
 }

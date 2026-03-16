@@ -37,6 +37,13 @@ func (s *SkillContentTool) GetToolGroup() model.ToolGroup {
 	return model.SkillToolGroup
 }
 
+// SkillContentData skill 内容数据
+type SkillContentData struct {
+	SkillName string `json:"skill_name"`
+	Content   string `json:"content"`
+	Length    int    `json:"length"`
+}
+
 // GetSkillContent 根据 skill name 返回对应 SKILL.md 的完整 body 内容
 func GetSkillContent(ctx context.Context, param *SkillContentParam) (string, error) {
 	log.Infof("GetSkillContent start, skill_name: %s", param.SkillName)
@@ -45,7 +52,7 @@ func GetSkillContent(ctx context.Context, param *SkillContentParam) (string, err
 	if param.SkillName == "" {
 		err := fmt.Errorf("skill_name is required")
 		message.BroadcastToolEnd("get_skill_content", "", err)
-		return "", err
+		return model.NewErrorResult(err.Error()), nil
 	}
 
 	manager := skills.GetManager()
@@ -53,22 +60,28 @@ func GetSkillContent(ctx context.Context, param *SkillContentParam) (string, err
 	if err != nil {
 		log.Errorf("GetSkillContent: failed to get skill %s: %v", param.SkillName, err)
 		message.BroadcastToolEnd("get_skill_content", "", err)
-		return "", err
+		return model.NewErrorResult(err.Error()), nil
 	}
 	if sk == nil {
 		err = fmt.Errorf("skill '%s' not found", param.SkillName)
 		log.Warnf("GetSkillContent: %v", err)
 		message.BroadcastToolEnd("get_skill_content", "", err)
-		return "", err
+		return model.NewErrorResult(err.Error()), nil
 	}
 
 	content, err := sk.GetContent()
 	if err != nil {
 		log.Errorf("GetSkillContent: failed to load content for skill %s: %v", param.SkillName, err)
 		message.BroadcastToolEnd("get_skill_content", "", err)
-		return "", err
+		return model.NewErrorResult(err.Error()), nil
+	}
+
+	data := &SkillContentData{
+		SkillName: param.SkillName,
+		Content:   content,
+		Length:    len(content),
 	}
 
 	message.BroadcastToolEnd("get_skill_content", fmt.Sprintf("loaded skill: %s (%d chars)", param.SkillName, len(content)), nil)
-	return content, nil
+	return model.NewSuccessResult(data, fmt.Sprintf("加载 skill: %s (%d 字符)", param.SkillName, len(content))), nil
 }

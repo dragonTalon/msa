@@ -45,12 +45,12 @@ func GetStockCompanyCode(ctx context.Context, param *CompanyParam) (string, erro
 	if param.StockName == "" {
 		err := fmt.Errorf("stock name is empty")
 		message.BroadcastToolEnd("get_stock_company_code", "", err)
-		return "", err
+		return model.NewErrorResult(err.Error()), nil
 	}
 	if len(param.StockName) < 2 {
 		err := fmt.Errorf("stock name is too short, minimum length is 2")
 		message.BroadcastToolEnd("get_stock_company_code", "", err)
-		return "", err
+		return model.NewErrorResult(err.Error()), nil
 	}
 
 	// 发起请求
@@ -61,25 +61,23 @@ func GetStockCompanyCode(ctx context.Context, param *CompanyParam) (string, erro
 	if err != nil {
 		log.Errorf("failed to get stock company code: %v", err)
 		message.BroadcastToolEnd("get_stock_company_code", "", err)
-		return "", err
+		return model.NewErrorResult(err.Error()), nil
 	}
 
 	// 处理响应
 	if len(resp.Stock) > 0 {
-		msg := mas_utils.ToJSONString(resp.Stock)
-		message.BroadcastToolEnd("get_stock_company_code", fmt.Sprintf("找到股票: %s", msg), nil)
-		log.Debugf("found company info: %s", msg)
-		return msg, nil
+		message.BroadcastToolEnd("get_stock_company_code", fmt.Sprintf("找到股票: %d 只", len(resp.Stock)), nil)
+		log.Debugf("found company info: %v", resp.Stock)
+		return model.NewSuccessResult(resp.Stock, fmt.Sprintf("找到股票: %d 只", len(resp.Stock))), nil
 	}
 	if len(resp.Fund) > 0 {
-		msg := mas_utils.ToJSONString(resp.Fund)
-		message.BroadcastToolEnd("get_stock_company_code", fmt.Sprintf("找到基金: %s", msg), nil)
-		log.Debugf("found company info: %s", msg)
-		return msg, nil
+		message.BroadcastToolEnd("get_stock_company_code", fmt.Sprintf("找到基金: %d 只", len(resp.Fund)), nil)
+		log.Debugf("found fund info: %v", resp.Fund)
+		return model.NewSuccessResult(resp.Fund, fmt.Sprintf("找到基金: %d 只", len(resp.Fund))), nil
 	}
 
 	err = fmt.Errorf("no stock found for name: %s", param.StockName)
 	message.BroadcastToolEnd("get_stock_company_code", "", err)
 	log.Warnf("no stock found for name: %s", param.StockName)
-	return "", err
+	return model.NewErrorResult(err.Error()), nil
 }

@@ -38,6 +38,12 @@ func (t *WriteKnowledgeFileTool) GetToolGroup() model.ToolGroup {
 	return model.KnowledgeToolGroup
 }
 
+// WriteKnowledgeFileData 写入知识文件数据
+type WriteKnowledgeFileData struct {
+	Path string `json:"path"`
+	Size int    `json:"size"`
+}
+
 // WriteKnowledgeFile 写入知识文件
 func WriteKnowledgeFile(ctx context.Context, param *WriteKnowledgeFileParam) (string, error) {
 	message.BroadcastToolStart("write_knowledge_file", fmt.Sprintf("路径: %s", param.Path))
@@ -46,7 +52,7 @@ func WriteKnowledgeFile(ctx context.Context, param *WriteKnowledgeFileParam) (st
 	fullPath, err := SafePath(param.Path)
 	if err != nil {
 		message.BroadcastToolEnd("write_knowledge_file", "", err)
-		return "", err
+		return model.NewErrorResult(err.Error()), nil
 	}
 
 	// 生成文件内容
@@ -55,7 +61,7 @@ func WriteKnowledgeFile(ctx context.Context, param *WriteKnowledgeFileParam) (st
 		content, err = GenerateFileContent(param.Metadata, param.Content)
 		if err != nil {
 			message.BroadcastToolEnd("write_knowledge_file", "", err)
-			return "", fmt.Errorf("生成文件内容失败: %w", err)
+			return model.NewErrorResult(fmt.Sprintf("生成文件内容失败: %v", err)), nil
 		}
 	} else {
 		content = param.Content
@@ -65,18 +71,22 @@ func WriteKnowledgeFile(ctx context.Context, param *WriteKnowledgeFileParam) (st
 	dir := filepath.Dir(fullPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		message.BroadcastToolEnd("write_knowledge_file", "", err)
-		return "", fmt.Errorf("创建目录失败: %w", err)
+		return model.NewErrorResult(fmt.Sprintf("创建目录失败: %v", err)), nil
 	}
 
 	// 原子写入
 	if err := atomicWrite(fullPath, []byte(content)); err != nil {
 		message.BroadcastToolEnd("write_knowledge_file", "", err)
-		return "", fmt.Errorf("写入文件失败: %w", err)
+		return model.NewErrorResult(fmt.Sprintf("写入文件失败: %v", err)), nil
 	}
 
-	result := fmt.Sprintf("文件写入成功！\n路径: %s\n大小: %d 字节", param.Path, len(content))
-	message.BroadcastToolEnd("write_knowledge_file", result, nil)
-	return result, nil
+	data := &WriteKnowledgeFileData{
+		Path: param.Path,
+		Size: len(content),
+	}
+
+	message.BroadcastToolEnd("write_knowledge_file", "文件写入成功", nil)
+	return model.NewSuccessResult(data, "文件写入成功"), nil
 }
 
 // atomicWrite 原子写入文件
