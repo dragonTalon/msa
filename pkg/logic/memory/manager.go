@@ -46,6 +46,24 @@ type SessionManager struct {
 	Tags      []string               // 会话标签
 }
 
+// ==================== 交易时段常量 ====================
+
+// 交易时段时间边界（格式：15:04）
+const (
+	MorningStart   = "09:30" // 早盘开始
+	MorningEnd     = "11:30" // 早盘结束
+	AfternoonStart = "13:00" // 午盘开始
+	AfternoonEnd   = "14:30" // 午盘结束
+	CloseStart     = "16:00" // 收盘总结开始
+)
+
+// 交易时段标签
+const (
+	TagMorningSession   = "morning-session"
+	TagAfternoonSession = "afternoon-session"
+	TagCloseSession     = "close-session"
+)
+
 // ==================== 单例模式 ====================
 
 var (
@@ -81,6 +99,23 @@ func GetManager() *Manager {
 
 // ==================== 初始化方法 ====================
 
+// getAutoTag 根据当前时间自动判断交易时段标签
+// 返回对应的时段标签，非交易时段返回空字符串
+func getAutoTag(now time.Time) string {
+	currentTime := now.Format("15:04")
+
+	switch {
+	case currentTime >= MorningStart && currentTime <= MorningEnd:
+		return TagMorningSession
+	case currentTime >= AfternoonStart && currentTime <= AfternoonEnd:
+		return TagAfternoonSession
+	case currentTime >= CloseStart:
+		return TagCloseSession
+	default:
+		return ""
+	}
+}
+
 // Initialize 初始化新会话
 func (m *Manager) Initialize() error {
 	m.mu.Lock()
@@ -90,9 +125,12 @@ func (m *Manager) Initialize() error {
 	sessionID := uuid.New().String()
 
 	// 创建会话管理器
+	now := time.Now()
+
+	// 创建会话管理器
 	m.currentSession = &SessionManager{
 		ID:        sessionID,
-		StartTime: time.Now(),
+		StartTime: now,
 		Messages:  []model.MemoryMessage{},
 		Context: &model.SessionContext{
 			StockCodes: []string{},
@@ -103,9 +141,15 @@ func (m *Manager) Initialize() error {
 		ShortTerm: &model.ShortTermMemory{
 			SessionID: sessionID,
 			Messages:  []model.MemoryMessage{},
-			UpdatedAt: time.Now(),
+			UpdatedAt: now,
 		},
 		Tags: []string{},
+	}
+
+	// 自动添加交易时段标签
+	if autoTag := getAutoTag(now); autoTag != "" {
+		m.currentSession.Tags = append(m.currentSession.Tags, autoTag)
+		log.Infof("自动添加会话标签: %s", autoTag)
 	}
 
 	m.initialized = true

@@ -30,6 +30,7 @@ var _ MsaTool = (*knowledge.WriteKnowledgeFileTool)(nil)
 var _ MsaTool = (*knowledge.ListKnowledgeFilesTool)(nil)
 var _ MsaTool = (*knowledge.QuerySessionsByDateTool)(nil)
 var _ MsaTool = (*knowledge.AddSessionTagTool)(nil)
+var _ MsaTool = (*knowledge.AnalyzeTodayTradesTool)(nil)
 
 func init() {
 	registerStock()
@@ -71,4 +72,5 @@ func registerKnowledge() {
 	RegisterTool(&knowledge.ListKnowledgeFilesTool{})
 	RegisterTool(&knowledge.QuerySessionsByDateTool{})
 	RegisterTool(&knowledge.AddSessionTagTool{})
+	RegisterTool(&knowledge.AnalyzeTodayTradesTool{})
 }
