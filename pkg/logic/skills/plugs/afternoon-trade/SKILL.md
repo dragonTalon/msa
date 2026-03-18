@@ -48,7 +48,7 @@ priority: 8
 
 #### Step 3: 读取早盘Session
 ```
-从记忆系统查询今日带有 'morning-session' 标签的Session
+调用 query_sessions_by_date(date="today", tag="morning-session")
 → 提取早盘的：
   - 操作决策和执行结果
   - 预测和建议
@@ -192,7 +192,7 @@ FOR each 卖出决策:
 
 #### 记录到Session
 
-为当前Session添加标签：`afternoon-session`
+**注意**：Session 标签 `afternoon-session` 由系统自动添加，无需手动操作。
 
 记录关键决策和执行结果，供闭市会话读取。
 
@@ -205,6 +205,7 @@ FOR each 卖出决策:
 3. **参考早盘**：必须读取早盘Session的决策
 4. **执行不确认**：直接执行，不需要确认
 5. **错误必读**：必须先执行 read-error skill
+6. **分段买入**：参考 trading-common 的仓位管理规则，首次买入不超过计划仓位的 50%
 
 ---
 

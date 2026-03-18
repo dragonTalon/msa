@@ -1,7 +1,7 @@
 ---
 name: market-close-summary
 description: 闭市总结，分析今日收益，复盘操作，沉淀经验。触发时间16:00后。
-version: 1.0.0
+version: 1.1.0
 priority: 8
 ---
 
@@ -16,19 +16,19 @@ priority: 8
 
 ---
 
-## 【强制前置】
+## ⚠️【强制前置】- 不执行将导致流程失败
 
-**第一步必须调用 `read-error` skill！**
+**第一步 MUST 调用 `read-error` skill！**
 
 ```
-⚠️ 在执行任何操作前，必须先读取历史错误经验。
+⚠️ 在执行任何操作前，**必须**先读取历史错误经验。**不执行此步骤将无法正确评估今日操作**。
 ```
 
 ---
 
 ## 执行流程
 
-### Phase 1: 信息收集
+### Phase 1: 信息收集【必须执行】
 
 #### Step 1: 【强制】读取历史错误
 ```
@@ -38,10 +38,10 @@ priority: 8
 
 #### Step 2: 查询今日所有Session
 ```
-从记忆系统查询今日的所有Session：
-- morning-session → 早盘会话（决策和执行）
-- afternoon-session → 午盘会话（决策和执行）
-- close-session → 当前会话
+调用 query_sessions_by_date(date="today")
+→ 获取今日所有Session：
+  - morning-session → 早盘会话（决策和执行）
+  - afternoon-session → 午盘会话（决策和执行）
 
 提取：
 - 早盘的决策和执行结果
@@ -143,79 +143,48 @@ priority: 8
 
 ---
 
-### Phase 4: 经验沉淀
+## ⚠️【强制执行】错误检查与记录
 
-根据复盘结果，写入不同文件：
+### 错误判断标准
 
-#### 策略类经验 → knowledge/strategies/
+以下情况 **必须** 记录到 errors/ 目录：
 
-如果发现有效的交易模式：
-```markdown
----
-id: strategy-XXX
-name: 止盈策略
-created: YYYY-MM-DD
----
+| 错误类型 | 判断条件 | 严重程度 |
+|----------|----------|----------|
+| 追高买入后亏损 | 涨幅 > 3% 时买入，之后下跌 | high |
+| 未执行分段策略 | 一次性 ALL IN 后价格下跌 | high |
+| 未及时止损 | 亏损 > 20% 仍未卖出 | critical |
+| 情绪化交易 | 无明确信号的冲动买卖 | medium |
+| 违背用户策略 | 未遵循用户画像投资风格 | medium |
 
-## 策略描述
-当持仓盈利超过8%时，减仓50%锁定收益。
+### 错误检查清单【必须逐项检查】
 
-## 适用条件
-- 短线持仓
-- 波动较大的股票
-
-## 历史验证
-- 2026-03-15 茅台止盈成功
+```
+□ 今日是否有追高买入？（涨幅 > 3% 时买入）
+□ 今日是否一次性买入超过计划仓位的 50%？
+□ 今日是否有持仓亏损超过 20% 未止损？
+□ 今日是否有情绪化决策？
+□ 今日操作是否符合用户策略？
 ```
 
-#### 洞察类经验 → knowledge/insights/
+### 如果有任何一项为"是"【必须执行】
 
-如果发现市场规律或板块特征：
-```markdown
----
-id: insight-XXX
-topic: 白酒板块联动
-created: YYYY-MM-DD
-valid_to: YYYY-MM-DD
+1. **必须** 调用 `analyze_today_trades` 工具分析
+2. **必须** 将分析结果记录到 `errors/` 目录
+3. **必须** 使用 `write_knowledge_file` 写入错误文件
+
 ---
 
-## 洞察内容
-茅台和五粮液存在较强的联动效应，茅台先涨时，五粮液往往随后跟进。
+## ⚠️【强制执行】今日总结文件
 
-## 相关股票
-- 贵州茅台 (sh600519)
-- 五粮液 (sz000858)
+### 必须生成的文件
 
-## 验证记录
-- 2026-03-15 茅台涨1.2%，五粮液涨2.1%，联动验证
-```
+**文件路径**: `summaries/YYYY-MM-DD.md`（使用今天的日期）
 
-#### 错误操作 → knowledge/errors/
+**必须调用**: `write_knowledge_file(path="summaries/YYYY-MM-DD.md", content=总结内容)`
 
-如果有错误操作：
-```markdown
----
-id: err-XXX
-date: YYYY-MM-DD
-severity: high | medium | low
-tags: [标签1, 标签2]
-status: active
----
+### 总结文件格式
 
-## 错误描述
-[具体错误]
-
-## 错误原因
-[原因分析]
-
-## 正确做法
-[应该怎么做]
-
-## 防范措施
-[如何避免]
-```
-
-#### 今日总结 → summaries/YYYY-MM-DD.md
 ```markdown
 ---
 date: YYYY-MM-DD
@@ -253,6 +222,24 @@ pnl_rate: x.xx%
 1. 关注五粮液能否突破150元
 2. 观察茅台是否企稳
 ```
+
+---
+
+## Phase 4: 经验沉淀
+
+根据复盘结果，写入不同文件：
+
+#### 策略类经验 → strategies/*.md
+
+如果发现有效的交易模式，调用 `write_knowledge_file(path="strategies/xxx.md", content=策略内容)`
+
+#### 洞察类经验 → insights/*.md
+
+如果发现市场规律或板块特征，调用 `write_knowledge_file(path="insights/xxx.md", content=洞察内容)`
+
+#### 错误操作 → errors/*.md
+
+如果有错误操作，调用 `write_knowledge_file(path="errors/err-XXX.md", content=错误内容)`
 
 ---
 
@@ -305,16 +292,34 @@ pnl_rate: x.xx%
 
 ## 记录到Session
 
-为当前Session添加标签：`close-session`
+**注意**：Session 标签 `close-session` 由系统自动添加，无需手动操作。
 
 记录完整的复盘结论。
 
 ---
 
-## 约束条件
+## ⚠️【强制约束条件】
 
-1. **必须查询今日所有Session**
-2. **错误操作必须记录到 errors/ 目录**
-3. **总结文件必须按日期命名**
-4. **错误必读**：必须先执行 read-error skill
-5. **必须写入今日总结到 summaries/ 目录**
+1. **必须** 查询今日所有Session
+2. **必须** 执行错误检查清单，如有错误 **必须** 记录到 errors/ 目录
+3. **必须** 写入今日总结到 summaries/YYYY-MM-DD.md
+4. **必须** 先执行 read-error skill
+5. **必须** 调用 write_knowledge_file 生成文件
+6. 总结文件名 **必须** 使用当天日期
+
+---
+
+## 执行检查表
+
+完成以下所有步骤才算执行成功：
+
+```
+□ 已调用 read-error skill
+□ 已查询今日所有 Session
+□ 已获取今日交易记录
+□ 已计算今日收益
+□ 已执行错误检查清单
+□ 如有错误，已写入 errors/ 目录
+□ 已写入总结到 summaries/YYYY-MM-DD.md
+□ 已输出完整的交易日总结
+```

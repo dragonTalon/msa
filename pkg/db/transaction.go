@@ -3,6 +3,7 @@ package db
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"gorm.io/gorm"
 
@@ -120,4 +121,29 @@ func UpdateTransactionsWithParent(tx *gorm.DB, parentID uint, childIDs []uint) e
 	}
 
 	return nil
+}
+
+// GetTodayTransactions 获取今日交易记录
+func GetTodayTransactions() ([]model.Transaction, error) {
+	db := GetDB()
+	if db == nil {
+		return nil, fmt.Errorf("数据库未初始化")
+	}
+
+	var transactions []model.Transaction
+
+	// 获取今天的开始和结束时间
+	now := time.Now()
+	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	endOfDay := startOfDay.Add(24 * time.Hour)
+
+	result := db.Where("created_at >= ? AND created_at < ?", startOfDay, endOfDay).
+		Order("created_at DESC").
+		Find(&transactions)
+
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to query today's transactions: %w", result.Error)
+	}
+
+	return transactions, nil
 }
