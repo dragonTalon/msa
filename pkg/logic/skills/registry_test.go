@@ -14,14 +14,12 @@ func TestRegistryRegisterAndQuery(t *testing.T) {
 		Name:     "skill-1",
 		Priority: 5,
 		Source:   SkillSourceBuiltin,
-		path:     "/path/to/skill1.md",
 	}
 
 	skill2 := &Skill{
 		Name:     "skill-2",
 		Priority: 8,
 		Source:   SkillSourceUser,
-		path:     "/path/to/skill2.md",
 	}
 
 	// 测试注册
@@ -114,10 +112,10 @@ func TestRegistryListAvailable(t *testing.T) {
 
 	// 注册多个 skills
 	skills := []*Skill{
-		{Name: "base", Priority: 10, Source: SkillSourceBuiltin, path: "/base.md"},
-		{Name: "skill-a", Priority: 5, Source: SkillSourceBuiltin, path: "/a.md"},
-		{Name: "skill-b", Priority: 3, Source: SkillSourceUser, path: "/b.md"},
-		{Name: "skill-c", Priority: 7, Source: SkillSourceUser, path: "/c.md"},
+		{Name: "base", Priority: 10, Source: SkillSourceBuiltin},
+		{Name: "skill-a", Priority: 5, Source: SkillSourceBuiltin},
+		{Name: "skill-b", Priority: 3, Source: SkillSourceUser},
+		{Name: "skill-c", Priority: 7, Source: SkillSourceUser},
 	}
 
 	for _, skill := range skills {
@@ -167,14 +165,12 @@ func TestRegistryDuplicateRegistration(t *testing.T) {
 		Name:     "test-skill",
 		Priority: 5,
 		Source:   SkillSourceBuiltin,
-		path:     "/path1.md",
 	}
 
 	skill2 := &Skill{
 		Name:     "test-skill", // 相同名称
 		Priority: 8,
 		Source:   SkillSourceUser,
-		path:     "/path2.md",
 	}
 
 	registry.Register(skill1)

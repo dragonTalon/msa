@@ -15,11 +15,14 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// SkillMetadata 用于发送给 LLM 的轻量级 Skill 信息
-type SkillMetadata struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Priority    int    `json:"priority"`
+// SkillInfo 用于发送给 LLM 的轻量级 Skill 信息
+type SkillInfo struct {
+	Name          string `json:"name"`
+	Description   string `json:"description"`
+	Priority      int    `json:"priority"`
+	Pattern       string `json:"pattern"`
+	HasReferences bool   `json:"has_references"`
+	HasAssets     bool   `json:"has_assets"`
 }
 
 // SelectionResult LLM 选择结果
@@ -50,12 +53,15 @@ func (s *Selector) SelectSkills(ctx context.Context, userInput string, history [
 	skills := s.registry.ListAvailable(disabledMap)
 
 	// 构建轻量级 metadata 列表
-	metadataList := make([]SkillMetadata, len(skills))
+	metadataList := make([]SkillInfo, len(skills))
 	for i, skill := range skills {
-		metadataList[i] = SkillMetadata{
-			Name:        skill.Name,
-			Description: skill.Description,
-			Priority:    skill.Priority,
+		metadataList[i] = SkillInfo{
+			Name:          skill.Name,
+			Description:   skill.Description,
+			Priority:      skill.Priority,
+			Pattern:       string(skill.Metadata.Pattern),
+			HasReferences: skill.HasReferences(),
+			HasAssets:     skill.HasAssets(),
 		}
 	}
 
@@ -131,7 +137,7 @@ const selectionSystemTemplate = `你是一个 skill 选择器。根据用户输�
 3. 高优先级的 skill 优先选择`
 
 // buildSelectionPrompt 使用 eino prompt.FromMessages 构建选择 Prompt
-func (s *Selector) buildSelectionPrompt(ctx context.Context, metadatas []SkillMetadata, userInput string, history []model.Message) ([]*schema.Message, error) {
+func (s *Selector) buildSelectionPrompt(ctx context.Context, metadatas []SkillInfo, userInput string, history []model.Message) ([]*schema.Message, error) {
 	hasHistory := len(history) > 0
 	template := prompt.FromMessages(schema.GoTemplate,
 		schema.SystemMessage(selectionSystemTemplate),
@@ -241,7 +247,7 @@ func truncate(s string, maxLen int) string {
 	return s[:maxLen] + "..."
 }
 
-func formatSkillsForLog(metadatas []SkillMetadata) string {
+func formatSkillsForLog(metadatas []SkillInfo) string {
 	names := make([]string, len(metadatas))
 	for i, meta := range metadatas {
 		names[i] = fmt.Sprintf("%s(%d)", meta.Name, meta.Priority)

@@ -13,9 +13,12 @@ import (
 
 // SkillMeta 注入模板的轻量级 Skill 元数据
 type SkillMeta struct {
-	Name        string
-	Description string
-	Priority    int
+	Name          string
+	Description   string
+	Priority      int
+	Pattern       string
+	HasReferences bool
+	HasAssets     bool
 }
 
 // BuildQueryMessages 使用 eino 的 prompt.FromMessages + schema.GoTemplate 构建完整的查询消息
@@ -75,9 +78,12 @@ func buildSkillMetas() []SkillMeta {
 	metas := make([]SkillMeta, 0, len(skillList))
 	for _, sk := range skillList {
 		metas = append(metas, SkillMeta{
-			Name:        sk.Name,
-			Description: sk.Description,
-			Priority:    sk.Priority,
+			Name:          sk.Name,
+			Description:   sk.Description,
+			Priority:      sk.Priority,
+			Pattern:       string(sk.Metadata.Pattern),
+			HasReferences: sk.HasReferences(),
+			HasAssets:     sk.HasAssets(),
 		})
 	}
 	return metas

@@ -55,14 +55,15 @@ const BasePromptTemplate = `
 # 【可用技能模块】
 {{if .skills}}以下是当前已激活的专业技能模块，按优先级排序：
 {{range .skills}}
-- **{{.Name}}** (优先级: {{.Priority}}): {{.Description}}
+- **{{.Name}}** ({{if .Pattern}}模式: {{.Pattern}}, {{end}}优先级: {{.Priority}}): {{.Description}}{{if .HasReferences}} 📖参考资料可用{{end}}{{if .HasAssets}} 📄模板可用{{end}}
 {{end}}
 
 ## 技能使用规则
 1. 收到用户问题后，先对照上方技能列表判断是否有匹配的技能模块
 2. 若有匹配的技能，**必须**先调用 get_skill_content 工具获取该技能的完整处理流程和规则
-3. 严格按照技能内容中规定的流程、工具和规则处理用户问题
-4. 若无匹配的技能，则按通用规范处理
+3. 如果该技能有参考资料或模板可用，使用 get_skill_reference 或 get_skill_asset 工具按需加载
+4. 严格按照技能内容中规定的流程、工具和规则处理用户问题
+5. 若无匹配的技能，则按通用规范处理
 {{else}}当前无已激活的技能模块，按通用规范处理。
 {{end}}`
 

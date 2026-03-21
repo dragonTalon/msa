@@ -1,22 +1,27 @@
 ---
 name: read-error
-description: 读取历史错误操作经验，必须在早盘、午盘、闭市SKILL执行前强制调用。返回的错误信息将用于指导后续操作决策。
-version: 1.0.0
+description: 读取历史错误操作经验，为后续决策提供风险警示。**必须**在早盘、午盘、闭市 SKILL 执行前强制调用。
+version: 2.0.0
 priority: 10
+pattern: reviewer
+tools:
+  - list_knowledge_files
+  - read_knowledge_file
 ---
 
-# Read Error Experience
+# Read Error - 错误经验读取器
 
-## 【强制要求】
+## ⚠️ 强制要求
 
-**此SKILL必须作为以下SKILL的第一步调用：**
-- morning-analysis（早盘分析）
-- afternoon-trade（午盘操作）
-- market-close-summary（闭市总结）
+**此 SKILL 必须作为以下 SKILL 的第一步调用：**
+- `morning-analysis`（早盘分析）
+- `afternoon-trade`（午盘操作）
+- `market-close-summary`（闭市总结）
 
-**不执行此SKILL将导致：**
+**不执行此 SKILL 将导致：**
 - 重复犯同样的错误
 - 缺少历史经验的指导
+- 决策缺少风险意识
 
 ---
 
@@ -24,7 +29,10 @@ priority: 10
 
 ### Step 1: 扫描错误文件
 
-扫描 `.msa/knowledge/errors/` 目录下的所有 `.md` 文件。
+```
+调用 list_knowledge_files(directory="errors")
+→ 获取所有错误记录文件列表
+```
 
 如果目录不存在或无文件：
 - 输出："暂无历史错误记录，继续保持良好操作习惯"
@@ -33,10 +41,11 @@ priority: 10
 ### Step 2: 读取并解析
 
 对每个文件：
-1. 解析 YAML frontmatter（id, date, severity, tags, status）
-2. 提取错误描述、原因、正确做法、防范措施
-3. 按 severity 排序（high > medium > low）
-4. 过滤 status=resolved 的记录（已解决的不再提醒）
+1. 调用 `read_knowledge_file` 读取内容
+2. 解析 YAML frontmatter（id, date, severity, tags, status）
+3. 提取错误描述、原因、正确做法、防范措施
+4. 按 severity 排序（critical > high > medium > low）
+5. 过滤 status=resolved 的记录（已解决的不再提醒）
 
 ### Step 3: 格式化输出
 
@@ -46,69 +55,30 @@ priority: 10
 
 ## 输出格式
 
-```
+```markdown
 ## ⚠️ 历史错误经验提醒
 
 本次操作前请注意以下历史教训：
 
-### [高优先级] 错误标题
+### [严重程度] 错误标题
 - 发生时间：YYYY-MM-DD
 - 错误描述：具体错误内容
 - 正确做法：应该怎么做
 - 防范措施：如何避免
 
-### [中优先级] 错误标题
-...
-
-### [低优先级] 错误标题
-...
-
 ---
+
 以上经验请在决策时充分考虑，避免重蹈覆辙。
 ```
 
 ---
 
-## 使用示例
-
-**在早盘SKILL中的调用方式：**
+## 在其他 SKILL 中的调用方式
 
 ```
-在执行任何分析前，首先执行 read-error skill：
+在执行任何分析前，首先调用此 SKILL：
 
-1. 调用此skill读取所有错误记录
-2. 将输出内容拼接到后续分析的prompt中
+1. 调用 read-error SKILL 读取所有错误记录
+2. 将输出内容拼接到后续分析的 prompt 中
 3. 在决策时参考历史错误，避免重复犯错
-```
-
----
-
-## 错误文件示例
-
-```markdown
----
-id: err-001
-date: 2026-03-14
-severity: high
-tags: [追高, 止损, 情绪化交易]
-status: active
----
-
-## 错误描述
-在茅台股价已涨3%时追高买入，未设止损，导致当日收盘亏损2%。
-
-## 错误原因
-1. 看到股票上涨产生FOMO情绪
-2. 未严格执行"不追高"策略
-3. 未设置止损位
-
-## 正确做法
-1. 等待回调至支撑位再买入
-2. 上涨超过2%不追高
-3. 买入前必须设置止损位（-3%）
-
-## 防范措施
-1. 每次买入前检查涨幅，超过2%放弃
-2. 买入时必须同时设置止损价位
-3. 记录情绪状态，避免情绪化决策
 ```
