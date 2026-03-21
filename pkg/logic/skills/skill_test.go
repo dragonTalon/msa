@@ -6,7 +6,20 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"unsafe"
 )
+
+// setDirPath 使用 unsafe 设置 Skill 的私有 dirPath 字段
+func setDirPath(skill *Skill, dirPath string) {
+	// 获取 Skill 结构体的反射值
+	val := unsafe.Pointer(skill)
+	// 获取 dirPath 字段的偏移量
+	dirPathOffset := unsafe.Offsetof(skill.dirPath)
+	// 获取 dirPath 字段的指针
+	dirPathPtr := (*string)(unsafe.Pointer(uintptr(val) + dirPathOffset))
+	// 设置值
+	*dirPathPtr = dirPath
+}
 
 // TestSkillLazyLoading 测试懒加载功能
 func TestSkillLazyLoading(t *testing.T) {
@@ -31,19 +44,9 @@ This is the test skill content.`
 
 	skill := &Skill{
 		Name:     "test-skill",
-		path:     skillPath,
-		loaded:   false,
 		Priority: 5,
 	}
-
-	// 初始状态：未加载
-	if skill.loaded {
-		t.Error("Skill should not be loaded initially")
-	}
-
-	if skill.content != "" {
-		t.Error("Skill content should be empty initially")
-	}
+	setDirPath(skill, tmpDir)
 
 	// 第一次调用 GetContent()：应该加载内容
 	content1, err := skill.GetContent()
@@ -54,11 +57,6 @@ This is the test skill content.`
 	expectedContent := "# Test Skill Content\n\nThis is the test skill content."
 	if content1 != expectedContent {
 		t.Errorf("Expected content %q, got %q", expectedContent, content1)
-	}
-
-	// 现在应该已加载
-	if !skill.loaded {
-		t.Error("Skill should be loaded after GetContent()")
 	}
 
 	// 第二次调用 GetContent()：应该使用缓存
@@ -95,10 +93,9 @@ This is test content for concurrent access.`
 
 	skill := &Skill{
 		Name:     "concurrent-test",
-		path:     skillPath,
-		loaded:   false,
 		Priority: 5,
 	}
+	setDirPath(skill, tmpDir)
 
 	// 启动 100 个 goroutine 同时访问
 	const numGoroutines = 100
@@ -133,11 +130,6 @@ This is test content for concurrent access.`
 			t.Errorf("Goroutine %d got unexpected content: %q", i, content)
 		}
 	}
-
-	// 验证只加载了一次
-	if !skill.loaded {
-		t.Error("Skill should be loaded after concurrent access")
-	}
 }
 
 // TestSkillCaching 测试缓存机制
@@ -161,10 +153,9 @@ priority: 5
 
 	skill := &Skill{
 		Name:     "cache-test",
-		path:     skillPath,
-		loaded:   false,
 		Priority: 5,
 	}
+	setDirPath(skill, tmpDir)
 
 	// 第一次调用
 	start1 := time.Now()
@@ -191,24 +182,18 @@ priority: 5
 
 	// 验证缓存调用更快（虽然可能不明显，因为文件很小）
 	t.Logf("First call duration: %v, Second call duration: %v", duration1, duration2)
-
-	// 验证缓存状态
-	if !skill.loaded {
-		t.Error("Skill should be marked as loaded")
-	}
 }
 
-// TestSkillGetPath 测试 GetPath 方法
-func TestSkillGetPath(t *testing.T) {
+// TestSkillGetDirPath 测试 GetDirPath 方法
+func TestSkillGetDirPath(t *testing.T) {
 	skill := &Skill{
 		Name:     "test",
-		path:     "/path/to/skill.md",
-		loaded:   false,
 		Priority: 5,
 	}
+	setDirPath(skill, "/path/to/skill")
 
-	expectedPath := "/path/to/skill.md"
-	actualPath := skill.GetPath()
+	expectedPath := "/path/to/skill"
+	actualPath := skill.GetDirPath()
 
 	if actualPath != expectedPath {
 		t.Errorf("Expected path %q, got %q", expectedPath, actualPath)

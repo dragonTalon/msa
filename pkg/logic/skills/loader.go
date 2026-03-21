@@ -27,12 +27,18 @@ func NewLoader(builtinDir, userDir string, registry *Registry) *Loader {
 	}
 }
 
-// skillMetadata 表示 SKILL.md 的 YAML frontmatter
-type skillMetadata struct {
-	Name        string `yaml:"name"`
-	Description string `yaml:"description"`
-	Version     string `yaml:"version"`
-	Priority    int    `yaml:"priority"`
+// skillMetadataYAML 表示 SKILL.md 的 YAML frontmatter（用于解析）
+type skillMetadataYAML struct {
+	Name        string         `yaml:"name"`
+	Description string         `yaml:"description"`
+	Version     string         `yaml:"version"`
+	Priority    int            `yaml:"priority"`
+	Pattern     string         `yaml:"pattern"`
+	Triggers    []SkillTrigger `yaml:"triggers"`
+	Tools       []string       `yaml:"tools"`
+	Dependencies []string      `yaml:"dependencies"`
+	Steps       int            `yaml:"steps"`
+	OutputFormat string        `yaml:"output-format"`
 }
 
 // LoadAll 扫描并加载所有 Skills
@@ -70,8 +76,9 @@ func (l *Loader) scanBuiltinSkills() error {
 			continue
 		}
 
-		skillPath := filepath.Join(l.builtinDir, entry.Name(), "SKILL.md")
-		if err := l.loadSkill(skillPath, SkillSourceBuiltin); err != nil {
+		skillDir := filepath.Join(l.builtinDir, entry.Name())
+		skillPath := filepath.Join(skillDir, "SKILL.md")
+		if err := l.loadSkill(skillDir, skillPath, SkillSourceBuiltin); err != nil {
 			log.Warnf("Failed to load builtin skill %s: %v", skillPath, err)
 			// 继续处理其他 Skills
 		}
@@ -100,8 +107,9 @@ func (l *Loader) scanUserSkills() error {
 			continue
 		}
 
-		skillPath := filepath.Join(l.userDir, entry.Name(), "SKILL.md")
-		if err := l.loadSkill(skillPath, SkillSourceUser); err != nil {
+		skillDir := filepath.Join(l.userDir, entry.Name())
+		skillPath := filepath.Join(skillDir, "SKILL.md")
+		if err := l.loadSkill(skillDir, skillPath, SkillSourceUser); err != nil {
 			log.Warnf("Failed to load user skill %s: %v", skillPath, err)
 			// 继续处理其他 Skills
 		}
@@ -111,9 +119,9 @@ func (l *Loader) scanUserSkills() error {
 }
 
 // loadSkill 加载单个 Skill
-func (l *Loader) loadSkill(path string, source SkillSource) error {
+func (l *Loader) loadSkill(skillDir, skillPath string, source SkillSource) error {
 	// 解析 Skill 元数据
-	metadata, err := l.parseSkillMetadata(path)
+	metadata, err := l.parseSkillMetadata(skillPath)
 	if err != nil {
 		return err
 	}
@@ -125,18 +133,30 @@ func (l *Loader) loadSkill(path string, source SkillSource) error {
 		Version:     metadata.Version,
 		Priority:    metadata.Priority,
 		Source:      source,
-		path:        path,
-		loaded:      false,
+		Metadata: SkillMetadata{
+			Pattern:      SkillPattern(metadata.Pattern),
+			Triggers:     metadata.Triggers,
+			Tools:        metadata.Tools,
+			Dependencies: metadata.Dependencies,
+			Steps:        metadata.Steps,
+			OutputFormat: metadata.OutputFormat,
+		},
+		dirPath:    skillDir,
+		loaded:     false,
 	}
 
 	// 注册到 Registry
 	l.registry.Register(skill)
 
+	// 记录详细信息
+	log.Debugf("Loaded skill: %s (pattern: %s, priority: %d, has_refs: %v, has_assets: %v)",
+		skill.Name, skill.Metadata.Pattern, skill.Priority, skill.HasReferences(), skill.HasAssets())
+
 	return nil
 }
 
 // parseSkillMetadata 解析 SKILL.md 文件的 YAML frontmatter
-func (l *Loader) parseSkillMetadata(path string) (*skillMetadata, error) {
+func (l *Loader) parseSkillMetadata(path string) (*skillMetadataYAML, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open skill file: %w", err)
@@ -176,7 +196,7 @@ func (l *Loader) parseSkillMetadata(path string) (*skillMetadata, error) {
 
 	// 解析 YAML
 	frontmatter := strings.Join(frontmatterLines, "\n")
-	var metadata skillMetadata
+	var metadata skillMetadataYAML
 	if err := yaml.Unmarshal([]byte(frontmatter), &metadata); err != nil {
 		return nil, fmt.Errorf("failed to parse frontmatter: %w", err)
 	}
@@ -194,7 +214,8 @@ func (l *Loader) parseSkillMetadata(path string) (*skillMetadata, error) {
 		metadata.Priority = 5 // 默认优先级
 	}
 
-	log.Debugf("Parsed skill metadata: %s (priority: %d)", metadata.Name, metadata.Priority)
+	log.Debugf("Parsed skill metadata: %s (priority: %d, pattern: %s)",
+		metadata.Name, metadata.Priority, metadata.Pattern)
 
 	return &metadata, nil
 }

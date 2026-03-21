@@ -63,7 +63,6 @@ func TestManagerGetRegistry(t *testing.T) {
 		Name:        "test-skill",
 		Description: "Test skill",
 		Priority:    5,
-		path:        "/test/path.md",
 	})
 
 	skill, err := registry.Get("test-skill")
@@ -86,9 +85,9 @@ func TestManagerListAllSkills(t *testing.T) {
 
 	// 注册一些测试 skills
 	testSkills := []*Skill{
-		{Name: "base", Description: "Base", Priority: 10, path: "/base.md"},
-		{Name: "stock", Description: "Stock", Priority: 8, path: "/stock.md"},
-		{Name: "news", Description: "News", Priority: 5, path: "/news.md"},
+		{Name: "base", Description: "Base", Priority: 10},
+		{Name: "stock", Description: "Stock", Priority: 8},
+		{Name: "news", Description: "News", Priority: 5},
 	}
 
 	for _, skill := range testSkills {
@@ -139,8 +138,8 @@ func TestManagerDisableEnableSkill(t *testing.T) {
 
 	// 注册测试 skills
 	testSkills := []*Skill{
-		{Name: "skill-a", Description: "A", Priority: 5, path: "/a.md"},
-		{Name: "skill-b", Description: "B", Priority: 5, path: "/b.md"},
+		{Name: "skill-a", Description: "A", Priority: 5},
+		{Name: "skill-b", Description: "B", Priority: 5},
 	}
 	for _, skill := range testSkills {
 		registry.Register(skill)
@@ -281,7 +280,6 @@ func TestManagerGetSkill(t *testing.T) {
 		Name:        "test-get-skill",
 		Description: "Test GetSkill",
 		Priority:    5,
-		path:        "/test/get.md",
 	}
 	registry.Register(testSkill)
 
@@ -390,7 +388,6 @@ func TestManagerConcurrentAccess(t *testing.T) {
 			Name:        "concurrent-test-" + string(rune('0'+i)),
 			Description: "Concurrent test",
 			Priority:    5,
-			path:        "/test.md",
 		})
 	}
 

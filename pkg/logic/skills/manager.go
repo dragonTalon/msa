@@ -149,3 +149,39 @@ func (m *Manager) GetDisabledSkills() []string {
 func (m *Manager) GetRegistry() *Registry {
 	return m.registry
 }
+
+// GetSkillContent 获取 Skill 主内容
+func (m *Manager) GetSkillContent(name string) (string, error) {
+	skill, err := m.registry.Get(name)
+	if err != nil {
+		return "", err
+	}
+	return skill.GetContent()
+}
+
+// GetSkillReference 获取 Skill 的 reference 文件内容
+func (m *Manager) GetSkillReference(skillName, refName string) (string, error) {
+	skill, err := m.registry.Get(skillName)
+	if err != nil {
+		return "", err
+	}
+	return skill.GetReference(refName)
+}
+
+// GetSkillAsset 获取 Skill 的 asset 文件内容
+func (m *Manager) GetSkillAsset(skillName, assetName string) (string, error) {
+	skill, err := m.registry.Get(skillName)
+	if err != nil {
+		return "", err
+	}
+	return skill.GetAsset(assetName)
+}
+
+// GetSkillMetadata 获取 Skill 的扩展元数据
+func (m *Manager) GetSkillMetadata(name string) (*SkillMetadata, error) {
+	skill, err := m.registry.Get(name)
+	if err != nil {
+		return nil, err
+	}
+	return &skill.Metadata, nil
+}

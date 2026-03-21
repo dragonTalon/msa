@@ -9,6 +9,8 @@ import (
 )
 
 var _ MsaTool = (*skilltools.SkillContentTool)(nil)
+var _ MsaTool = (*skilltools.SkillReferenceTool)(nil)
+var _ MsaTool = (*skilltools.SkillAssetTool)(nil)
 
 var _ MsaTool = (*stock.CompanyCode)(nil)
 var _ MsaTool = (*stock.CompanyK)(nil)
@@ -64,6 +66,8 @@ func registerFinance() {
 
 func registerSkill() {
 	RegisterTool(&skilltools.SkillContentTool{})
+	RegisterTool(&skilltools.SkillReferenceTool{})
+	RegisterTool(&skilltools.SkillAssetTool{})
 }
 
 func registerKnowledge() {

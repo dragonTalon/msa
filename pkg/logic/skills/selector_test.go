@@ -16,10 +16,10 @@ func TestSelectorSortByPriority(t *testing.T) {
 	registry := NewRegistry()
 
 	skills := []*Skill{
-		{Name: "base", Priority: 10, Description: "Base", path: "/base.md"},
-		{Name: "high", Priority: 8, Description: "High", path: "/high.md"},
-		{Name: "medium", Priority: 5, Description: "Medium", path: "/med.md"},
-		{Name: "low", Priority: 2, Description: "Low", path: "/low.md"},
+		{Name: "base", Priority: 10, Description: "Base"},
+		{Name: "high", Priority: 8, Description: "High"},
+		{Name: "medium", Priority: 5, Description: "Medium"},
+		{Name: "low", Priority: 2, Description: "Low"},
 	}
 
 	for _, skill := range skills {
@@ -70,7 +70,7 @@ func TestSelectorSortByPriority(t *testing.T) {
 func TestSelectorBuildSelectionPrompt(t *testing.T) {
 	selector := &Selector{}
 
-	metadatas := []SkillMetadata{
+	metadatas := []SkillInfo{
 		{Name: "base", Description: "Base system rules", Priority: 10},
 		{Name: "stock", Description: "Stock analysis", Priority: 8},
 	}
@@ -226,9 +226,9 @@ func TestSelectorListAvailable(t *testing.T) {
 	registry := NewRegistry()
 
 	skills := []*Skill{
-		{Name: "base", Priority: 10, Description: "Base", path: "/base.md"},
-		{Name: "skill-a", Priority: 5, Description: "A", path: "/a.md"},
-		{Name: "skill-b", Priority: 8, Description: "B", path: "/b.md"},
+		{Name: "base", Priority: 10, Description: "Base"},
+		{Name: "skill-a", Priority: 5, Description: "A"},
+		{Name: "skill-b", Priority: 8, Description: "B"},
 	}
 
 	for _, skill := range skills {
@@ -313,9 +313,9 @@ func TestSelectionResultStruct(t *testing.T) {
 	}
 }
 
-// TestSkillMetadataStruct 测试 SkillMetadata 结构
-func TestSkillMetadataStruct(t *testing.T) {
-	metadata := SkillMetadata{
+// TestSkillInfoStruct 测试 SkillInfo 结构
+func TestSkillInfoStruct(t *testing.T) {
+	metadata := SkillInfo{
 		Name:        "test-skill",
 		Description: "Test description",
 		Priority:    7,
@@ -335,7 +335,7 @@ func TestSkillMetadataStruct(t *testing.T) {
 		t.Fatalf("Failed to marshal: %v", err)
 	}
 
-	var decoded SkillMetadata
+	var decoded SkillInfo
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		t.Fatalf("Failed to unmarshal: %v", err)
 	}
@@ -482,7 +482,7 @@ func TestTruncate(t *testing.T) {
 
 // TestFormatSkillsForLog 测试 formatSkillsForLog 辅助函数
 func TestFormatSkillsForLog(t *testing.T) {
-	metadatas := []SkillMetadata{
+	metadatas := []SkillInfo{
 		{Name: "base", Priority: 10},
 		{Name: "stock", Priority: 8},
 		{Name: "news", Priority: 5},
@@ -497,7 +497,7 @@ func TestFormatSkillsForLog(t *testing.T) {
 	}
 
 	// 测试空列表
-	result = formatSkillsForLog([]SkillMetadata{})
+	result = formatSkillsForLog([]SkillInfo{})
 	if result != "" {
 		t.Errorf("Expected empty string for empty list, got '%s'", result)
 	}

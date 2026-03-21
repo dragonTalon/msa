@@ -51,7 +51,7 @@ func runSkillsShow(cmd *cobra.Command, args []string) error {
 	fmt.Printf("版本: %s\n", skill.Version)
 	fmt.Printf("优先级: %s\n", formatPriority(skill.Priority))
 	fmt.Printf("来源: %s\n", formatSource(skill.Source))
-	fmt.Printf("路径: %s\n", skill.GetPath())
+	fmt.Printf("路径: %s\n", skill.GetDirPath())
 
 	// 状态
 	disabled := manager.GetDisabledSkills()

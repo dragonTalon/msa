@@ -12,7 +12,7 @@ func TestLoaderParseMetadata(t *testing.T) {
 		name        string
 		content     string
 		expectError bool
-		expected    *skillMetadata
+		expected    *skillMetadataYAML
 	}{
 		{
 			name: "Valid frontmatter",
@@ -25,7 +25,7 @@ priority: 7
 
 Content here`,
 			expectError: false,
-			expected: &skillMetadata{
+			expected: &skillMetadataYAML{
 				Name:        "test-skill",
 				Description: "A test skill",
 				Version:     "1.0.0",
@@ -42,7 +42,7 @@ version: 1.0.0
 
 Content here`,
 			expectError: false,
-			expected: &skillMetadata{
+			expected: &skillMetadataYAML{
 				Name:        "test-skill",
 				Description: "A test skill",
 				Version:     "1.0.0",
