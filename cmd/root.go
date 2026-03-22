@@ -12,6 +12,7 @@ import (
 
 	"msa/cmd/config"
 	"msa/cmd/skill"
+	"msa/cmd/update"
 	"msa/cmd/version"
 	"msa/pkg/app"
 	"msa/pkg/config"
@@ -53,6 +54,7 @@ func init() {
 	AddCommand(cmd_config.NewCommand())
 	AddCommand(cmd_skill.NewCommand())
 	AddCommand(cmd_version.NewCommand())
+	AddCommand(cmd_update.NewCommand())
 }
 
 // runRoot 根命令执行函数，仅做路由调用
