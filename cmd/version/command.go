@@ -22,7 +22,5 @@ func NewCommand() *cobra.Command {
 
 func runVersion(cmd *cobra.Command, args []string) {
 	v, c, d := version.Get()
-	fmt.Println("MSA 版本:", v)
-	fmt.Println("Commit:", c)
-	fmt.Println("构建时间:", d)
+	fmt.Printf("MSA %s (commit: %s, built: %s)\n", v, c, d)
 }

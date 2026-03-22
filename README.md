@@ -52,15 +52,41 @@ It currently implements core features including AI-powered chat, stock data quer
 
 ### Installation
 
-```bash
-# Install via go install
-go install github.com/yourusername/msa@latest
+#### One-line Install (Recommended)
 
-# Or clone the repository
-git clone https://github.com/yourusername/msa.git
+```bash
+# macOS / Linux
+curl -fsSL https://raw.githubusercontent.com/dragonTalon/msa/main/install.sh | sh
+```
+
+The install script automatically detects your system architecture, downloads the latest release, and installs to `~/.local/bin`.
+
+#### Manual Installation
+
+```bash
+# Download from GitHub Releases
+# https://github.com/dragonTalon/msa/releases
+
+# Or install via go install
+go install github.com/dragonTalon/msa@latest
+
+# Or build from source
+git clone https://github.com/dragonTalon/msa.git
 cd msa
 go build
 ```
+
+### Update
+
+```bash
+# Check for updates
+msa update --check
+
+# Update to the latest version
+msa update
+```
+
+The update command automatically downloads the latest release from GitHub Releases and replaces the current binary.
 
 ### Configuration
 

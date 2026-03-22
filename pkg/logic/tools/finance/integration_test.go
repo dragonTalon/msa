@@ -1,6 +1,7 @@
 package finance
 
 import (
+	"msa/pkg/model"
 	"os"
 	"path/filepath"
 	"testing"
@@ -9,7 +10,6 @@ import (
 	"gorm.io/gorm"
 	msadb "msa/pkg/db"
 	"msa/pkg/logic/finsvc"
-	
 )
 
 // setupTestDB 创建测试用的临时数据库
