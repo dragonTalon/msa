@@ -8,8 +8,8 @@ import (
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 	msadb "msa/pkg/db"
-	"msa/pkg/model"
 	"msa/pkg/logic/finsvc"
+	
 )
 
 // setupTestDB 创建测试用的临时数据库
@@ -318,7 +318,7 @@ func TestIntegration_AccountTotalValue(t *testing.T) {
 	priceMap := make(finsvc.PriceMap)
 	priceMap["600519"] = model.YuanToHao(11.00) // 当前价格涨到 11 元
 
-	totalValue, err := finsvc.GetAccountTotalValue(db, accountID, priceMap)
+	result, err := finsvc.GetAccountTotalValue(db, accountID, priceMap)
 	if err != nil {
 		t.Fatalf("Failed to get total value: %v", err)
 	}
@@ -328,7 +328,7 @@ func TestIntegration_AccountTotalValue(t *testing.T) {
 	// 持仓市值 = 100 * 11 = 1100 元 = 11000000 毫
 	// 总价值 = 89999500 + 11000000 = 100999500 毫
 	expectedValue := model.YuanToHao(10000) - price*quantity - model.YuanToHao(0.05) + model.YuanToHao(11.00)*quantity
-	if totalValue != expectedValue {
-		t.Errorf("Expected total value %d, got %d", expectedValue, totalValue)
+	if result.TotalValue != expectedValue {
+		t.Errorf("Expected total value %d, got %d", expectedValue, result.TotalValue)
 	}
 }

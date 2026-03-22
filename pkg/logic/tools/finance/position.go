@@ -6,6 +6,7 @@ import (
 
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"
+	log "github.com/sirupsen/logrus"
 	msadb "msa/pkg/db"
 	"msa/pkg/logic/finsvc"
 	"msa/pkg/logic/message"
@@ -162,14 +163,16 @@ func (t *GetAccountSummaryTool) GetToolGroup() model.ToolGroup {
 
 // AccountSummaryData 账户总览数据
 type AccountSummaryData struct {
-	TotalAssets   string  `json:"total_assets"`
-	AvailableAmt  string  `json:"available_amt"`
-	LockedAmt     string  `json:"locked_amt"`
-	PositionValue string  `json:"position_value"`
-	InitialAmount string  `json:"initial_amount"`
-	TotalPnL      string  `json:"total_pnl"`
-	PnLRatio      float64 `json:"pnl_ratio"`
-	PnLStatus     string  `json:"pnl_status"`
+	TotalAssets   string   `json:"total_assets"`
+	AvailableAmt  string   `json:"available_amt"`
+	LockedAmt     string   `json:"locked_amt"`
+	PositionValue string   `json:"position_value"`
+	InitialAmount string   `json:"initial_amount"`
+	TotalPnL      string   `json:"total_pnl"`
+	PnLRatio      float64  `json:"pnl_ratio"`
+	PnLStatus     string   `json:"pnl_status"`
+	FailedStocks  []string `json:"failed_stocks,omitempty"` // 价格获取失败的股票
+	Warning       string   `json:"warning,omitempty"`       // 警告信息
 }
 
 // GetAccountSummary 获取账户总览
@@ -205,24 +208,23 @@ func GetAccountSummary(ctx context.Context, param *GetAccountSummaryParam) (stri
 	if len(stockCodes) > 0 {
 		prices, err := fetchAllPrices(stockCodes)
 		if err != nil {
-			// 价格获取失败不影响其他计算
-			message.BroadcastToolEnd("get_account_summary", "", err)
-		} else {
-			for code, price := range prices {
-				priceMap[code] = price
-			}
+			// 价格获取失败时记录日志，但不中断流程
+			log.Warnf("批量获取价格失败: %v", err)
+		}
+		for code, price := range prices {
+			priceMap[code] = price
 		}
 	}
 
 	// 计算总市值
-	totalValue, err := finsvc.GetAccountTotalValue(database, account.ID, priceMap)
+	result, err := finsvc.GetAccountTotalValue(database, account.ID, priceMap)
 	if err != nil {
 		message.BroadcastToolEnd("get_account_summary", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
 	// 计算总盈亏
-	pnl := totalValue - account.InitialAmount
+	pnl := result.TotalValue - account.InitialAmount
 	pnlRatio := 0.0
 	if account.InitialAmount > 0 {
 		pnlRatio = float64(pnl) / float64(account.InitialAmount) * 100
@@ -233,15 +235,27 @@ func GetAccountSummary(ctx context.Context, param *GetAccountSummaryParam) (stri
 		pnlStatus = "盈利"
 	}
 
+	// 生成警告信息
+	var warning string
+	if len(result.FailedStocks) > 0 {
+		if len(result.FailedStocks) == len(stockCodes) {
+			warning = "无法获取持仓价格，市值未计入"
+		} else {
+			warning = fmt.Sprintf("部分股票价格获取失败: %v", result.FailedStocks)
+		}
+	}
+
 	data := &AccountSummaryData{
-		TotalAssets:   formatHaoToYuan(totalValue),
-		AvailableAmt:  formatHaoToYuan(account.AvailableAmt),
-		LockedAmt:     formatHaoToYuan(account.LockedAmt),
-		PositionValue: formatHaoToYuan(totalValue - account.AvailableAmt - account.LockedAmt),
+		TotalAssets:   formatHaoToYuan(result.TotalValue),
+		AvailableAmt:  formatHaoToYuan(result.AvailableAmt),
+		LockedAmt:     formatHaoToYuan(result.LockedAmt),
+		PositionValue: formatHaoToYuan(result.PositionValue),
 		InitialAmount: formatHaoToYuan(account.InitialAmount),
 		TotalPnL:      formatHaoToYuan(pnl),
 		PnLRatio:      pnlRatio,
 		PnLStatus:     pnlStatus,
+		FailedStocks:  result.FailedStocks,
+		Warning:       warning,
 	}
 
 	message.BroadcastToolEnd("get_account_summary", "获取账户总览成功", nil)
