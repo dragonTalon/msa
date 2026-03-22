@@ -24,6 +24,15 @@ type Position struct {
 // PriceMap 价格映射
 type PriceMap map[string]int64 // stock_code -> price (毫)
 
+// AccountValueResult 账户价值计算结果
+type AccountValueResult struct {
+	TotalValue    int64    // 总资产（可用 + 锁定 + 持仓市值）
+	AvailableAmt  int64    // 可用余额
+	LockedAmt     int64    // 锁定金额
+	PositionValue int64    // 持仓市值
+	FailedStocks  []string // 价格获取失败的股票代码列表
+}
+
 // GetPosition 获取指定股票的持仓数量
 // 计算：SUM(BUY) - SUM(SELL)
 func GetPosition(database *gorm.DB, accountID uint, stockCode string) (int64, error) {
@@ -118,15 +127,15 @@ func GetAllPositions(database *gorm.DB, accountID uint, prices PriceMap) ([]*Pos
 }
 
 // GetAccountTotalValue 获取账户总市值
-// 计算：available_amt + locked_amt + 持仓市值（需要外部提供价格）
-func GetAccountTotalValue(database *gorm.DB, accountID uint, prices PriceMap) (int64, error) {
+// 返回完整的账户价值计算结果，包含持仓市值和价格获取失败的股票列表
+func GetAccountTotalValue(database *gorm.DB, accountID uint, prices PriceMap) (*AccountValueResult, error) {
 	log.Debugf("计算账户总市值: 账户=%d", accountID)
 
 	// 查询账户
 	account, err := db.GetAccountByID(database, accountID)
 	if err != nil {
 		log.Errorf("查询账户失败: %v", err)
-		return 0, err
+		return nil, err
 	}
 
 	// 查询所有持仓股票
@@ -137,28 +146,44 @@ func GetAccountTotalValue(database *gorm.DB, accountID uint, prices PriceMap) (i
 		Pluck("stock_code", &stockCodes).Error
 	if err != nil {
 		log.Errorf("查询股票列表失败: %v", err)
-		return 0, fmt.Errorf("failed to query stocks: %w", err)
+		return nil, fmt.Errorf("failed to query stocks: %w", err)
 	}
 
 	positionValue := int64(0)
-	for _, stockCode := range stockCodes {
-		price, ok := prices[stockCode]
-		if !ok {
-			continue // 跳过没有价格的股票
-		}
+	var failedStocks []string
 
+	for _, stockCode := range stockCodes {
 		qty, err := GetPosition(database, accountID, stockCode)
 		if err != nil {
-			return 0, err
+			return nil, err
+		}
+
+		// 跳过无持仓的股票
+		if qty <= 0 {
+			continue
+		}
+
+		price, ok := prices[stockCode]
+		if !ok {
+			// 记录价格获取失败的股票
+			failedStocks = append(failedStocks, stockCode)
+			continue
 		}
 
 		positionValue += qty * price
 	}
 
 	totalValue := account.AvailableAmt + account.LockedAmt + positionValue
-	log.Debugf("账户总市值: %d (可用=%d, 锁定=%d, 持仓=%d)",
-		totalValue, account.AvailableAmt, account.LockedAmt, positionValue)
-	return totalValue, nil
+	log.Debugf("账户总市值: %d (可用=%d, 锁定=%d, 持仓=%d, 失败=%v)",
+		totalValue, account.AvailableAmt, account.LockedAmt, positionValue, failedStocks)
+
+	return &AccountValueResult{
+		TotalValue:    totalValue,
+		AvailableAmt:  account.AvailableAmt,
+		LockedAmt:     account.LockedAmt,
+		PositionValue: positionValue,
+		FailedStocks:  failedStocks,
+	}, nil
 }
 
 // getPositionCost 获取指定股票的持仓成本（内部函数）

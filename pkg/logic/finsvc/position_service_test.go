@@ -131,13 +131,19 @@ func TestGetAccountTotalValue(t *testing.T) {
 	account, _ := msadb.GetAccountByID(db, accountID)
 
 	// 无持仓时
-	value, err := GetAccountTotalValue(db, account.ID, nil)
+	result, err := GetAccountTotalValue(db, account.ID, nil)
 	if err != nil {
 		t.Fatalf("GetAccountTotalValue failed: %v", err)
 	}
 	// 只有可用余额
-	if value != model.YuanToHao(10000) {
-		t.Errorf("Expected %d, got %d", model.YuanToHao(10000), value)
+	if result.TotalValue != model.YuanToHao(10000) {
+		t.Errorf("Expected total %d, got %d", model.YuanToHao(10000), result.TotalValue)
+	}
+	if result.PositionValue != 0 {
+		t.Errorf("Expected position value 0, got %d", result.PositionValue)
+	}
+	if len(result.FailedStocks) != 0 {
+		t.Errorf("Expected no failed stocks, got %v", result.FailedStocks)
 	}
 
 	// 买入股票
@@ -156,7 +162,7 @@ func TestGetAccountTotalValue(t *testing.T) {
 		"600519": model.YuanToHao(12),
 	}
 
-	value, err = GetAccountTotalValue(db, account.ID, priceMap)
+	result, err = GetAccountTotalValue(db, account.ID, priceMap)
 	if err != nil {
 		t.Fatalf("GetAccountTotalValue failed: %v", err)
 	}
@@ -167,8 +173,23 @@ func TestGetAccountTotalValue(t *testing.T) {
 	// 总计 = 10199.95
 	expectedAvailable := model.YuanToHao(10000) - model.YuanToHao(10)*100 - model.YuanToHao(0.05)
 	expectedValue := expectedAvailable + model.YuanToHao(12)*100
-	if value != expectedValue {
-		t.Errorf("Expected %d, got %d", expectedValue, value)
+	if result.TotalValue != expectedValue {
+		t.Errorf("Expected total %d, got %d", expectedValue, result.TotalValue)
+	}
+	if result.PositionValue != model.YuanToHao(12)*100 {
+		t.Errorf("Expected position value %d, got %d", model.YuanToHao(12)*100, result.PositionValue)
+	}
+
+	// 测试部分价格失败的情况
+	result2, err := GetAccountTotalValue(db, account.ID, nil) // 不提供价格
+	if err != nil {
+		t.Fatalf("GetAccountTotalValue failed: %v", err)
+	}
+	if len(result2.FailedStocks) != 1 || result2.FailedStocks[0] != "600519" {
+		t.Errorf("Expected failed stocks [600519], got %v", result2.FailedStocks)
+	}
+	if result2.PositionValue != 0 {
+		t.Errorf("Expected position value 0 when price missing, got %d", result2.PositionValue)
 	}
 }
 
