@@ -3,7 +3,9 @@ package finance
 import (
 	"context"
 	"fmt"
+	"strings"
 
+	"encoding/json"
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"
 	log "github.com/sirupsen/logrus"
@@ -20,7 +22,8 @@ type GetPositionsParam struct{}
 type GetPositionsTool struct{}
 
 func (t *GetPositionsTool) GetToolInfo() (tool.BaseTool, error) {
-	return utils.InferTool(t.GetName(), t.GetDescription(), GetPositions)
+	return utils.InferTool(t.GetName(), t.GetDescription(), GetPositions,
+		utils.WithUnmarshalArguments(unmarshalEmptyParam[GetPositionsParam]))
 }
 
 func (t *GetPositionsTool) GetName() string {
@@ -146,7 +149,8 @@ type GetAccountSummaryParam struct{}
 type GetAccountSummaryTool struct{}
 
 func (t *GetAccountSummaryTool) GetToolInfo() (tool.BaseTool, error) {
-	return utils.InferTool(t.GetName(), t.GetDescription(), GetAccountSummary)
+	return utils.InferTool(t.GetName(), t.GetDescription(), GetAccountSummary,
+		utils.WithUnmarshalArguments(unmarshalEmptyParam[GetAccountSummaryParam]))
 }
 
 func (t *GetAccountSummaryTool) GetName() string {
@@ -260,4 +264,17 @@ func GetAccountSummary(ctx context.Context, param *GetAccountSummaryParam) (stri
 
 	message.BroadcastToolEnd("get_account_summary", "获取账户总览成功", nil)
 	return model.NewSuccessResult(data, "获取账户总览成功"), nil
+}
+
+// unmarshalEmptyParam 处理无参数工具的 JSON 解析，兼容空字符串和空 JSON 对象
+func unmarshalEmptyParam[T any](ctx context.Context, arguments string) (interface{}, error) {
+	inst := new(T)
+	s := strings.TrimSpace(arguments)
+	if s == "" || s == "{}" {
+		return inst, nil
+	}
+	if err := json.Unmarshal([]byte(arguments), inst); err != nil {
+		return nil, err
+	}
+	return inst, nil
 }

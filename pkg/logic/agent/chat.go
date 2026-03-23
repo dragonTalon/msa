@@ -32,7 +32,7 @@ func ResetCache() {
 }
 
 // maxHistoryRounds 最大保留的对话轮数（一轮 = 一条 User + 一条 Assistant）
-const maxHistoryRounds = 20
+const maxHistoryRounds = 10
 
 func GetChatModel(ctx context.Context) (*react.Agent, error) {
 	if agentCache != nil {
@@ -88,7 +88,7 @@ func GetChatModel(ctx context.Context) (*react.Agent, error) {
 	agent, err := react.NewAgent(ctx, &react.AgentConfig{
 		ToolCallingModel:      chatModel,
 		ToolsConfig:           tools,
-		MaxStep:               40,
+		MaxStep:               100,
 		StreamToolCallChecker: toolCallChecker,
 	})
 	if err != nil {

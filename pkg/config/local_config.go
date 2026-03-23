@@ -160,10 +160,14 @@ func InitConfig() error {
 		if finalCfg.LogConfig.File == "" {
 			finalCfg.LogConfig.File = filepath.Join(configDir, LOG_FILE)
 		}
+		if finalCfg.LogConfig.ErrFile == "" {
+			finalCfg.LogConfig.ErrFile = filepath.Join(configDir, ERR_LOG_FILE)
+		}
 		InitLogger(finalCfg.LogConfig)
 	} else {
 		defaultLogConfig := DefaultConfig()
 		defaultLogConfig.File = filepath.Join(configDir, LOG_FILE)
+		defaultLogConfig.ErrFile = filepath.Join(configDir, ERR_LOG_FILE)
 		InitLogger(defaultLogConfig)
 	}
 
