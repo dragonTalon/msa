@@ -100,7 +100,8 @@ type GetAccountParam struct{}
 type GetAccountTool struct{}
 
 func (t *GetAccountTool) GetToolInfo() (tool.BaseTool, error) {
-	return utils.InferTool(t.GetName(), t.GetDescription(), GetAccount)
+	return utils.InferTool(t.GetName(), t.GetDescription(), GetAccount,
+		utils.WithUnmarshalArguments(unmarshalEmptyParam[GetAccountParam]))
 }
 
 func (t *GetAccountTool) GetName() string {

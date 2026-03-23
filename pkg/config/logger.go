@@ -1,11 +1,40 @@
 package config
 
 import (
+	"io"
 	"os"
 	"strings"
 
 	"github.com/sirupsen/logrus"
 )
+
+// errorFileHook 将 error 及以上级别的日志额外写入独立文件
+type errorFileHook struct {
+	writer    io.Writer
+	formatter logrus.Formatter
+	levels    []logrus.Level
+}
+
+func newErrorFileHook(file *os.File, formatter logrus.Formatter) *errorFileHook {
+	return &errorFileHook{
+		writer:    file,
+		formatter: formatter,
+		levels:    []logrus.Level{logrus.ErrorLevel, logrus.FatalLevel, logrus.PanicLevel},
+	}
+}
+
+func (h *errorFileHook) Levels() []logrus.Level {
+	return h.levels
+}
+
+func (h *errorFileHook) Fire(entry *logrus.Entry) error {
+	line, err := h.formatter.Format(entry)
+	if err != nil {
+		return err
+	}
+	_, err = h.writer.Write(line)
+	return err
+}
 
 // LogConfig 日志配置结构
 type LogConfig struct {
@@ -13,6 +42,7 @@ type LogConfig struct {
 	Format     string `json:"format"`     // 日志格式: json, text
 	Output     string `json:"output"`     // 输出目标: stdout, stderr, file
 	File       string `json:"file"`       // 日志文件路径 (当output为file时)
+	ErrFile    string `json:"errFile"`    // error 级别独立日志文件路径
 	ShowColor  bool   `json:"showColor"`  // 是否显示颜色
 	TimeFormat string `json:"timeFormat"` // 时间格式
 }
@@ -28,6 +58,8 @@ func DefaultConfig() *LogConfig {
 		TimeFormat: "2006-01-02 15:04:05",
 	}
 }
+
+const ERR_LOG_FILE = "msa_err.log"
 
 // InitLogger 初始化日志系统
 func InitLogger(config *LogConfig) {
@@ -79,6 +111,16 @@ func InitLogger(config *LogConfig) {
 		fallthrough
 	default:
 		logrus.SetOutput(os.Stdout)
+	}
+
+	// 注册 error 独立日志文件 hook
+	if config.ErrFile != "" {
+		errFile, err := os.OpenFile(config.ErrFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		if err == nil {
+			logrus.AddHook(newErrorFileHook(errFile, logrus.StandardLogger().Formatter))
+		} else {
+			logrus.Warnf("无法打开错误日志文件 %s: %v", config.ErrFile, err)
+		}
 	}
 }
 
