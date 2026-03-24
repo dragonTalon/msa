@@ -18,22 +18,25 @@ import (
 	"msa/pkg/config"
 	"msa/pkg/db"
 	"msa/pkg/extcli"
-	"msa/pkg/logic/memory"
+	"msa/pkg/session"
+	"msa/pkg/tui"
 	"msa/pkg/tui/style"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 var (
 	// configArgs --config 参数的值
 	configArgs []string
 
-	// resumeSession --resume 参数的会话ID值
-	resumeSession string
-
 	// question -q/--question 参数的值（单轮对话）
 	question string
 
 	// modelOverride -m/--model 参数的值（模型覆盖）
 	modelOverride string
+
+	// resumeSessionID --resume 参数的值（恢复会话）
+	resumeSessionID string
 )
 
 var rootCmd = &cobra.Command{
@@ -45,10 +48,9 @@ var rootCmd = &cobra.Command{
 
 func init() {
 	rootCmd.PersistentFlags().StringArrayVar(&configArgs, "config", nil, "配置参数（格式：key=value 或文件路径）")
-	rootCmd.PersistentFlags().StringVar(&resumeSession, "resume", "", "恢复指定会话（会话ID）")
-	rootCmd.PersistentFlags().StringVar(&resumeSession, "r", "", "恢复指定会话的简写（会话ID）")
 	rootCmd.PersistentFlags().StringVarP(&question, "question", "q", "", "单轮对话问题（不进入TUI）")
 	rootCmd.PersistentFlags().StringVarP(&modelOverride, "model", "m", "", "指定模型（覆盖配置文件）")
+	rootCmd.PersistentFlags().StringVar(&resumeSessionID, "resume", "", "恢复会话（格式：YYYY-MM-DD_uuid）")
 
 	// 注册子命令
 	AddCommand(cmd_config.NewCommand())
@@ -63,29 +65,48 @@ func runRoot(cmd *cobra.Command, args []string) error {
 
 	// 如果指定了 -q 参数（即使为空），执行 CLI 单轮对话
 	if cmd.Flags().Changed("question") {
-		// 检查参数互斥
-		if resumeSession != "" {
-			fmt.Println("⚠️  警告：-q 和 --resume 不能同时使用，将忽略 --resume 参数")
-		}
-
 		exitCode := extcli.Run(ctx, question, modelOverride)
 		os.Exit(exitCode)
 		return nil
 	}
 
-	// 如果指定了 resume 参数，恢复会话
-	if resumeSession != "" {
-		log.Infof("正在恢复会话: %s", resumeSession)
-		manager := memory.GetManager()
-		if _, err := manager.LoadSession(resumeSession); err != nil {
-			log.Warnf("恢复会话失败: %v", err)
-			fmt.Printf("⚠️  恢复会话失败: %v\n", err)
-			fmt.Println("将继续启动新会话...")
-			// 继续启动新会话，不退出
-		}
+	// 处理 --resume 参数
+	if resumeSessionID != "" {
+		return runResume(ctx, resumeSessionID)
 	}
 
 	return app.Run(ctx)
+}
+
+// runResume 处理 --resume 参数
+func runResume(ctx context.Context, sessionID string) error {
+	// 加载会话
+	sessionMgr := session.GetManager()
+	parsed, err := sessionMgr.LoadSession(sessionID)
+	if err != nil {
+		fmt.Printf("❌ %v\n", err)
+		fmt.Printf("正确格式：msa --resume YYYY-MM-DD_uuid\n")
+		os.Exit(1)
+		return nil
+	}
+
+	log.Infof("恢复会话: %s, 历史消息: %d 条", parsed.Session.SessionID(), len(parsed.Messages))
+
+	// 启动 TUI 并注入恢复的会话
+	p := tea.NewProgram(tui.NewChat(ctx, tui.WithResumeSession(parsed)))
+	if _, err := p.Run(); err != nil {
+		log.Errorf("运行 TUI 失败: %v", err)
+		return err
+	}
+
+	// TUI 退出后输出会话 ID
+	sess := sessionMgr.Current()
+	if sess != nil {
+		fmt.Printf("\n📌 会话ID: %s\n", sess.SessionID())
+		fmt.Printf("   msa --resume %s\n", sess.SessionID())
+	}
+
+	return nil
 }
 
 // Execute 程序执行入口

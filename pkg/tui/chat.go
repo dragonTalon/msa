@@ -8,10 +8,9 @@ import (
 	"msa/pkg/config"
 	"msa/pkg/logic/agent"
 	command "msa/pkg/logic/command"
-	"msa/pkg/logic/memory"
 	"msa/pkg/logic/message"
 	"msa/pkg/model"
-	tuimemory "msa/pkg/tui/memory"
+	"msa/pkg/session"
 	"msa/pkg/tui/style"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -66,7 +65,18 @@ type Chat struct {
 	currentSegment       strings.Builder             // 当前消息段内容
 	currentSegmentType   model.StreamMsgType         // 当前消息段类型
 	streamSegments       []model.Message             // 流式输出的消息段
-	memoryInitialized    bool                        // 记忆系统是否已初始化
+	sessionMgr           *session.Manager            // 会话管理器
+	resumeSession        *session.ParsedSession      // 恢复的会话（可选）
+}
+
+// Option Chat 配置选项
+type Option func(*Chat)
+
+// WithResumeSession 设置恢复的会话
+func WithResumeSession(parsed *session.ParsedSession) Option {
+	return func(c *Chat) {
+		c.resumeSession = parsed
+	}
 }
 
 // maskAPIKey 隐藏 APIKey，只显示前4个和后4个字符
@@ -81,21 +91,10 @@ func maskAPIKey(apiKey string) string {
 }
 
 // NewChat 创建新的聊天模型
-func NewChat(ctx context.Context) *Chat {
+func NewChat(ctx context.Context, opts ...Option) *Chat {
 	// 初始化 Markdown 渲染器
 	if err := style.InitMarkdownRenderer(80); err != nil {
 		log.Warnf("初始化 Markdown 渲染器失败: %v", err)
-	}
-
-	// 初始化记忆系统
-	memoryInitialized := false
-	if memory.IsMemoryEnabled() {
-		if err := memory.InitChatMemory(ctx); err != nil {
-			log.Warnf("初始化记忆系统失败: %v", err)
-		} else {
-			memoryInitialized = true
-			log.Info("记忆系统已初始化")
-		}
 	}
 
 	// 初始化文本输入组件
@@ -114,23 +113,63 @@ func NewChat(ctx context.Context) *Chat {
 		modelName = "未设置"
 	}
 
-	pendingMsgs := []model.Message{
-		{Role: model.RoleLogo, Content: style.GetStyledLogo()},
-		{Role: model.RoleSystem, Content: fmt.Sprintf("模型供应商: %s", cfg.Provider)},
-		{Role: model.RoleSystem, Content: fmt.Sprintf("模型 : %s", modelName)},
-		{Role: model.RoleSystem, Content: fmt.Sprintf("APIKey : %s", maskAPIKey(cfg.APIKey))},
-		{Role: model.RoleSystem, Content: welcomeMessage},
-	}
+	// 获取会话管理器
+	sessionMgr := session.GetManager()
 
-	return &Chat{
+	c := &Chat{
 		textInput:            ti,
-		pendingMsgs:          pendingMsgs,
 		ctx:                  ctx,
 		history:              make([]model.Message, 0),
 		commandSelectedIndex: 0,
 		commandSuggestions:   make([]command.CommandSuggestion, 0),
-		memoryInitialized:    memoryInitialized,
+		sessionMgr:           sessionMgr,
 	}
+
+	// 应用选项（可能在 opts 中传入 resumeSession）
+	for _, opt := range opts {
+		opt(c)
+	}
+
+	// 如果有恢复的会话，加载历史消息
+	if c.resumeSession != nil {
+		sessionMgr.SetCurrent(c.resumeSession.Session)
+		c.history = c.resumeSession.Messages
+
+		// 构建欢迎信息和历史消息
+		c.pendingMsgs = []model.Message{
+			{Role: model.RoleLogo, Content: style.GetStyledLogo()},
+			{Role: model.RoleSystem, Content: fmt.Sprintf("已恢复会话: %s", c.resumeSession.Session.ShortID())},
+		}
+
+		// 添加历史消息到 pendingMsgs 以便显示
+		for _, msg := range c.resumeSession.Messages {
+			c.pendingMsgs = append(c.pendingMsgs, msg)
+		}
+
+		// 添加继续对话提示
+		c.pendingMsgs = append(c.pendingMsgs, model.Message{
+			Role:    model.RoleSystem,
+			Content: welcomeMessage,
+		})
+	} else {
+		// 创建新会话
+		sess := sessionMgr.NewSession(session.ModeTUI)
+		if err := sessionMgr.CreateSessionFile(sess); err != nil {
+			log.Warnf("创建会话文件失败: %v", err)
+		}
+		sessionMgr.SetCurrent(sess)
+
+		c.pendingMsgs = []model.Message{
+			{Role: model.RoleLogo, Content: style.GetStyledLogo()},
+			{Role: model.RoleSystem, Content: fmt.Sprintf("模型供应商: %s", cfg.Provider)},
+			{Role: model.RoleSystem, Content: fmt.Sprintf("模型 : %s", modelName)},
+			{Role: model.RoleSystem, Content: fmt.Sprintf("APIKey : %s", maskAPIKey(cfg.APIKey))},
+			{Role: model.RoleSystem, Content: fmt.Sprintf("会话ID: %s", sess.ShortID())},
+			{Role: model.RoleSystem, Content: welcomeMessage},
+		}
+	}
+
+	return c
 }
 
 // Init 实现 tea.Model 接口
@@ -228,23 +267,6 @@ func (c *Chat) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		log.Debugf("捕获按键: %s, Type: %v", msg.String(), msg.Type)
 		switch msg.Type {
 		case tea.KeyCtrlC, tea.KeyEsc:
-			// 结束记忆会话并获取会话ID
-			var sessionID string
-			if c.memoryInitialized {
-				var err error
-				sessionID, err = memory.EndChatMemory()
-				if err != nil {
-					log.Warnf("结束记忆会话失败: %v", err)
-				}
-			}
-			// 显示会话ID和恢复提示
-			if sessionID != "" {
-				fmt.Println() // 添加空行
-				fmt.Println("────────────────────────────────────────")
-				fmt.Printf("会话已保存: %s\n", sessionID)
-				fmt.Printf("提示: 使用 \"msa --resume %s\" 恢复此会话\n", sessionID)
-				fmt.Println("────────────────────────────────────────")
-			}
 			return c, tea.Quit
 
 		case tea.KeyEnter:
@@ -391,11 +413,10 @@ func (c *Chat) chatStreamMsg(msg *model.StreamChunk) (tea.Model, tea.Cmd) {
 				MsgType: model.StreamMsgTypeText,
 			})
 
-			// 记录助手消息到记忆系统
-			if c.memoryInitialized {
-				if err := memory.AddChatMessage("assistant", allContent); err != nil {
-					log.Debugf("记录助手消息到记忆失败: %v", err)
-				}
+			// 持久化助手消息
+			sess := c.sessionMgr.Current()
+			if sess != nil {
+				c.sessionMgr.AppendMessage(sess, "assistant", allContent)
 			}
 		}
 
@@ -598,14 +619,6 @@ func (c *Chat) commandHandler(input string) (tea.Model, tea.Cmd) {
 		return selectorView, nil
 	}
 
-	// 如果命令返回的是 memory-browser 类型，则打开记忆浏览器
-	if runResult.Type == "memory-browser" {
-		memoryHome := tuimemory.GetMemoryHomeModel()
-		memoryHome.SetParentModel(c) // 设置父模型为 Chat
-		c.textInput.Reset()
-		return memoryHome, nil
-	}
-
 	c.addMessage(model.RoleSystem, analyzeResult(runResult), model.StreamMsgTypeText)
 	c.textInput.Reset()
 	return c, c.Flush()
@@ -682,14 +695,14 @@ func (c *Chat) handleEnterKey() (tea.Model, tea.Cmd) {
 		MsgType: model.StreamMsgTypeText,
 	})
 	c.addMessage(model.RoleUser, input, model.StreamMsgTypeText)
-	c.textInput.Reset()
 
-	// 记录用户消息到记忆系统
-	if c.memoryInitialized {
-		if err := memory.AddChatMessage("user", input); err != nil {
-			log.Debugf("记录用户消息到记忆失败: %v", err)
-		}
+	// 持久化用户消息
+	sess := c.sessionMgr.Current()
+	if sess != nil {
+		c.sessionMgr.AppendMessage(sess, "user", input)
 	}
+
+	c.textInput.Reset()
 
 	// 处理命令
 	if strings.HasPrefix(input, "/") {
@@ -715,7 +728,16 @@ func (c *Chat) handleEnterKey() (tea.Model, tea.Cmd) {
 func (c *Chat) handleClearHistory() (tea.Model, tea.Cmd) {
 	c.textInput.Reset()
 	c.history = make([]model.Message, 0)
+
+	// 重置会话，开始新会话
+	sess := c.sessionMgr.NewSession(session.ModeTUI)
+	if err := c.sessionMgr.CreateSessionFile(sess); err != nil {
+		log.Warnf("创建新会话文件失败: %v", err)
+	}
+	c.sessionMgr.SetCurrent(sess)
+
 	c.addMessage(model.RoleSystem, clearSuccessMessage, model.StreamMsgTypeText)
+	c.addMessage(model.RoleSystem, fmt.Sprintf("新会话ID: %s", sess.ShortID()), model.StreamMsgTypeText)
 	return c, c.Flush()
 }
 
