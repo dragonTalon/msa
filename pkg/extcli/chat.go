@@ -10,9 +10,9 @@ import (
 
 	"msa/pkg/config"
 	"msa/pkg/logic/agent"
-	"msa/pkg/logic/memory"
 	"msa/pkg/logic/message"
 	"msa/pkg/model"
+	"msa/pkg/session"
 )
 
 const (
@@ -112,62 +112,42 @@ func Run(ctx context.Context, question string, modelOverride string) int {
 	// 5. 清除 agent 缓存以使用新配置
 	agent.ResetCache()
 
-	// 6. 初始化记忆系统
-	memoryInitialized := false
-	if memory.IsMemoryEnabled() {
-		if err := memory.InitChatMemory(ctx); err != nil {
-			log.Warnf("初始化记忆系统失败: %v", err)
-		} else {
-			memoryInitialized = true
-			log.Info("记忆系统已初始化")
-		}
+	// 6. 创建会话并持久化用户消息
+	sessionMgr := session.GetManager()
+	sess := sessionMgr.NewSession(session.ModeCLI)
+	if err := sessionMgr.CreateSessionFile(sess); err != nil {
+		log.Warnf("创建会话文件失败: %v", err)
 	}
+	sessionMgr.SetCurrent(sess)
 
-	// 7. 记录用户消息到记忆系统
-	if memoryInitialized {
-		if err := memory.AddChatMessage("user", question); err != nil {
-			log.Debugf("记录用户消息到记忆失败: %v", err)
-		}
-	}
+	// 追加用户消息
+	sessionMgr.AppendMessage(sess, "user", question)
 
-	// 8. 注册流式输出
+	// 7. 注册流式输出
 	streamCh, unregister := message.RegisterStreamOutput(streamBufferSize)
 	defer unregister()
 
 	// 创建流式内容收集器
 	collector := &streamCollector{}
 
-	// 9. 发起对话请求
+	// 8. 发起对话请求
 	if err := agent.Ask(ctx, question, nil); err != nil {
 		log.Errorf("对话请求失败: %v", err)
 		return 1
 	}
 
-	// 10. 流式输出处理
-	exitCode := processStreamOutputWithCollector(streamCh, collector)
+	// 9. 流式输出处理
+	exitCode := processStreamOutputWithCollector(streamCh, collector, sess, sessionMgr)
 
-	// 11. 记录助手回复到记忆系统
-	if memoryInitialized && exitCode == 0 {
-		assistantContent := collector.getContent()
-		if assistantContent != "" {
-			if err := memory.AddChatMessage("assistant", assistantContent); err != nil {
-				log.Debugf("记录助手消息到记忆失败: %v", err)
-			}
-		}
-
-		// 12. 结束记忆会话
-		if sessionID, err := memory.EndChatMemory(); err != nil {
-			log.Debugf("结束记忆会话失败: %v", err)
-		} else if sessionID != "" {
-			log.Infof("会话已保存: %s", sessionID)
-		}
-	}
+	// 10. 输出会话 ID
+	fmt.Printf("\n---\n📌 会话ID: %s\n", sess.SessionID())
+	fmt.Printf("   msa --resume %s\n", sess.SessionID())
 
 	return exitCode
 }
 
 // processStreamOutputWithCollector 处理流式输出并收集内容
-func processStreamOutputWithCollector(streamCh <-chan *model.StreamChunk, collector *streamCollector) int {
+func processStreamOutputWithCollector(streamCh <-chan *model.StreamChunk, collector *streamCollector, sess *session.Session, sessionMgr *session.Manager) int {
 	for chunk := range streamCh {
 		if chunk.Err != nil {
 			log.Errorf("流式输出错误: %v", chunk.Err)
@@ -182,6 +162,10 @@ func processStreamOutputWithCollector(streamCh <-chan *model.StreamChunk, collec
 		if chunk.IsDone {
 			// 流式输出完成
 			log.Info("CLI 单轮对话完成")
+
+			// 追加助手消息
+			sessionMgr.AppendMessage(sess, "assistant", collector.getContent())
+
 			return 0
 		}
 
