@@ -31,6 +31,7 @@ func NewFileStore() (*FileStore, error) {
 	// 获取用户主目录
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
+		log.Errorf("获取用户主目录失败: %v", err)
 		return nil, fmt.Errorf("获取用户主目录失败: %w", err)
 	}
 
@@ -135,6 +136,7 @@ func (s *FileStore) saveIndexesUnsafe() error {
 	data, err := json.MarshalIndent(s.indexes, "", "  ")
 
 	if err != nil {
+		log.Errorf("序列化索引失败: %v", err)
 		return fmt.Errorf("序列化索引失败: %w", err)
 	}
 
@@ -440,6 +442,7 @@ func (s *FileStore) writeSessionFile(session *model.Session) error {
 	// 序列化
 	data, err := json.MarshalIndent(session, "", "  ")
 	if err != nil {
+		log.Errorf("序列化会话失败: %v", err)
 		return fmt.Errorf("序列化会话失败: %w", err)
 	}
 
@@ -628,6 +631,7 @@ func (s *FileStore) writeKnowledgeFile(knowledge *model.Knowledge) error {
 	// 序列化
 	data, err := json.MarshalIndent(knowledge, "", "  ")
 	if err != nil {
+		log.Errorf("序列化知识失败: %v", err)
 		return fmt.Errorf("序列化知识失败: %w", err)
 	}
 
@@ -784,6 +788,7 @@ func (s *FileStore) SaveShortTermMemory(memory *model.ShortTermMemory) error {
 	// 序列化
 	data, err := json.MarshalIndent(memory, "", "  ")
 	if err != nil {
+		log.Errorf("序列化短期记忆失败: %v", err)
 		return fmt.Errorf("序列化短期记忆失败: %w", err)
 	}
 
