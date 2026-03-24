@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/glebarez/sqlite"
+	log "github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
@@ -17,6 +18,7 @@ import (
 func getDBPath() (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
+		log.Errorf("获取用户主目录失败: %v", err)
 		return "", fmt.Errorf("failed to get home directory: %w", err)
 	}
 
@@ -74,12 +76,14 @@ func openDB(dbPath string) (*gorm.DB, error) {
 		Logger: logger.Default.LogMode(logger.Silent),
 	})
 	if err != nil {
+		log.Errorf("打开数据库失败: %v", err)
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
 	// 获取底层 sql.DB 以配置连接池
 	sqlDB, err := database.DB()
 	if err != nil {
+		log.Errorf("获取 sql.DB 失败: %v", err)
 		return nil, fmt.Errorf("failed to get sql.DB: %w", err)
 	}
 

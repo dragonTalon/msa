@@ -40,6 +40,7 @@ func (l *ListModel) Run(ctx context.Context, args []string) (*model.CmdResult, e
 	}
 	models, err := p.ListModels(ctx)
 	if err != nil {
+		log.Errorf("获取模型列表失败: %v", err)
 		return nil, err
 	}
 

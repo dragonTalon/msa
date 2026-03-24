@@ -58,8 +58,8 @@ type UpdateResult struct {
 type Updater struct {
 	currentVersion string
 	currentCommit  string
-	apiClient      *http.Client  // 用于 API 请求
-	downloadClient *http.Client  // 用于文件下载
+	apiClient      *http.Client // 用于 API 请求
+	downloadClient *http.Client // 用于文件下载
 }
 
 // New 创建新的 Updater 实例
@@ -83,12 +83,14 @@ func (u *Updater) CheckLatestVersion() (*ReleaseInfo, error) {
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
+		log.Errorf("创建请求失败: %v", err)
 		return nil, fmt.Errorf("创建请求失败: %w", err)
 	}
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
 
 	resp, err := u.apiClient.Do(req)
 	if err != nil {
+		log.Errorf("请求 GitHub API 失败: %v", err)
 		return nil, fmt.Errorf("请求 GitHub API 失败: %w", err)
 	}
 	defer resp.Body.Close()
@@ -149,23 +151,27 @@ func (u *Updater) downloadFile(url string) (string, error) {
 
 	resp, err := u.downloadClient.Get(url)
 	if err != nil {
+		log.Errorf("下载失败: %v", err)
 		return "", fmt.Errorf("下载失败: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		log.Errorf("下载返回错误状态码: %d", resp.StatusCode)
 		return "", fmt.Errorf("下载返回错误状态码: %d", resp.StatusCode)
 	}
 
 	// 创建临时文件
 	tmpDir, err := os.MkdirTemp("", "msa-update-*")
 	if err != nil {
+		log.Errorf("创建临时目录失败: %v", err)
 		return "", fmt.Errorf("创建临时目录失败: %w", err)
 	}
 
 	tmpFile := filepath.Join(tmpDir, filepath.Base(url))
 	out, err := os.Create(tmpFile)
 	if err != nil {
+		log.Errorf("创建临时文件失败: %v", err)
 		return "", fmt.Errorf("创建临时文件失败: %w", err)
 	}
 	defer out.Close()
@@ -179,6 +185,7 @@ func (u *Updater) downloadFile(url string) (string, error) {
 		written: &written,
 	}))
 	if err != nil {
+		log.Errorf("写入文件失败: %v", err)
 		return "", fmt.Errorf("写入文件失败: %w", err)
 	}
 
@@ -226,12 +233,14 @@ func (u *Updater) verifyChecksum(filePath string, release *ReleaseInfo) error {
 
 	resp, err := u.downloadClient.Get(checksumURL)
 	if err != nil {
+		log.Errorf("下载 checksums.txt 失败: %v", err)
 		return fmt.Errorf("下载 checksums.txt 失败: %w", err)
 	}
 	defer resp.Body.Close()
 
 	checksums, err := io.ReadAll(resp.Body)
 	if err != nil {
+		log.Errorf("读取 checksums.txt 失败: %v", err)
 		return fmt.Errorf("读取 checksums.txt 失败: %w", err)
 	}
 
@@ -253,6 +262,7 @@ func (u *Updater) verifyChecksum(filePath string, release *ReleaseInfo) error {
 	// 计算下载文件的校验和
 	file, err := os.Open(filePath)
 	if err != nil {
+		log.Errorf("打开文件失败: %v", err)
 		return fmt.Errorf("打开文件失败: %w", err)
 	}
 	defer file.Close()
@@ -276,6 +286,7 @@ func (u *Updater) verifyChecksum(filePath string, release *ReleaseInfo) error {
 func (u *Updater) replaceBinary(newBinaryPath string) error {
 	currentBinary, err := getBinaryPath()
 	if err != nil {
+		log.Errorf("获取当前二进制路径失败: %v", err)
 		return fmt.Errorf("获取当前二进制路径失败: %w", err)
 	}
 

@@ -101,12 +101,14 @@ func ExtractKnowledgeWithAI(session *model.Session) ([]*model.Knowledge, error) 
 	// 3. 调用 LLM API
 	response, err := callLLMForExtraction(ctx, prompt)
 	if err != nil {
+		log.Errorf("调用 LLM 失败: %v", err)
 		return nil, fmt.Errorf("调用 LLM 失败: %w", err)
 	}
 
 	// 4. 解析 JSON 响应
 	knowledges, err := parseExtractionResponse(response)
 	if err != nil {
+		log.Errorf("解析响应失败: %v", err)
 		return nil, fmt.Errorf("解析响应失败: %w", err)
 	}
 
@@ -164,6 +166,7 @@ func callLLMForExtraction(ctx context.Context, prompt string) (string, error) {
 
 	chatModel, err := openai.NewChatModel(ctx, modelConfig)
 	if err != nil {
+		log.Errorf("创建 ChatModel 失败: %v", err)
 		return "", fmt.Errorf("创建 ChatModel 失败: %w", err)
 	}
 
@@ -182,6 +185,7 @@ func callLLMForExtraction(ctx context.Context, prompt string) (string, error) {
 	// 调用 LLM（使用 Generate 而不是 Stream，因为我们需要完整响应）
 	resp, err := chatModel.Generate(ctx, messages)
 	if err != nil {
+		log.Errorf("LLM 生成失败: %v", err)
 		return "", fmt.Errorf("LLM 生成失败: %w", err)
 	}
 

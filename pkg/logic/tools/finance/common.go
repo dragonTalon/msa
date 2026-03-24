@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
+	log "github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 	"msa/pkg/logic/tools/stock"
 	"msa/pkg/model"
@@ -51,7 +52,7 @@ func fetchAllPrices(stockCodes []string) (map[string]int64, error) {
 	for _, stockCode := range stockCodes {
 		price, err := fetchCurrentPrice(stockCode)
 		if err != nil {
-			// 跳过获取失败的股票
+			log.Errorf("获取股票价格失败: stockCode=%s, err=%v", stockCode, err)
 			continue
 		}
 		prices[stockCode] = price

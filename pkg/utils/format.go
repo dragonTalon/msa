@@ -11,6 +11,7 @@ import (
 func PrettyJSON(data interface{}) (string, error) {
 	bytes, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
+		log.Warnf("JSON 序列化失败: %v", err)
 		return "", fmt.Errorf("failed to marshal JSON: %w", err)
 	}
 	return string(bytes), nil
@@ -29,6 +30,7 @@ func PrettyJSONBytes(data []byte) (string, error) {
 func CompactJSON(data interface{}) (string, error) {
 	bytes, err := json.Marshal(data)
 	if err != nil {
+		log.Warnf("JSON 序列化失败: %v", err)
 		return "", fmt.Errorf("failed to marshal JSON: %w", err)
 	}
 	return string(bytes), nil
