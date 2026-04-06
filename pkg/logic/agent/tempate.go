@@ -18,6 +18,7 @@ type SkillMeta struct {
 	Pattern       string
 	HasReferences bool
 	HasAssets     bool
+	RequiresTodo  bool
 }
 
 // BuildQueryMessages 使用 eino 的 prompt.FromMessages + schema.GoTemplate 构建完整的查询消息
@@ -71,6 +72,7 @@ func buildSkillMetas() []SkillMeta {
 			Pattern:       string(sk.Metadata.Pattern),
 			HasReferences: sk.HasReferences(),
 			HasAssets:     sk.HasAssets(),
+			RequiresTodo:  sk.Metadata.RequiresTodo,
 		})
 	}
 	return metas

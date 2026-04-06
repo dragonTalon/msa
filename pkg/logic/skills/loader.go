@@ -29,16 +29,17 @@ func NewLoader(builtinDir, userDir string, registry *Registry) *Loader {
 
 // skillMetadataYAML 表示 SKILL.md 的 YAML frontmatter（用于解析）
 type skillMetadataYAML struct {
-	Name        string         `yaml:"name"`
-	Description string         `yaml:"description"`
-	Version     string         `yaml:"version"`
-	Priority    int            `yaml:"priority"`
-	Pattern     string         `yaml:"pattern"`
-	Triggers    []SkillTrigger `yaml:"triggers"`
-	Tools       []string       `yaml:"tools"`
-	Dependencies []string      `yaml:"dependencies"`
-	Steps       int            `yaml:"steps"`
-	OutputFormat string        `yaml:"output-format"`
+	Name         string         `yaml:"name"`
+	Description  string         `yaml:"description"`
+	Version      string         `yaml:"version"`
+	Priority     int            `yaml:"priority"`
+	Pattern      string         `yaml:"pattern"`
+	Triggers     []SkillTrigger `yaml:"triggers"`
+	Tools        []string       `yaml:"tools"`
+	Dependencies []string       `yaml:"dependencies"`
+	Steps        int            `yaml:"steps"`
+	OutputFormat string         `yaml:"output-format"`
+	RequiresTodo bool           `yaml:"requires_todo"`
 }
 
 // LoadAll 扫描并加载所有 Skills
@@ -140,9 +141,10 @@ func (l *Loader) loadSkill(skillDir, skillPath string, source SkillSource) error
 			Dependencies: metadata.Dependencies,
 			Steps:        metadata.Steps,
 			OutputFormat: metadata.OutputFormat,
+			RequiresTodo: metadata.RequiresTodo,
 		},
-		dirPath:    skillDir,
-		loaded:     false,
+		dirPath: skillDir,
+		loaded:  false,
 	}
 
 	// 注册到 Registry

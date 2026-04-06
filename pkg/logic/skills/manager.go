@@ -185,3 +185,21 @@ func (m *Manager) GetSkillMetadata(name string) (*SkillMetadata, error) {
 	}
 	return &skill.Metadata, nil
 }
+
+// GetTodoTemplate 获取 Skill 的 TODO 模板内容
+func (m *Manager) GetTodoTemplate(name string) (string, error) {
+	skill, err := m.registry.Get(name)
+	if err != nil {
+		return "", err
+	}
+	return skill.GetTodoTemplate()
+}
+
+// RequiresTodo 检查 Skill 是否需要创建 TODO
+func (m *Manager) RequiresTodo(name string) (bool, error) {
+	skill, err := m.registry.Get(name)
+	if err != nil {
+		return false, err
+	}
+	return skill.Metadata.RequiresTodo, nil
+}

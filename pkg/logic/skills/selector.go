@@ -23,6 +23,7 @@ type SkillInfo struct {
 	Pattern       string `json:"pattern"`
 	HasReferences bool   `json:"has_references"`
 	HasAssets     bool   `json:"has_assets"`
+	RequiresTodo  bool   `json:"requires_todo"`
 }
 
 // SelectionResult LLM 选择结果
@@ -62,6 +63,7 @@ func (s *Selector) SelectSkills(ctx context.Context, userInput string, history [
 			Pattern:       string(skill.Metadata.Pattern),
 			HasReferences: skill.HasReferences(),
 			HasAssets:     skill.HasAssets(),
+			RequiresTodo:  skill.Metadata.RequiresTodo,
 		}
 	}
 

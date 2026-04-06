@@ -74,6 +74,8 @@ const (
 	SkillToolGroup ToolGroup = "skill"
 	// 知识库工具组
 	KnowledgeToolGroup ToolGroup = "knowledge"
+	// TODO 工具组
+	TodoToolGroup ToolGroup = "todo"
 )
 
 type Pair struct {

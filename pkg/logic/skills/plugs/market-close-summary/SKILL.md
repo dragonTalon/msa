@@ -5,6 +5,7 @@ version: 2.0.0
 priority: 8
 pattern: pipeline
 steps: 5
+requires_todo: true
 triggers:
   - time: "16:00+"
     session: close-session

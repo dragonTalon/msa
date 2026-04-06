@@ -5,6 +5,7 @@ import (
 	"msa/pkg/logic/tools/search"
 	skilltools "msa/pkg/logic/tools/skill"
 	"msa/pkg/logic/tools/stock"
+	"msa/pkg/logic/tools/todo"
 )
 
 var _ MsaTool = (*skilltools.SkillContentTool)(nil)
@@ -26,11 +27,18 @@ var _ MsaTool = (*finance.SubmitBuyOrderTool)(nil)
 var _ MsaTool = (*finance.SubmitSellOrderTool)(nil)
 var _ MsaTool = (*finance.GetTransactionsTool)(nil)
 
+var _ MsaTool = (*todo.CheckTodoTool)(nil)
+var _ MsaTool = (*todo.CreateTodoTool)(nil)
+var _ MsaTool = (*todo.UpdateTodoTool)(nil)
+var _ MsaTool = (*todo.VerifyTodoTool)(nil)
+var _ MsaTool = (*todo.FillSummaryTool)(nil)
+
 func init() {
 	registerStock()
 	registerSearch()
 	registerFinance()
 	registerSkill()
+	registerTodo()
 }
 
 func registerStock() {
@@ -59,4 +67,12 @@ func registerSkill() {
 	RegisterTool(&skilltools.SkillContentTool{})
 	RegisterTool(&skilltools.SkillReferenceTool{})
 	RegisterTool(&skilltools.SkillAssetTool{})
+}
+
+func registerTodo() {
+	RegisterTool(&todo.CheckTodoTool{})
+	RegisterTool(&todo.CreateTodoTool{})
+	RegisterTool(&todo.UpdateTodoTool{})
+	RegisterTool(&todo.VerifyTodoTool{})
+	RegisterTool(&todo.FillSummaryTool{})
 }
