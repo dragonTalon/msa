@@ -1,7 +1,7 @@
 ---
 name: afternoon-trade
 description: 午盘交易操作，执行以买入为主的策略。触发时间 13:00-14:30，必须实际执行买卖操作。
-version: 2.0.0
+version: 2.1.0
 priority: 8
 pattern: pipeline
 steps: 4
@@ -19,9 +19,10 @@ tools:
   - web_search
   - fetch_page_content
   - query_sessions_by_date
+  - read_knowledge
 dependencies:
   - trading-common
-  - read-error
+  - knowledge-read
   - output-formats
 ---
 
@@ -39,7 +40,7 @@ dependencies:
 
 ## ⚠️ 强制前置
 
-**第一步 MUST 调用 `read-error` SKILL！**
+**第一步 MUST 调用 `read_knowledge` 工具！**
 
 ```
 在执行任何操作前，必须先读取历史错误经验。
@@ -57,7 +58,8 @@ dependencies:
 
 #### 1.1 读取历史错误【强制】
 ```
-→ 调用 read-error SKILL
+→ 调用 read_knowledge(type="all")
+→ 获取历史错误和昨日总结
 → 将错误经验拼接到后续分析的 prompt 中
 ```
 
@@ -196,5 +198,5 @@ FOR each 卖出决策:
 | 时间敏感 | 14:30 后不建议新开仓 |
 | 参考早盘 | 必须读取早盘 Session 的决策 |
 | 执行不确认 | 直接执行，不需要确认 |
-| 错误必读 | 必须先执行 read-error SKILL |
+| 错误必读 | 必须先调用 read_knowledge 工具 |
 | 分段买入 | 首次买入不超过计划仓位的 50% |
