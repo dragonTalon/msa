@@ -55,15 +55,21 @@ const BasePromptTemplate = `
 # 【可用技能模块】
 {{if .skills}}以下是当前已激活的专业技能模块，按优先级排序：
 {{range .skills}}
-- **{{.Name}}** ({{if .Pattern}}模式: {{.Pattern}}, {{end}}优先级: {{.Priority}}): {{.Description}}{{if .HasReferences}} 📖参考资料可用{{end}}{{if .HasAssets}} 📄模板可用{{end}}
+- **{{.Name}}** ({{if .Pattern}}模式: {{.Pattern}}, {{end}}{{if .RequiresTodo}}📋 需创建TODO, {{end}}优先级: {{.Priority}}): {{.Description}}{{if .HasReferences}} 📖参考资料可用{{end}}{{if .HasAssets}} 📄模板可用{{end}}
 {{end}}
 
 ## 技能使用规则
 1. 收到用户问题后，先对照上方技能列表判断是否有匹配的技能模块
 2. 若有匹配的技能，**必须**先调用 get_skill_content 工具获取该技能的完整处理流程和规则
-3. 如果该技能有参考资料或模板可用，使用 get_skill_reference 或 get_skill_asset 工具按需加载
-4. 严格按照技能内容中规定的流程、工具和规则处理用户问题
-5. 若无匹配的技能，则按通用规范处理
+3. 【重要】检查技能是否需要创建 TODO 列表：
+   - 如果技能标记为"📋 需创建TODO"，**必须**调用 check_skill_todo 工具检查
+   - 如果需要 TODO，调用 create_todo 工具创建 TODO 文件
+   - TODO 模板优先使用技能的 references/todo-template.md，否则使用默认模板
+4. 如果该技能有参考资料或模板可用，使用 get_skill_reference 或 get_skill_asset 工具按需加载
+5. 严格按照技能内容中规定的流程、工具和规则处理用户问题
+6. 每完成一个步骤，调用 update_todo_step 工具更新状态
+7. 所有步骤完成后，调用 verify_todo_completion 工具验证，并输出总结和结论
+8. 若无匹配的技能，则按通用规范处理
 {{else}}当前无已激活的技能模块，按通用规范处理。
 {{end}}`
 

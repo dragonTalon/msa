@@ -45,19 +45,20 @@ const (
 
 // SkillTrigger 定义 Skill 的触发条件
 type SkillTrigger struct {
-	Time    string   `yaml:"time,omitempty"`    // 触发时间段，如 "9:30-11:30"
-	Session string   `yaml:"session,omitempty"` // Session 标签，如 "morning-session"
+	Time     string   `yaml:"time,omitempty"`     // 触发时间段，如 "9:30-11:30"
+	Session  string   `yaml:"session,omitempty"`  // Session 标签，如 "morning-session"
 	Keywords []string `yaml:"keywords,omitempty"` // 触发关键词
 }
 
 // SkillMetadata 扩展的 Skill 元数据
 type SkillMetadata struct {
-	Pattern      SkillPattern  `yaml:"pattern,omitempty"`       // 设计模式类型
-	Triggers     []SkillTrigger `yaml:"triggers,omitempty"`     // 触发条件
-	Tools        []string      `yaml:"tools,omitempty"`         // 依赖的工具
-	Dependencies []string      `yaml:"dependencies,omitempty"`  // 依赖的其他 Skill
-	Steps        int           `yaml:"steps,omitempty"`         // Pipeline 模式的步骤数量
-	OutputFormat string        `yaml:"output-format,omitempty"` // Generator 模式的输出格式
+	Pattern      SkillPattern   `yaml:"pattern,omitempty"`       // 设计模式类型
+	Triggers     []SkillTrigger `yaml:"triggers,omitempty"`      // 触发条件
+	Tools        []string       `yaml:"tools,omitempty"`         // 依赖的工具
+	Dependencies []string       `yaml:"dependencies,omitempty"`  // 依赖的其他 Skill
+	Steps        int            `yaml:"steps,omitempty"`         // Pipeline 模式的步骤数量
+	OutputFormat string         `yaml:"output-format,omitempty"` // Generator 模式的输出格式
+	RequiresTodo bool           `yaml:"requires_todo,omitempty"` // 是否需要创建 TODO 列表
 }
 
 // Skill 表示一个技能单元
@@ -71,12 +72,12 @@ type Skill struct {
 	Metadata    SkillMetadata // 扩展元数据
 
 	// 私有字段
-	dirPath     string              // Skill 目录路径
-	content     string              // Skill 主内容（懒加载）
-	references  map[string]string   // references/ 目录内容（懒加载）
-	assets      map[string]string   // assets/ 目录内容（懒加载）
-	loaded      bool                // 主内容是否已加载
-	mu          sync.RWMutex        // 并发保护
+	dirPath    string            // Skill 目录路径
+	content    string            // Skill 主内容（懒加载）
+	references map[string]string // references/ 目录内容（懒加载）
+	assets     map[string]string // assets/ 目录内容（懒加载）
+	loaded     bool              // 主内容是否已加载
+	mu         sync.RWMutex      // 并发保护
 }
 
 // GetContent 懒加载 Skill 主内容
@@ -211,6 +212,18 @@ func (s *Skill) HasAssets() bool {
 	assetDir := filepath.Join(s.dirPath, "assets")
 	_, err := os.Stat(assetDir)
 	return err == nil
+}
+
+// HasTodoTemplate 检查是否有 TODO 模板文件
+func (s *Skill) HasTodoTemplate() bool {
+	todoPath := filepath.Join(s.dirPath, "references", "todo-template.md")
+	_, err := os.Stat(todoPath)
+	return err == nil
+}
+
+// GetTodoTemplate 获取 TODO 模板内容
+func (s *Skill) GetTodoTemplate() (string, error) {
+	return s.GetReference("todo-template.md")
 }
 
 // loadSkillContent 从文件加载 Skill 内容，跳过 YAML frontmatter
