@@ -157,7 +157,19 @@ artifacts:
     template: tasks.md
     instruction: |
       创建任务列表，分解实现工作。
-      **强制**: 检查当前skills中是否含有 superpowers技能，如果存在，强制使用 superpowers:writing-plans 技能创建实现任务清单
+
+      **⚠️ 强制技能注入**
+      必须使用 Skill 工具调用以下技能（按优先级）：
+
+      | 技能名称 | 用途 | 触发条件 |
+      |---------|------|---------|
+      | `superpowers:writing-plans` | 创建实现任务清单 | 默认必需 |
+
+      调用方式：
+      ```
+      Skill 工具 -> skill: "superpowers:writing-plans"
+      ```
+
       **重要：严格按照模板格式。** apply阶段解析复选框格式来跟踪进度。
       不使用 `- [ ]` 格式的任务不会被跟踪。
 
@@ -214,7 +226,22 @@ artifacts:
     description: 可选工件，用于记录实现过程中遇到的问题
     template: fix.md
     instruction: |
-      创建修复文档来记录问题。
+      创建修复文档来记录问题
+
+      **⚠️ 强制技能注入**
+      必须使用 Skill 工具调用以下技能（按优先级）：
+
+      | 技能名称 | 用途 | 触发条件 |
+      |---------|------|---------|
+      | `superpowers:systematic-debugging` | 系统性调试 | 遇到 bug 或错误时 |
+      | `superpowers:receiving-code-review` | 处理代码审查反馈 | 收到审查反馈时 |
+
+      调用方式：
+      ```
+      Skill 工具 -> skill: "superpowers:systematic-debugging"
+      # 或
+      Skill 工具 -> skill: "superpowers:receiving-code-review"
+      ```
 
       **仅在发现问题时创建**：
       - 意外错误（运行时、编译时、逻辑错误）
@@ -273,16 +300,41 @@ apply:
   tracks: tasks.md
   instruction: |
     阅读上下文文件，完成待处理任务。
-    **强制**: 检查当前skills中是否含有 superpowers技能，如果存在，强制使用以下 superpower 技能执行
-      - superpowers:execute-plan —— 批量执行任务
-      - superpowers:brainstorm —— 先分析可能的根因。
-      - superpowers:receiving-code-review —— 每个 Task 完成后发起Code Review
-      
+
+    **⚠️ 强制技能注入**
+    必须使用 Skill 工具调用以下技能（按执行顺序）：
+
+    | 优先级 | 技能名称 | 用途 | 触发条件 |
+    |--------|---------|------|---------|
+    | 1 | `superpowers:test-driven-development` | 测试驱动开发 | 实现功能/修复前 |
+    | 2 | `superpowers:subagent-driven-development` | 并行执行独立任务 | 多个独立任务时 |
+    | 3 | `superpowers:systematic-debugging` | 系统性调试 | 遇到 bug 或错误时 |
+    | 4 | `superpowers:requesting-code-review` | 完成后请求审查 | 任务完成后 |
+
+    调用方式：
+    ```
+    # 实现前
+    Skill 工具 -> skill: "superpowers:test-driven-development"
+
+    # 多任务并行
+    Skill 工具 -> skill: "superpowers:subagent-driven-development"
+
+    # 遇到问题
+    Skill 工具 -> skill: "superpowers:systematic-debugging"
+
+    # 完成后
+    Skill 工具 -> skill: "superpowers:requesting-code-review"
+    ```
+
+    **注意**：技能调用在当前会话内执行，无需中断会话。
 
     **知识驱动的应用**：
     - 应用知识库中推荐的模式
     - 避免知识库中的反模式
     - 如果遇到问题，创建 fix.md 来记录
     - 完成后标记任务为完成
-
+    **执行流程说明**：
+    - 完成后标记任务为完成。
+    - 如果有多个任务，并行执行。
+    - 中途不可以中断执行，如果遇到阻碍或需要澄清，暂停并寻求帮助。
     如果遇到阻碍或需要澄清，暂停并寻求帮助。

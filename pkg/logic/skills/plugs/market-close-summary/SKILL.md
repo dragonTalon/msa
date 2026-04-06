@@ -1,7 +1,7 @@
 ---
 name: market-close-summary
 description: 闭市总结，分析今日收益，复盘操作，沉淀经验。触发时间 16:00 后。
-version: 2.0.0
+version: 2.1.0
 priority: 8
 pattern: pipeline
 steps: 5
@@ -15,12 +15,13 @@ tools:
   - get_transactions
   - get_stock_quote
   - query_sessions_by_date
-  - write_knowledge_file
-  - list_knowledge_files
+  - read_knowledge
+  - write_knowledge
   - analyze_today_trades
 dependencies:
   - trading-common
-  - read-error
+  - knowledge-read
+  - knowledge-write
 ---
 
 # Market Close Summary - 闭市总结
@@ -36,7 +37,7 @@ dependencies:
 
 ## ⚠️ 强制前置
 
-**第一步 MUST 调用 `read-error` SKILL！**
+**第一步 MUST 调用 `read_knowledge` 工具！**
 
 ```
 不执行此步骤将无法正确评估今日操作。
@@ -54,7 +55,8 @@ dependencies:
 
 #### 1.1 读取历史错误【强制】
 ```
-→ 调用 read-error SKILL
+→ 调用 read_knowledge(type="all")
+→ 获取历史错误和昨日总结
 → 了解历史错误，用于评估今日操作
 ```
 
@@ -164,8 +166,8 @@ dependencies:
 #### 如果有任何一项为"是"【必须执行】
 
 1. **必须** 调用 `analyze_today_trades` 工具分析
-2. **必须** 将分析结果记录到 `errors/` 目录
-3. **必须** 使用 `write_knowledge_file` 写入错误文件
+2. **必须** 使用 `write_knowledge(type="error", content=错误记录)` 写入错误
+3. **必须** 检查返回的 `verified` 字段是否为 true
 
 ---
 
@@ -175,9 +177,11 @@ dependencies:
 
 #### 必须生成的文件
 
-**文件路径**: `summaries/YYYY-MM-DD.md`（使用今天的日期）
+**必须调用**: `write_knowledge(type="summary", date="YYYY-MM-DD", content=总结内容)`
 
-**必须调用**: `write_knowledge_file(path="summaries/YYYY-MM-DD.md", content=总结内容)`
+**重要**：调用后必须检查返回的 `verified` 字段：
+- 如果 `verified: true`，写入成功
+- 如果 `verified: false`，必须重试或报告错误
 
 #### 总结文件格式
 
@@ -187,13 +191,12 @@ dependencies:
 
 ## 经验沉淀
 
-根据复盘结果，写入不同文件：
+根据复盘结果，使用 `write_knowledge` 工具写入：
 
-| 类型 | 目标目录 | 条件 |
+| 类型 | 调用方式 | 条件 |
 |------|----------|------|
-| 策略类经验 | strategies/*.md | 发现有效的交易模式 |
-| 洞察类经验 | insights/*.md | 发现市场规律或板块特征 |
-| 错误操作 | errors/*.md | 有错误操作时 |
+| 错误操作 | write_knowledge(type="error", content=错误记录) | 有错误操作时 |
+| 每日总结 | write_knowledge(type="summary", date="YYYY-MM-DD", content=总结) | 每日收盘后 |
 
 ---
 
@@ -202,10 +205,10 @@ dependencies:
 | 约束 | 说明 |
 |------|------|
 | 必须查询 Session | 查询今日所有 Session |
-| 必须执行错误检查 | 如有错误必须记录到 errors/ |
-| 必须写入总结 | summaries/YYYY-MM-DD.md |
-| 必须先执行 read-error | 历史错误指导评估 |
-| 文件名必须用当天日期 | YYYY-MM-DD 格式 |
+| 必须执行错误检查 | 如有错误必须调用 write_knowledge 记录 |
+| 必须写入总结 | 使用 write_knowledge(type="summary") |
+| 必须先调用 read_knowledge | 历史错误指导评估 |
+| 必须检查 verified 字段 | 写入后验证 verified=true |
 
 ---
 
@@ -214,12 +217,12 @@ dependencies:
 完成以下所有步骤才算执行成功：
 
 ```
-□ 已调用 read-error SKILL
+□ 已调用 read_knowledge(type="all")
 □ 已查询今日所有 Session
 □ 已获取今日交易记录
 □ 已计算今日收益
 □ 已执行错误检查清单
-□ 如有错误，已写入 errors/ 目录
-□ 已写入总结到 summaries/YYYY-MM-DD.md
+□ 如有错误，已调用 write_knowledge(type="error") 并验证成功
+□ 已调用 write_knowledge(type="summary") 并验证成功
 □ 已输出完整的交易日总结
 ```

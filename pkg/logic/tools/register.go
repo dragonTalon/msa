@@ -2,6 +2,7 @@ package tools
 
 import (
 	"msa/pkg/logic/tools/finance"
+	"msa/pkg/logic/tools/knowledge"
 	"msa/pkg/logic/tools/search"
 	skilltools "msa/pkg/logic/tools/skill"
 	"msa/pkg/logic/tools/stock"
@@ -33,12 +34,16 @@ var _ MsaTool = (*todo.UpdateTodoTool)(nil)
 var _ MsaTool = (*todo.VerifyTodoTool)(nil)
 var _ MsaTool = (*todo.FillSummaryTool)(nil)
 
+var _ MsaTool = (*knowledge.ReadKnowledgeTool)(nil)
+var _ MsaTool = (*knowledge.WriteKnowledgeTool)(nil)
+
 func init() {
 	registerStock()
 	registerSearch()
 	registerFinance()
 	registerSkill()
 	registerTodo()
+	registerKnowledge()
 }
 
 func registerStock() {
@@ -75,4 +80,9 @@ func registerTodo() {
 	RegisterTool(&todo.UpdateTodoTool{})
 	RegisterTool(&todo.VerifyTodoTool{})
 	RegisterTool(&todo.FillSummaryTool{})
+}
+
+func registerKnowledge() {
+	RegisterTool(&knowledge.ReadKnowledgeTool{})
+	RegisterTool(&knowledge.WriteKnowledgeTool{})
 }

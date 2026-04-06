@@ -14,7 +14,7 @@
 ## 1. 信息收集
 
 ### 步骤
-- [ ] 1.1 读取历史错误（调用 read-error SKILL）
+- [ ] 1.1 读取历史错误（调用 read_knowledge 工具）
 - [ ] 1.2 读取用户知识库
 - [ ] 1.3 获取账户状态（get_account_summary, get_positions）
 

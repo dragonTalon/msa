@@ -1,7 +1,7 @@
 ---
 name: morning-analysis
 description: 早盘开市操作，执行以卖出为主的策略。触发时间 9:30-11:30，必须实际执行买卖操作。
-version: 2.0.0
+version: 2.1.0
 priority: 8
 pattern: pipeline
 steps: 4
@@ -18,9 +18,10 @@ tools:
   - submit_sell_order
   - web_search
   - fetch_page_content
+  - read_knowledge
 dependencies:
   - trading-common
-  - read-error
+  - knowledge-read
   - output-formats
 ---
 
@@ -38,7 +39,7 @@ dependencies:
 
 ## ⚠️ 强制前置
 
-**第一步 MUST 调用 `read-error` SKILL！**
+**第一步 MUST 调用 `read_knowledge` 工具！**
 
 ```
 在执行任何操作前，必须先读取历史错误经验。
@@ -57,7 +58,8 @@ dependencies:
 
 #### 1.1 读取历史错误【强制】
 ```
-→ 调用 read-error SKILL
+→ 调用 read_knowledge(type="all")
+→ 获取历史错误和昨日总结
 → 将错误经验拼接到后续分析的 prompt 中
 ```
 
@@ -198,5 +200,5 @@ FOR each 买入决策:
 | 禁止卖空 | 卖出数量不能超过持仓数量 |
 | 整手交易 | 买入数量必须是 100 的整数倍 |
 | 执行不确认 | 输出决策后直接执行，不需要用户确认 |
-| 错误必读 | 必须先执行 read-error SKILL |
+| 错误必读 | 必须先调用 read_knowledge 工具 |
 | 分段买入 | 首次买入不超过计划仓位的 50% |
