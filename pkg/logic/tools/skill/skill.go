@@ -10,6 +10,7 @@ import (
 
 	"msa/pkg/logic/message"
 	"msa/pkg/logic/skills"
+	"msa/pkg/logic/tools/safetool"
 	"msa/pkg/model"
 )
 
@@ -48,6 +49,12 @@ type SkillContentData struct {
 
 // GetSkillContent 根据 skill name 返回对应 SKILL.md 的完整 body 内容
 func GetSkillContent(ctx context.Context, param *SkillContentParam) (string, error) {
+	return safetool.SafeExecute("get_skill_content", fmt.Sprintf("skill_name: %s", param.SkillName), func() (string, error) {
+		return doGetSkillContent(ctx, param)
+	})
+}
+
+func doGetSkillContent(ctx context.Context, param *SkillContentParam) (string, error) {
 	log.Infof("GetSkillContent start, skill_name: %s", param.SkillName)
 	message.BroadcastToolStart("get_skill_content", fmt.Sprintf("skill_name: %s", param.SkillName))
 
@@ -119,14 +126,20 @@ func (s *SkillReferenceTool) GetToolGroup() model.ToolGroup {
 
 // SkillReferenceData skill reference 数据
 type SkillReferenceData struct {
-	SkillName  string `json:"skill_name"`
-	FileName   string `json:"file_name"`
-	Content    string `json:"content"`
-	Length     int    `json:"length"`
+	SkillName string `json:"skill_name"`
+	FileName  string `json:"file_name"`
+	Content   string `json:"content"`
+	Length    int    `json:"length"`
 }
 
 // GetSkillReference 根据 skill name 和 file name 返回 reference 文件内容
 func GetSkillReference(ctx context.Context, param *SkillReferenceParam) (string, error) {
+	return safetool.SafeExecute("get_skill_reference", fmt.Sprintf("skill_name: %s, file_name: %s", param.SkillName, param.FileName), func() (string, error) {
+		return doGetSkillReference(ctx, param)
+	})
+}
+
+func doGetSkillReference(ctx context.Context, param *SkillReferenceParam) (string, error) {
 	log.Infof("GetSkillReference start, skill_name: %s, file_name: %s", param.SkillName, param.FileName)
 	message.BroadcastToolStart("get_skill_reference", fmt.Sprintf("skill_name: %s, file_name: %s", param.SkillName, param.FileName))
 
@@ -218,6 +231,12 @@ type SkillAssetData struct {
 
 // GetSkillAsset 根据 skill name 和 file name 返回 asset 文件内容
 func GetSkillAsset(ctx context.Context, param *SkillAssetParam) (string, error) {
+	return safetool.SafeExecute("get_skill_asset", fmt.Sprintf("skill_name: %s, file_name: %s", param.SkillName, param.FileName), func() (string, error) {
+		return doGetSkillAsset(ctx, param)
+	})
+}
+
+func doGetSkillAsset(ctx context.Context, param *SkillAssetParam) (string, error) {
 	log.Infof("GetSkillAsset start, skill_name: %s, file_name: %s", param.SkillName, param.FileName)
 	message.BroadcastToolStart("get_skill_asset", fmt.Sprintf("skill_name: %s, file_name: %s", param.SkillName, param.FileName))
 

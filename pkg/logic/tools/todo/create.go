@@ -14,6 +14,7 @@ import (
 
 	"msa/pkg/logic/message"
 	"msa/pkg/logic/skills"
+	"msa/pkg/logic/tools/safetool"
 	"msa/pkg/model"
 	"msa/pkg/session"
 )
@@ -52,6 +53,12 @@ type CreateTodoData struct {
 
 // CreateTodo 创建 TODO 文件
 func CreateTodo(ctx context.Context, param *CreateTodoParam) (string, error) {
+	return safetool.SafeExecute("create_todo", fmt.Sprintf("skill_name: %s", param.SkillName), func() (string, error) {
+		return doCreateTodo(ctx, param)
+	})
+}
+
+func doCreateTodo(ctx context.Context, param *CreateTodoParam) (string, error) {
 	log.Infof("CreateTodo start, skill_name: %s", param.SkillName)
 	message.BroadcastToolStart("create_todo", fmt.Sprintf("skill_name: %s", param.SkillName))
 

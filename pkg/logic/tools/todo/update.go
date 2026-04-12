@@ -9,6 +9,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"msa/pkg/logic/message"
+	"msa/pkg/logic/tools/safetool"
 	"msa/pkg/model"
 )
 
@@ -49,6 +50,12 @@ type UpdateTodoData struct {
 
 // UpdateTodoStep 更新 TODO 步骤状态
 func UpdateTodoStep(ctx context.Context, param *UpdateTodoParam) (string, error) {
+	return safetool.SafeExecute("update_todo_step", fmt.Sprintf("step: %s, status: %s", param.StepID, param.Status), func() (string, error) {
+		return doUpdateTodoStep(ctx, param)
+	})
+}
+
+func doUpdateTodoStep(ctx context.Context, param *UpdateTodoParam) (string, error) {
 	log.Infof("UpdateTodoStep start, path: %s, step: %s, status: %s", param.TodoPath, param.StepID, param.Status)
 	message.BroadcastToolStart("update_todo_step", fmt.Sprintf("step: %s, status: %s", param.StepID, param.Status))
 

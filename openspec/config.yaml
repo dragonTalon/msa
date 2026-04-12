@@ -63,68 +63,29 @@ rules:
     - 必须包含"非目标"章节
     - 适用时引用相关规格文档
     - 考虑向后兼容性
-  
-  tasks:
-    - 将任务拆分为不超过 4 小时的子任务
-    - 包含验证步骤
-    - 引用 knowledge/metadata/components.yaml 中的相关组件
-    - 使用 knowledge/metadata/tags.yaml 中的标签
-  
-  fix:
-    - 使用 .templates/fix.md 模板
-    - 必须包含根因分析
-    - 适用时关联相关模式或反模式
-    - 标记适当的组件和严重程度
-  
+
   spec:
     - 遵循格式: 目的、需求（含场景）
     - 场景使用 Given-When-Then 格式
     - 每个需求应可测试
     - 修改行为时引用现有组件
 
-# 知识库配置
-knowledge:
-  enabled: true
-  components_file: knowledge/metadata/components.yaml
-  tags_file: knowledge/metadata/tags.yaml
-  index_file: knowledge/index.yaml
-  
-  # 从归档变更中自动收集
-  collect_from: changes/archive/*/fix.md
-  
-  # 输出目录
-  output:
-    issues: knowledge/issues
-    patterns: knowledge/patterns
-    anti_patterns: knowledge/anti-patterns
-    guides: knowledge/guides
+  tasks:
+    - 优先使用 superpower 插件体功能任务 编写任务
+    - 将任务拆分为不超过 4 小时的子任务
+    - 包含验证步骤
+    - 引用 knowledge/metadata/components.yaml 中的相关组件
+    - 使用 knowledge/metadata/tags.yaml 中的标签
 
-# 变更管理
-changes:
-  # 活跃变更目录
-  active: changes
-  
-  # 归档变更目录
-  archive: changes/archive
-  
-  # fix 文档模板
-  fix_template: .templates/fix.md
+  fix:
+    - 使用 .templates/fix.md 模板
+    - 必须包含根因分析
+    - 适用时关联相关模式或反模式
+    - 标记适当的组件和严重程度
 
-# 扩展配置
-extensions:
-  skills_dir: extensions/skills
-  commands_dir: extensions/commands
+apply:
+  - 优先使用 superpower 插件体功能任务执行任务
 
-# Schema 验证
-validation:
-  # 验证规格文档
-  specs: true
-  
-  # 验证 fix 文档
-  fixes: true
-  
-  # 验证知识条目
-  knowledge: true
 
 # OpenSpec CLI 日志配置
 logging:

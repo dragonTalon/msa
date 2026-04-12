@@ -9,6 +9,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"msa/pkg/logic/message"
+	"msa/pkg/logic/tools/safetool"
 	"msa/pkg/model"
 )
 
@@ -48,6 +49,12 @@ func (t *ReadKnowledgeTool) GetToolGroup() model.ToolGroup {
 
 // ReadKnowledge 读取知识库
 func ReadKnowledge(ctx context.Context, param *ReadKnowledgeParam) (string, error) {
+	return safetool.SafeExecute("read_knowledge", fmt.Sprintf("type: %s", param.Type), func() (string, error) {
+		return doReadKnowledge(ctx, param)
+	})
+}
+
+func doReadKnowledge(ctx context.Context, param *ReadKnowledgeParam) (string, error) {
 	log.Infof("ReadKnowledge start, type: %s", param.Type)
 	message.BroadcastToolStart("read_knowledge", fmt.Sprintf("type: %s", param.Type))
 

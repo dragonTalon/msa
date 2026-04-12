@@ -10,6 +10,7 @@ import (
 	msadb "msa/pkg/db"
 	"msa/pkg/logic/finsvc"
 	"msa/pkg/logic/message"
+	"msa/pkg/logic/tools/safetool"
 	"msa/pkg/model"
 )
 
@@ -54,6 +55,13 @@ type OrderData struct {
 
 // SubmitBuyOrder 提交买入订单
 func SubmitBuyOrder(ctx context.Context, param *SubmitBuyOrderParam) (string, error) {
+	return safetool.SafeExecute("submit_buy_order", fmt.Sprintf("%s %s %d股@%.4f元",
+		param.StockCode, param.StockName, param.Quantity, param.Price), func() (string, error) {
+		return doSubmitBuyOrder(ctx, param)
+	})
+}
+
+func doSubmitBuyOrder(ctx context.Context, param *SubmitBuyOrderParam) (string, error) {
 	message.BroadcastToolStart("submit_buy_order", fmt.Sprintf("%s %s %d股@%.4f元",
 		param.StockCode, param.StockName, param.Quantity, param.Price))
 
@@ -156,6 +164,13 @@ func (t *SubmitSellOrderTool) GetToolGroup() model.ToolGroup {
 
 // SubmitSellOrder 提交卖出订单
 func SubmitSellOrder(ctx context.Context, param *SubmitSellOrderParam) (string, error) {
+	return safetool.SafeExecute("submit_sell_order", fmt.Sprintf("%s %s %d股@%.2f元",
+		param.StockCode, param.StockName, param.Quantity, param.Price), func() (string, error) {
+		return doSubmitSellOrder(ctx, param)
+	})
+}
+
+func doSubmitSellOrder(ctx context.Context, param *SubmitSellOrderParam) (string, error) {
 	message.BroadcastToolStart("submit_sell_order", fmt.Sprintf("%s %s %d股@%.2f元",
 		param.StockCode, param.StockName, param.Quantity, param.Price))
 
@@ -283,6 +298,12 @@ type TransactionItem struct {
 
 // GetTransactions 查询交易记录
 func GetTransactions(ctx context.Context, param *GetTransactionsParam) (string, error) {
+	return safetool.SafeExecute("get_transactions", "", func() (string, error) {
+		return doGetTransactions(ctx, param)
+	})
+}
+
+func doGetTransactions(ctx context.Context, param *GetTransactionsParam) (string, error) {
 	message.BroadcastToolStart("get_transactions", "")
 
 	database := msadb.GetDB()
