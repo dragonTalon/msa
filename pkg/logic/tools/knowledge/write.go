@@ -12,6 +12,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"msa/pkg/logic/message"
+	"msa/pkg/logic/tools/safetool"
 	"msa/pkg/model"
 )
 
@@ -63,6 +64,12 @@ func (t *WriteKnowledgeTool) GetToolGroup() model.ToolGroup {
 
 // WriteKnowledge 写入知识库
 func WriteKnowledge(ctx context.Context, param *WriteKnowledgeParam) (string, error) {
+	return safetool.SafeExecute("write_knowledge", fmt.Sprintf("type: %s, content_len: %d", param.Type, len(param.Content)), func() (string, error) {
+		return doWriteKnowledge(ctx, param)
+	})
+}
+
+func doWriteKnowledge(ctx context.Context, param *WriteKnowledgeParam) (string, error) {
 	log.Infof("WriteKnowledge start, type: %s", param.Type)
 	message.BroadcastToolStart("write_knowledge", fmt.Sprintf("type: %s, content_len: %d", param.Type, len(param.Content)))
 

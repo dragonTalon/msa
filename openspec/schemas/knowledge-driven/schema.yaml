@@ -157,18 +157,14 @@ artifacts:
     template: tasks.md
     instruction: |
       创建任务列表，分解实现工作。
-
+      整理 已有的Skill技能，优先使用superpowers 的技能完成所有的任务
       **⚠️ 强制技能注入**
       必须使用 Skill 工具调用以下技能（按优先级）：
 
       | 技能名称 | 用途 | 触发条件 |
       |---------|------|---------|
+      |`superpowers:using-git-worktrees`| 创建工作树 | 默认必需 |
       | `superpowers:writing-plans` | 创建实现任务清单 | 默认必需 |
-
-      调用方式：
-      ```
-      Skill 工具 -> skill: "superpowers:writing-plans"
-      ```
 
       **重要：严格按照模板格式。** apply阶段解析复选框格式来跟踪进度。
       不使用 `- [ ]` 格式的任务不会被跟踪。
@@ -300,31 +296,12 @@ apply:
   tracks: tasks.md
   instruction: |
     阅读上下文文件，完成待处理任务。
-
-    **⚠️ 强制技能注入**
-    必须使用 Skill 工具调用以下技能（按执行顺序）：
+    整理 已有的Skill技能，优先使用superpowers 的技能完成所有的任务
 
     | 优先级 | 技能名称 | 用途 | 触发条件 |
     |--------|---------|------|---------|
     | 1 | `superpowers:test-driven-development` | 测试驱动开发 | 实现功能/修复前 |
-    | 2 | `superpowers:subagent-driven-development` | 并行执行独立任务 | 多个独立任务时 |
-    | 3 | `superpowers:systematic-debugging` | 系统性调试 | 遇到 bug 或错误时 |
-    | 4 | `superpowers:requesting-code-review` | 完成后请求审查 | 任务完成后 |
-
-    调用方式：
-    ```
-    # 实现前
-    Skill 工具 -> skill: "superpowers:test-driven-development"
-
-    # 多任务并行
-    Skill 工具 -> skill: "superpowers:subagent-driven-development"
-
-    # 遇到问题
-    Skill 工具 -> skill: "superpowers:systematic-debugging"
-
-    # 完成后
-    Skill 工具 -> skill: "superpowers:requesting-code-review"
-    ```
+    | 2 | `superpowers:requesting-code-review` | 完成后请求审查 | 任务完成后 |
 
     **注意**：技能调用在当前会话内执行，无需中断会话。
 

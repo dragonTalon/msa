@@ -12,6 +12,7 @@ import (
 	msadb "msa/pkg/db"
 	"msa/pkg/logic/finsvc"
 	"msa/pkg/logic/message"
+	"msa/pkg/logic/tools/safetool"
 	"msa/pkg/model"
 )
 
@@ -58,6 +59,12 @@ type PositionsData struct {
 
 // GetPositions 获取持仓列表
 func GetPositions(ctx context.Context, param *GetPositionsParam) (string, error) {
+	return safetool.SafeExecute("get_positions", "", func() (string, error) {
+		return doGetPositions(ctx, param)
+	})
+}
+
+func doGetPositions(ctx context.Context, param *GetPositionsParam) (string, error) {
 	message.BroadcastToolStart("get_positions", "")
 
 	database := msadb.GetDB()
@@ -181,6 +188,12 @@ type AccountSummaryData struct {
 
 // GetAccountSummary 获取账户总览
 func GetAccountSummary(ctx context.Context, param *GetAccountSummaryParam) (string, error) {
+	return safetool.SafeExecute("get_account_summary", "", func() (string, error) {
+		return doGetAccountSummary(ctx, param)
+	})
+}
+
+func doGetAccountSummary(ctx context.Context, param *GetAccountSummaryParam) (string, error) {
 	message.BroadcastToolStart("get_account_summary", "")
 
 	database := msadb.GetDB()

@@ -9,6 +9,7 @@ import (
 	"msa/pkg/db"
 	msadb "msa/pkg/db"
 	"msa/pkg/logic/message"
+	"msa/pkg/logic/tools/safetool"
 	"msa/pkg/model"
 )
 
@@ -48,6 +49,12 @@ type AccountData struct {
 
 // CreateAccount 创建账户
 func CreateAccount(ctx context.Context, param *CreateAccountParam) (string, error) {
+	return safetool.SafeExecute("create_account", fmt.Sprintf("初始金额: %.2f 元", param.InitialAmount), func() (string, error) {
+		return doCreateAccount(ctx, param)
+	})
+}
+
+func doCreateAccount(ctx context.Context, param *CreateAccountParam) (string, error) {
 	message.BroadcastToolStart("create_account", fmt.Sprintf("初始金额: %.2f 元", param.InitialAmount))
 
 	database := msadb.GetDB()
@@ -118,6 +125,12 @@ func (t *GetAccountTool) GetToolGroup() model.ToolGroup {
 
 // GetAccount 查询账户
 func GetAccount(ctx context.Context, param *GetAccountParam) (string, error) {
+	return safetool.SafeExecute("get_account", "", func() (string, error) {
+		return doGetAccount(ctx, param)
+	})
+}
+
+func doGetAccount(ctx context.Context, param *GetAccountParam) (string, error) {
 	message.BroadcastToolStart("get_account", "")
 
 	database := msadb.GetDB()
@@ -172,6 +185,12 @@ func (t *UpdateAccountStatusTool) GetToolGroup() model.ToolGroup {
 
 // UpdateAccountStatus 修改账户状态
 func UpdateAccountStatus(ctx context.Context, param *UpdateAccountStatusParam) (string, error) {
+	return safetool.SafeExecute("update_account_status", fmt.Sprintf("操作: %s", param.Action), func() (string, error) {
+		return doUpdateAccountStatus(ctx, param)
+	})
+}
+
+func doUpdateAccountStatus(ctx context.Context, param *UpdateAccountStatusParam) (string, error) {
 	message.BroadcastToolStart("update_account_status", fmt.Sprintf("操作: %s", param.Action))
 
 	database := msadb.GetDB()

@@ -12,6 +12,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"msa/pkg/logic/message"
+	"msa/pkg/logic/tools/safetool"
 	"msa/pkg/model"
 )
 
@@ -50,6 +51,12 @@ type FillSummaryData struct {
 
 // FillTodoSummary 填写执行总结
 func FillTodoSummary(ctx context.Context, param *FillSummaryParam) (string, error) {
+	return safetool.SafeExecute("fill_todo_summary", param.TodoPath, func() (string, error) {
+		return doFillTodoSummary(ctx, param)
+	})
+}
+
+func doFillTodoSummary(ctx context.Context, param *FillSummaryParam) (string, error) {
 	log.Infof("FillTodoSummary start, path: %s", param.TodoPath)
 	message.BroadcastToolStart("fill_todo_summary", param.TodoPath)
 

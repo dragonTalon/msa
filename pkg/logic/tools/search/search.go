@@ -3,13 +3,15 @@ package search
 import (
 	"context"
 	"fmt"
+	"sync"
+
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"
 	log "github.com/sirupsen/logrus"
 	"msa/pkg/logic/message"
+	"msa/pkg/logic/tools/safetool"
 	internal "msa/pkg/logic/tools/search/internal"
 	"msa/pkg/model"
-	"sync"
 )
 
 // SearchTool 搜索工具
@@ -54,6 +56,13 @@ func (s *SearchTool) GetToolGroup() model.ToolGroup {
 
 // WebSearch 执行网页搜索
 func WebSearch(ctx context.Context, param *model.WebSearchParams) (string, error) {
+	return safetool.SafeExecute("web_search", fmt.Sprintf("query: %s", param.Query), func() (string, error) {
+		return doWebSearch(ctx, param)
+	})
+}
+
+// doWebSearch 执行网页搜索的核心逻辑
+func doWebSearch(ctx context.Context, param *model.WebSearchParams) (string, error) {
 	log.Debugf("WebSearch start, query: %s", param.Query)
 
 	// 使用公共函数记录工具调用开始

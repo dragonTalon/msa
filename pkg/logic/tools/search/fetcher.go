@@ -3,15 +3,16 @@ package search
 import (
 	"context"
 	"fmt"
-	"msa/pkg/logic/message"
-	internal "msa/pkg/logic/tools/search/internal"
-	"msa/pkg/model"
 	"net/url"
 	"sync"
 
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"
 	log "github.com/sirupsen/logrus"
+	"msa/pkg/logic/message"
+	"msa/pkg/logic/tools/safetool"
+	internal "msa/p
+	"msa/pkg/model"
 )
 
 // FetcherTool 页面抓取工具
@@ -50,6 +51,13 @@ func (f *FetcherTool) GetToolGroup() model.ToolGroup {
 
 // FetchPageContent 抓取页面内容
 func FetchPageContent(ctx context.Context, param *model.FetchPageParams) (string, error) {
+	return safetool.SafeExecute("fetch_page_content", fmt.Sprintf("url: %s", param.URL), func() (string, error) {
+		return doFetchPageContent(ctx, param)
+	})
+}
+
+// doFetchPageContent 抓取页面内容的核心逻辑
+func doFetchPageContent(ctx context.Context, param *model.FetchPageParams) (string, error) {
 	log.Infof("FetchPageContent start, url: %s", param.URL)
 
 	// 使用公共函数记录工具调用开始

@@ -3,13 +3,14 @@ package stock
 import (
 	"context"
 	"fmt"
-	"msa/pkg/logic/message"
-	"msa/pkg/model"
-	mas_utils "msa/pkg/utils"
 
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"
 	log "github.com/sirupsen/logrus"
+	"msa/pkg/logic/message"
+	"msa/pkg/logic/tools/safetool"
+	"msa/pkg/model"
+	mas_utils "msa/pkg/utils"
 )
 
 type CompanyParam struct {
@@ -36,6 +37,12 @@ func (c *CompanyCode) GetToolGroup() model.ToolGroup {
 }
 
 func GetStockCompanyCode(ctx context.Context, param *CompanyParam) (string, error) {
+	return safetool.SafeExecute("get_stock_company_code", fmt.Sprintf("stock_name: %s", param.StockName), func() (string, error) {
+		return doGetStockCompanyCode(ctx, param)
+	})
+}
+
+func doGetStockCompanyCode(ctx context.Context, param *CompanyParam) (string, error) {
 	log.Debugf("GetStockCompanyCode start, stock_name: %s", param.StockName)
 
 	// 使用公共函数记录工具调用开始

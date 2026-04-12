@@ -10,6 +10,7 @@ import (
 
 	"msa/pkg/logic/message"
 	"msa/pkg/logic/skills"
+	"msa/pkg/logic/tools/safetool"
 	"msa/pkg/model"
 )
 
@@ -47,6 +48,12 @@ type CheckTodoData struct {
 
 // CheckSkillTodo 检查 Skill 是否需要创建 TODO
 func CheckSkillTodo(ctx context.Context, param *CheckTodoParam) (string, error) {
+	return safetool.SafeExecute("check_skill_todo", fmt.Sprintf("skill_name: %s", param.SkillName), func() (string, error) {
+		return doCheckSkillTodo(ctx, param)
+	})
+}
+
+func doCheckSkillTodo(ctx context.Context, param *CheckTodoParam) (string, error) {
 	log.Infof("CheckSkillTodo start, skill_name: %s", param.SkillName)
 	message.BroadcastToolStart("check_skill_todo", fmt.Sprintf("skill_name: %s", param.SkillName))
 
@@ -70,7 +77,7 @@ func CheckSkillTodo(ctx context.Context, param *CheckTodoParam) (string, error) 
 		return model.NewErrorResult(err.Error()), nil
 	}
 
-	// 检查是否需要 TODO
+	// 检查是否需要
 	requiresTodo := sk.Metadata.RequiresTodo
 	hasCustomTemplate := sk.HasTodoTemplate()
 	templateSource := "default"

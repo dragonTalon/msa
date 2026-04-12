@@ -9,6 +9,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"msa/pkg/logic/message"
+	"msa/pkg/logic/tools/safetool"
 	"msa/pkg/model"
 )
 
@@ -53,6 +54,12 @@ type VerifyTodoData struct {
 
 // VerifyTodoCompletion 验证 TODO 完成情况
 func VerifyTodoCompletion(ctx context.Context, param *VerifyTodoParam) (string, error) {
+	return safetool.SafeExecute("verify_todo_completion", param.TodoPath, func() (string, error) {
+		return doVerifyTodoCompletion(ctx, param)
+	})
+}
+
+func doVerifyTodoCompletion(ctx context.Context, param *VerifyTodoParam) (string, error) {
 	log.Infof("VerifyTodoCompletion start, path: %s", param.TodoPath)
 	message.BroadcastToolStart("verify_todo_completion", param.TodoPath)
 
