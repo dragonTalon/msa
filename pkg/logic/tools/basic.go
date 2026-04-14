@@ -1,9 +1,7 @@
 package tools
 
 import (
-	"fmt"
 	"msa/pkg/model"
-	"sort"
 
 	"github.com/cloudwego/eino/components/tool"
 	log "github.com/sirupsen/logrus"
@@ -47,13 +45,4 @@ func RegisterTool(tool MsaTool) {
 		Value: tool.GetDescription(),
 	})
 	toolMap[tool.GetName()] = tool
-}
-
-func main() {
-	num1 := []int{1, 2}
-	num2 := []int{3, 4}
-	num1 = append(num1, num2...)
-	fmt.Println(num1)
-	copy(num1, num2)
-	sort.Ints(num1)
 }
