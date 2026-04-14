@@ -387,8 +387,8 @@ func (c *Chat) chatStreamMsg(msg *model.StreamChunk) (tea.Model, tea.Cmd) {
 	}
 
 	if msg.IsDone {
-		// 将当前 segment 内容追加到完整回复
-		if c.fullStreamContent.Len() > 0 {
+		// 将当前 segment 内容追加到完整回复（跳过工具调用文本，避免污染历史消息）
+		if c.fullStreamContent.Len() > 0 && c.currentSegmentType != model.StreamMsgTypeTool {
 			if c.allStreamContent.Len() > 0 {
 				c.allStreamContent.WriteString("\n")
 			}
@@ -437,11 +437,11 @@ func (c *Chat) chatStreamMsg(msg *model.StreamChunk) (tea.Model, tea.Cmd) {
 
 	// 如果当前有流式内容，且新消息类型与当前不同，先flush之前的内容
 	if !isFirst && c.currentSegmentType != "" && c.currentSegmentType != msg.MsgType {
-		// 保存之前的内容到完整回复累积器
+		// 保存之前的内容到完整回复累积器（跳过工具调用文本，避免污染历史消息）
 		prevContent := c.fullStreamContent.String()
 		prevMsgType := c.currentSegmentType
 
-		if prevContent != "" {
+		if prevContent != "" && prevMsgType != model.StreamMsgTypeTool {
 			if c.allStreamContent.Len() > 0 {
 				c.allStreamContent.WriteString("\n")
 			}

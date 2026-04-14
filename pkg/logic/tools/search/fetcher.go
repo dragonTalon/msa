@@ -11,7 +11,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"msa/pkg/logic/message"
 	"msa/pkg/logic/tools/safetool"
-	internal "msa/p
+	internal "msa/pkg/logic/tools/search/internal"
 	"msa/pkg/model"
 )
 
