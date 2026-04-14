@@ -2,10 +2,12 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"msa/pkg/utils"
+	"regexp"
 	"strings"
 	"time"
 
@@ -98,18 +100,29 @@ func GetChatModel(ctx context.Context) (*react.Agent, error) {
 	return agent, nil
 }
 
+// dsmlStartTag 是 DeepSeek DSML 格式工具调用的开始标记（｜ 为全角竖线 U+FF5C）
+const dsmlStartTag = "<\uff5cDSML\uff5cfunction_calls>"
+
+// dsmlStartPattern 用于检测 DSML 开始标记（大小写不敏感）
+var dsmlStartPattern = regexp.MustCompile(`(?i)<[｜|]DSML[｜|]function_calls>`)
+
+// pipeToolCallPattern 用于检测 <|tool_calls_section_begin|> 格式的工具调用
+var pipeToolCallPattern = regexp.MustCompile(`<\|tool_calls_section_begin\|>`)
+
 func toolCallChecker(ctx context.Context, sr *schema.StreamReader[*schema.Message]) (bool, error) {
 	defer sr.Close()
 
 	streamManager := msamessage.GetStreamManager()
 
+	// 收集所有 chunk，用于检测非标准格式工具调用（DSML / pipe 格式）
+	var allChunks []*schema.Message
+	var contentBuilder strings.Builder
+	var specialFormatDetected bool // 是否已检测到非标准格式工具调用开始标记
+
 	for {
 		msg, err := sr.Recv()
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				streamManager.Broadcast(&msamodel.StreamChunk{
-					IsDone: true,
-				})
 				break
 			}
 			streamManager.Broadcast(&msamodel.StreamChunk{
@@ -119,25 +132,209 @@ func toolCallChecker(ctx context.Context, sr *schema.StreamReader[*schema.Messag
 			return false, err
 		}
 
-		isToolCall := len(msg.ToolCalls) > 0
-		if isToolCall {
+		// 标准工具调用：直接返回 true（不广播 IsDone，工具执行完后还会继续输出）
+		if len(msg.ToolCalls) > 0 {
 			log.Infof("tool call: %v", msg.ToolCalls)
 			return true, nil
 		}
+
+		// 广播思考内容
 		if msg.ReasoningContent != "" {
 			streamManager.Broadcast(&msamodel.StreamChunk{
 				Content: msg.ReasoningContent,
 				MsgType: model.StreamMsgTypeReason,
 			})
+		}
+
+		// 处理正文内容
+		if msg.Content != "" {
+			contentBuilder.WriteString(msg.Content)
+			currentContent := contentBuilder.String()
+
+			// 检测是否出现非标准格式工具调用开始标记（DSML 或 pipe 格式）
+			if !specialFormatDetected {
+				var tagIdx int = -1
+				if loc := dsmlStartPattern.FindStringIndex(currentContent); loc != nil {
+					tagIdx = loc[0]
+				} else if loc := pipeToolCallPattern.FindStringIndex(currentContent); loc != nil {
+					tagIdx = loc[0]
+				}
+
+				if tagIdx >= 0 {
+					// 发现工具调用标记，广播标记之前的内容
+					if tagIdx > 0 {
+						streamManager.Broadcast(&msamodel.StreamChunk{
+							Content: currentContent[:tagIdx],
+							MsgType: model.StreamMsgTypeText,
+						})
+					}
+					specialFormatDetected = true
+					// 清空当前 chunk 的 Content，避免工具调用文本被广播给用户
+					msg.Content = ""
+				} else {
+					// 还没有工具调用标记，正常广播
+					streamManager.Broadcast(&msamodel.StreamChunk{
+						Content: msg.Content,
+						MsgType: model.StreamMsgTypeText,
+					})
+				}
+			} else {
+				// 已检测到工具调用标记，清空 Content 避免广播
+				msg.Content = ""
+			}
+		}
+
+		allChunks = append(allChunks, msg)
+	}
+
+	// 检查完整内容是否包含非标准格式工具调用（DSML 或 pipe 格式）
+	if specialFormatDetected {
+		fullContent := contentBuilder.String()
+		toolCalls := parseToolCalls(fullContent)
+		if len(toolCalls) > 0 {
+			log.Infof("检测到 DSML 格式工具调用，解析结果: %v", toolCalls)
+			// 将解析后的 ToolCalls 注入到最后一个 chunk 中
+			// 由于 tee 流共享同一个 *schema.Message 指针，修改会影响 eino 内部的处理
+			// 注意：不广播 IsDone，工具执行完后还会继续输出
+			if len(allChunks) > 0 {
+				lastChunk := allChunks[len(allChunks)-1]
+				lastChunk.ToolCalls = toolCalls
+				lastChunk.Content = ""
+			}
+			return true, nil
+		}
+	}
+
+	// 没有工具调用，广播完成信号
+	streamManager.Broadcast(&msamodel.StreamChunk{IsDone: true})
+	return false, nil
+}
+
+// parseToolCalls 解析非标准格式的工具调用，支持以下两种格式：
+//
+// 1. DeepSeek DSML 格式：
+//
+//	<｜DSML｜function_calls>
+//	<｜DSML｜invoke name="tool_name">
+//	<｜DSML｜parameter name="param_name" string="true">value</｜DSML｜parameter>
+//	</｜DSML｜invoke>
+//	</｜DSML｜function_calls>
+//
+// 2. Pipe 格式：
+//
+//	<|tool_calls_section_begin|>[{"name":"tool_name","parameters":{"key":"value"}}]
+func parseToolCalls(content string) []schema.ToolCall {
+	// 优先尝试解析 pipe 格式
+	if pipeToolCallPattern.MatchString(content) {
+		if calls := parsePipeToolCalls(content); len(calls) > 0 {
+			return calls
+		}
+	}
+	// 尝试解析 DSML 格式
+	return parseDSMLToolCalls(content)
+}
+
+func parseDSMLToolCalls(content string) []schema.ToolCall {
+	// 匹配 invoke 块：<｜DSML｜invoke name="...">...</｜DSML｜invoke>
+	invokePattern := regexp.MustCompile(`(?i)<[｜|]DSML[｜|]invoke\s+name="([^"]+)"[^>]*>([\s\S]*?)</[｜|]DSML[｜|]invoke>`)
+	// 匹配 parameter 块：<｜DSML｜parameter name="...">value</｜DSML｜parameter>
+	paramPattern := regexp.MustCompile(`(?i)<[｜|]DSML[｜|]parameter\s+name="([^"]+)"[^>]*>([\s\S]*?)</[｜|]DSML[｜|]parameter>`)
+
+	var toolCalls []schema.ToolCall
+	invokeMatches := invokePattern.FindAllStringSubmatch(content, -1)
+
+	for i, invokeMatch := range invokeMatches {
+		if len(invokeMatch) < 3 {
 			continue
 		}
-		streamManager.Broadcast(&msamodel.StreamChunk{
-			Content: msg.Content,
-			MsgType: model.StreamMsgTypeText,
+		toolName := strings.TrimSpace(invokeMatch[1])
+		invokeBody := invokeMatch[2]
+
+		// 解析参数
+		params := make(map[string]interface{})
+		paramMatches := paramPattern.FindAllStringSubmatch(invokeBody, -1)
+		for _, paramMatch := range paramMatches {
+			if len(paramMatch) < 3 {
+				continue
+			}
+			paramName := strings.TrimSpace(paramMatch[1])
+			paramValue := strings.TrimSpace(paramMatch[2])
+			params[paramName] = paramValue
+		}
+
+		// 序列化参数为 JSON
+		argsJSON, err := json.Marshal(params)
+		if err != nil {
+			log.Warnf("parseDSMLToolCalls: 序列化参数失败: %v", err)
+			continue
+		}
+
+		// 生成唯一 ID
+		idx := i
+		toolCalls = append(toolCalls, schema.ToolCall{
+			Index: &idx,
+			ID:    fmt.Sprintf("dsml_call_%d", i),
+			Type:  "function",
+			Function: schema.FunctionCall{
+				Name:      toolName,
+				Arguments: string(argsJSON),
+			},
 		})
 	}
 
-	return false, nil
+	return toolCalls
+}
+
+// parsePipeToolCalls 解析 <|tool_calls_section_begin|> 格式的工具调用
+// 格式示例：
+//
+//	<|tool_calls_section_begin|>[{"name":"tool_name","parameters":{"key":"value"}}]
+func parsePipeToolCalls(content string) []schema.ToolCall {
+	// 提取 <|tool_calls_section_begin|> 之后的 JSON 数组
+	pipeExtractPattern := regexp.MustCompile(`<\|tool_calls_section_begin\|>(\[.*?\])`)
+	matches := pipeExtractPattern.FindStringSubmatch(content)
+	if len(matches) < 2 {
+		// 尝试贪婪匹配（JSON 可能跨行）
+		pipeExtractPatternMultiline := regexp.MustCompile(`(?s)<\|tool_calls_section_begin\|>(\[.*?\])`)
+		matches = pipeExtractPatternMultiline.FindStringSubmatch(content)
+		if len(matches) < 2 {
+			log.Warnf("parsePipeToolCalls: 未找到 JSON 数组")
+			return nil
+		}
+	}
+
+	jsonStr := strings.TrimSpace(matches[1])
+
+	// 解析 JSON 数组
+	type pipeToolCall struct {
+		Name       string                 `json:"name"`
+		Parameters map[string]interface{} `json:"parameters"`
+	}
+	var rawCalls []pipeToolCall
+	if err := json.Unmarshal([]byte(jsonStr), &rawCalls); err != nil {
+		log.Warnf("parsePipeToolCalls: JSON 解析失败: %v, json: %s", err, jsonStr)
+		return nil
+	}
+
+	var toolCalls []schema.ToolCall
+	for i, raw := range rawCalls {
+		argsJSON, err := json.Marshal(raw.Parameters)
+		if err != nil {
+			log.Warnf("parsePipeToolCalls: 序列化参数失败: %v", err)
+			continue
+		}
+		idx := i
+		toolCalls = append(toolCalls, schema.ToolCall{
+			Index: &idx,
+			ID:    fmt.Sprintf("pipe_call_%d", i),
+			Type:  "function",
+			Function: schema.FunctionCall{
+				Name:      strings.TrimSpace(raw.Name),
+				Arguments: string(argsJSON),
+			},
+		})
+	}
+	return toolCalls
 }
 
 // Ask 聊天（异步处理流式数据，通过 StreamOutputManager 广播）
