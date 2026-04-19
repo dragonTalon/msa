@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"runtime/debug"
 
-	log "github.com/sirupsen/logrus"
 	"msa/pkg/logic/message"
 	"msa/pkg/model"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // SafeExecute 提供统一的 panic recovery 保护
@@ -26,6 +27,11 @@ func SafeExecute(toolName string, params string, fn func() (string, error)) (res
 			err = nil
 		}
 	}()
-
-	return fn()
+	result, err = fn()
+	log.Infof("Tool [%s] result: %s", toolName, result)
+	if err != nil {
+		log.Errorf("Tool [%s] error: %v", toolName, err)
+		return "", err
+	}
+	return result, nil
 }

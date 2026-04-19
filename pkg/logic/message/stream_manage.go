@@ -54,17 +54,24 @@ func (m *StreamOutputManager) Register(bufferSize int) (<-chan *msamodel.StreamC
 }
 
 // Broadcast 广播消息给所有订阅者
+// IsDone=true 的消息使用阻塞发送，确保结束信号不丢失
 func (m *StreamOutputManager) Broadcast(chunk *msamodel.StreamChunk) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
 	for _, ch := range m.subscribers {
-		// 非阻塞发送，防止慢消费者阻塞整个流程
-		select {
-		case ch <- chunk:
-		default:
-			// channel 满了就跳过，避免阻塞
-			log.Warnf("stream output channel is full, skipping chunk")
+		if chunk.IsDone {
+			// IsDone 消息必须送达，使用阻塞发送，防止会话死锁
+			log.Infof("Broadcast IsDone message")
+			ch <- chunk
+		} else {
+			// 普通消息非阻塞发送，防止慢消费者阻塞整个流程
+			select {
+			case ch <- chunk:
+			default:
+				// channel 满了就跳过，避免阻塞
+				log.Warnf("stream output channel is full, skipping chunk")
+			}
 		}
 	}
 }
@@ -98,12 +105,12 @@ func BroadcastToolStart(toolName string, params string) {
 // toolName: 工具名称
 // result: 工具执行结果描述
 // err: 错误信息（如果有）
+// 注意：工具执行失败是可恢复的业务错误，使用 IsToolError=true 标记，不设置 Err 字段，避免 TUI 中断会话
 func BroadcastToolEnd(toolName string, result string, err error) {
 	if err != nil {
 		globalStreamManager.Broadcast(&msamodel.StreamChunk{
 			Content: fmt.Sprintf("工具 %s 执行失败: %v\n", toolName, err),
 			MsgType: msamodel.StreamMsgTypeTool,
-			Err:     err,
 		})
 		log.Errorf("Tool [%s] failed: %v", toolName, err)
 	} else {
