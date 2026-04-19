@@ -1,58 +1,61 @@
 # 规格：query-sessions-by-date
 
-> **能力**: 按日期查询会话
-> **目的**: 系统必须提供工具来按日期查询 Session 记录，用于 SKILL 获取早盘、午盘、收盘等历史会话信息。
+## Purpose
 
-## 需求：按日期查询 Session
+系统 SHALL 提供工具来按日期查询 Session 记录，用于 SKILL 获取早盘、午盘、收盘等历史会话信息。
 
-系统必须提供工具来按日期查询 Session 记录，用于 SKILL 获取早盘、午盘、收盘等历史会话信息。
+## Requirements
 
-### 场景：查询今日所有 Session
-- **当** 调用工具查询日期为今天
-- **那么** 返回当日所有 Session 记录
+### Requirement: 按日期查询 Session
 
-### 场景：查询指定日期的 Session
-- **当** 调用工具查询日期 `2026-03-14`
-- **那么** 返回该日期的所有 Session 记录
+系统 SHALL 提供工具来按日期查询 Session 记录，用于 SKILL 获取早盘、午盘、收盘等历史会话信息。
 
-### 场景：查询无 Session 的日期
-- **当** 查询的日期没有任何 Session
-- **那么** 返回空列表
+#### Scenario: 查询今日所有 Session
+- **WHEN** 调用工具查询日期为今天
+- **THEN** 返回当日所有 Session 记录
 
----
+#### Scenario: 查询指定日期的 Session
+- **WHEN** 调用工具查询日期 `2026-03-14`
+- **THEN** 返回该日期的所有 Session 记录
 
-## 需求：Session 信息返回
-
-返回的 Session 信息应包含关键内容。
-
-### 场景：返回 Session 基本信息
-- **当** 查询成功
-- **那么** 返回每个 Session 的 ID、创建时间、标签列表
-
-### 场景：返回 Session 摘要
-- **当** 查询成功
-- **那么** 返回每个 Session 的消息摘要（首尾消息内容）
+#### Scenario: 查询无 Session 的日期
+- **WHEN** 查询的日期没有任何 Session
+- **THEN** 返回空列表
 
 ---
 
-## 需求：日期格式支持
+### Requirement: Session 信息返回
 
-支持多种日期格式输入。
+返回的 Session 信息 SHALL 包含关键内容。
 
-### 场景：支持 ISO 日期格式
-- **当** 日期参数为 `2026-03-15`
-- **那么** 正确解析并查询
+#### Scenario: 返回 Session 基本信息
+- **WHEN** 查询成功
+- **THEN** 返回每个 Session 的 ID、创建时间、标签列表
 
-### 场景：支持相对日期
-- **当** 日期参数为 `today` 或 `yesterday`
-- **那么** 自动转换为对应日期
+#### Scenario: 返回 Session 摘要
+- **WHEN** 查询成功
+- **THEN** 返回每个 Session 的消息摘要（首尾消息内容）
 
 ---
 
-## 需求：标签过滤
+### Requirement: 日期格式支持
 
-支持按标签过滤 Session。
+系统 SHALL 支持多种日期格式输入。
 
-### 场景：过滤特定标签的 Session
-- **当** 提供标签参数 `morning-session`
-- **那么** 只返回带有该标签的 Session
+#### Scenario: 支持 ISO 日期格式
+- **WHEN** 日期参数为 `2026-03-15`
+- **THEN** 正确解析并查询
+
+#### Scenario: 支持相对日期
+- **WHEN** 日期参数为 `today` 或 `yesterday`
+- **THEN** 自动转换为对应日期
+
+---
+
+### Requirement: 标签过滤
+
+系统 SHALL 支持按标签过滤 Session。
+
+#### Scenario: 过滤特定标签的 Session
+- **WHEN** 提供标签参数 `morning-session`
+- **THEN** 只返回带有该标签的 Session
