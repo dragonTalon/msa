@@ -1,4 +1,6 @@
-// pkg/core/event/event.go
+// Package event defines the Event type system for the MSA pipeline.
+// All communication between Agent, Runner, and Renderer flows as Event values
+// through a <-chan Event channel.
 package event
 
 // EventType 定义 pipeline 中所有可能的事件类型
