@@ -11,7 +11,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	msadb "msa/pkg/db"
 	"msa/pkg/logic/finsvc"
-	"msa/pkg/logic/message"
 	"msa/pkg/logic/tools/safetool"
 	"msa/pkg/model"
 )
@@ -65,18 +64,14 @@ func GetPositions(ctx context.Context, param *GetPositionsParam) (string, error)
 }
 
 func doGetPositions(ctx context.Context, param *GetPositionsParam) (string, error) {
-	message.BroadcastToolStart("get_positions", "")
-
 	database := msadb.GetDB()
 	if database == nil {
 		err := fmt.Errorf("数据库未初始化")
-		message.BroadcastToolEnd("get_positions", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
 	account, err := getActiveAccount(database)
 	if err != nil {
-		message.BroadcastToolEnd("get_positions", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
@@ -87,19 +82,16 @@ func doGetPositions(ctx context.Context, param *GetPositionsParam) (string, erro
 		Where("account_id = ? AND status = ?", account.ID, model.TransactionStatusFilled).
 		Pluck("stock_code", &stockCodes).Error
 	if err != nil {
-		message.BroadcastToolEnd("get_positions", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
 	if len(stockCodes) == 0 {
-		message.BroadcastToolEnd("get_positions", "当前无持仓", nil)
 		return model.NewSuccessResult(&PositionsData{Total: 0, Items: []PositionItem{}}, "当前无持仓"), nil
 	}
 
 	// 批量获取价格
 	prices, err := fetchAllPrices(stockCodes)
 	if err != nil {
-		message.BroadcastToolEnd("get_positions", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
@@ -112,12 +104,10 @@ func doGetPositions(ctx context.Context, param *GetPositionsParam) (string, erro
 	// 获取所有持仓
 	positions, err := finsvc.GetAllPositions(database, account.ID, priceMap)
 	if err != nil {
-		message.BroadcastToolEnd("get_positions", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
 	if len(positions) == 0 {
-		message.BroadcastToolEnd("get_positions", "当前无持仓", nil)
 		return model.NewSuccessResult(&PositionsData{Total: 0, Items: []PositionItem{}}, "当前无持仓"), nil
 	}
 
@@ -145,7 +135,6 @@ func doGetPositions(ctx context.Context, param *GetPositionsParam) (string, erro
 		Items: items,
 	}
 
-	message.BroadcastToolEnd("get_positions", fmt.Sprintf("获取 %d 只持仓", len(positions)), nil)
 	return model.NewSuccessResult(data, fmt.Sprintf("获取 %d 只持仓", len(positions))), nil
 }
 
@@ -194,18 +183,14 @@ func GetAccountSummary(ctx context.Context, param *GetAccountSummaryParam) (stri
 }
 
 func doGetAccountSummary(ctx context.Context, param *GetAccountSummaryParam) (string, error) {
-	message.BroadcastToolStart("get_account_summary", "")
-
 	database := msadb.GetDB()
 	if database == nil {
 		err := fmt.Errorf("数据库未初始化")
-		message.BroadcastToolEnd("get_account_summary", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
 	account, err := getActiveAccount(database)
 	if err != nil {
-		message.BroadcastToolEnd("get_account_summary", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
@@ -216,7 +201,6 @@ func doGetAccountSummary(ctx context.Context, param *GetAccountSummaryParam) (st
 		Where("account_id = ? AND status = ?", account.ID, model.TransactionStatusFilled).
 		Pluck("stock_code", &stockCodes).Error
 	if err != nil {
-		message.BroadcastToolEnd("get_account_summary", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
@@ -236,7 +220,6 @@ func doGetAccountSummary(ctx context.Context, param *GetAccountSummaryParam) (st
 	// 计算总市值
 	result, err := finsvc.GetAccountTotalValue(database, account.ID, priceMap)
 	if err != nil {
-		message.BroadcastToolEnd("get_account_summary", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
@@ -275,7 +258,6 @@ func doGetAccountSummary(ctx context.Context, param *GetAccountSummaryParam) (st
 		Warning:       warning,
 	}
 
-	message.BroadcastToolEnd("get_account_summary", "获取账户总览成功", nil)
 	return model.NewSuccessResult(data, "获取账户总览成功"), nil
 }
 

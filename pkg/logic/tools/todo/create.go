@@ -12,7 +12,6 @@ import (
 	"github.com/cloudwego/eino/components/tool/utils"
 	log "github.com/sirupsen/logrus"
 
-	"msa/pkg/logic/message"
 	"msa/pkg/logic/skills"
 	"msa/pkg/logic/tools/safetool"
 	"msa/pkg/model"
@@ -60,8 +59,6 @@ func CreateTodo(ctx context.Context, param *CreateTodoParam) (string, error) {
 
 func doCreateTodo(ctx context.Context, param *CreateTodoParam) (string, error) {
 	log.Infof("CreateTodo start, skill_name: %s", param.SkillName)
-	message.BroadcastToolStart("create_todo", fmt.Sprintf("skill_name: %s", param.SkillName))
-
 
 	// 清理 skill_name：去除首尾空白和可能的冒号前缀（模型有时会输出 ": value" 格式）
 	skillName := strings.TrimSpace(param.SkillName)
@@ -69,7 +66,6 @@ func doCreateTodo(ctx context.Context, param *CreateTodoParam) (string, error) {
 	skillName = strings.TrimSpace(skillName)
 	if skillName == "" {
 		err := fmt.Errorf("skill_name is required, got: %q (原始值: %q)", skillName, param.SkillName)
-		message.BroadcastToolEnd("create_todo", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
@@ -78,13 +74,11 @@ func doCreateTodo(ctx context.Context, param *CreateTodoParam) (string, error) {
 	sk, err := manager.GetSkill(skillName)
 	if err != nil {
 		log.Errorf("CreateTodo: failed to get skill %s: %v", skillName, err)
-		message.BroadcastToolEnd("create_todo", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 	if sk == nil {
 		err = fmt.Errorf("skill '%s' not found", skillName)
 		log.Warnf("CreateTodo: %v", err)
-		message.BroadcastToolEnd("create_todo", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
@@ -94,7 +88,6 @@ func doCreateTodo(ctx context.Context, param *CreateTodoParam) (string, error) {
 	if currentSession == nil {
 		err = fmt.Errorf("no active session")
 		log.Warnf("CreateTodo: %v", err)
-		message.BroadcastToolEnd("create_todo", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
@@ -108,7 +101,6 @@ func doCreateTodo(ctx context.Context, param *CreateTodoParam) (string, error) {
 	// 确保目录存在
 	if err := os.MkdirAll(todoDir, 0755); err != nil {
 		log.Errorf("CreateTodo: failed to create todo directory: %v", err)
-		message.BroadcastToolEnd("create_todo", "", err)
 		return model.NewErrorResult(fmt.Sprintf("创建 TODO 目录失败: %v", err)), nil
 	}
 
@@ -116,7 +108,6 @@ func doCreateTodo(ctx context.Context, param *CreateTodoParam) (string, error) {
 	templateContent, err := getTemplateContent(sk)
 	if err != nil {
 		log.Errorf("CreateTodo: failed to get template: %v", err)
-		message.BroadcastToolEnd("create_todo", "", err)
 		return model.NewErrorResult(fmt.Sprintf("获取模板失败: %v", err)), nil
 	}
 
@@ -127,7 +118,6 @@ func doCreateTodo(ctx context.Context, param *CreateTodoParam) (string, error) {
 	todoPath := filepath.Join(todoDir, skillName+".md")
 	if err := os.WriteFile(todoPath, []byte(content), 0644); err != nil {
 		log.Errorf("CreateTodo: failed to write todo file: %v", err)
-		message.BroadcastToolEnd("create_todo", "", err)
 		return model.NewErrorResult(fmt.Sprintf("写入 TODO 文件失败: %v", err)), nil
 	}
 
@@ -150,7 +140,6 @@ func doCreateTodo(ctx context.Context, param *CreateTodoParam) (string, error) {
 	}
 
 	resultMsg := fmt.Sprintf("创建 TODO 文件: %s (%d 步骤)", todoPath, totalSteps)
-	message.BroadcastToolEnd("create_todo", resultMsg, nil)
 
 	return model.NewSuccessResult(data, resultMsg), nil
 }

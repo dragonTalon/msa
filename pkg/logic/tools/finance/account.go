@@ -8,7 +8,6 @@ import (
 	"github.com/cloudwego/eino/components/tool/utils"
 	"msa/pkg/db"
 	msadb "msa/pkg/db"
-	"msa/pkg/logic/message"
 	"msa/pkg/logic/tools/safetool"
 	"msa/pkg/model"
 )
@@ -55,12 +54,9 @@ func CreateAccount(ctx context.Context, param *CreateAccountParam) (string, erro
 }
 
 func doCreateAccount(ctx context.Context, param *CreateAccountParam) (string, error) {
-	message.BroadcastToolStart("create_account", fmt.Sprintf("初始金额: %.2f 元", param.InitialAmount))
-
 	database := msadb.GetDB()
 	if database == nil {
 		err := fmt.Errorf("数据库未初始化")
-		message.BroadcastToolEnd("create_account", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
@@ -71,21 +67,18 @@ func doCreateAccount(ctx context.Context, param *CreateAccountParam) (string, er
 		Count(&count)
 	if count > 0 {
 		err := fmt.Errorf("已存在活跃账户，不支持多账户")
-		message.BroadcastToolEnd("create_account", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
 	// 创建账户
 	accountID, err := db.CreateAccount(database, "default", model.YuanToHao(param.InitialAmount))
 	if err != nil {
-		message.BroadcastToolEnd("create_account", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
 	// 查询创建的账户
 	account, err := db.GetAccountByID(database, accountID)
 	if err != nil {
-		message.BroadcastToolEnd("create_account", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
@@ -96,7 +89,6 @@ func doCreateAccount(ctx context.Context, param *CreateAccountParam) (string, er
 		Status:        string(account.Status),
 	}
 
-	message.BroadcastToolEnd("create_account", "账户创建成功", nil)
 	return model.NewSuccessResult(data, "账户创建成功"), nil
 }
 
@@ -131,18 +123,14 @@ func GetAccount(ctx context.Context, param *GetAccountParam) (string, error) {
 }
 
 func doGetAccount(ctx context.Context, param *GetAccountParam) (string, error) {
-	message.BroadcastToolStart("get_account", "")
-
 	database := msadb.GetDB()
 	if database == nil {
 		err := fmt.Errorf("数据库未初始化")
-		message.BroadcastToolEnd("get_account", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
 	account, err := getActiveAccount(database)
 	if err != nil {
-		message.BroadcastToolEnd("get_account", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
@@ -155,7 +143,6 @@ func doGetAccount(ctx context.Context, param *GetAccountParam) (string, error) {
 		CreatedAt:     account.CreatedAt.Format("2006-01-02 15:04:05"),
 	}
 
-	message.BroadcastToolEnd("get_account", "查询账户成功", nil)
 	return model.NewSuccessResult(data, "查询账户成功"), nil
 }
 
@@ -191,18 +178,14 @@ func UpdateAccountStatus(ctx context.Context, param *UpdateAccountStatusParam) (
 }
 
 func doUpdateAccountStatus(ctx context.Context, param *UpdateAccountStatusParam) (string, error) {
-	message.BroadcastToolStart("update_account_status", fmt.Sprintf("操作: %s", param.Action))
-
 	database := msadb.GetDB()
 	if database == nil {
 		err := fmt.Errorf("数据库未初始化")
-		message.BroadcastToolEnd("update_account_status", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
 	account, err := getActiveAccount(database)
 	if err != nil {
-		message.BroadcastToolEnd("update_account_status", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
@@ -211,14 +194,12 @@ func doUpdateAccountStatus(ctx context.Context, param *UpdateAccountStatusParam)
 	case "freeze":
 		err = db.UpdateAccountStatus(database, account.ID, model.AccountStatusFrozen)
 		if err != nil {
-			message.BroadcastToolEnd("update_account_status", "", err)
 			return model.NewErrorResult(err.Error()), nil
 		}
 		result = "账户已冻结"
 	case "unfreeze":
 		err = db.UpdateAccountStatus(database, account.ID, model.AccountStatusActive)
 		if err != nil {
-			message.BroadcastToolEnd("update_account_status", "", err)
 			return model.NewErrorResult(err.Error()), nil
 		}
 		result = "账户已解冻"
@@ -228,21 +209,17 @@ func doUpdateAccountStatus(ctx context.Context, param *UpdateAccountStatusParam)
 			err := fmt.Errorf("无法关闭账户：余额不为零（可用: %s 元，锁定: %s 元）",
 				formatHaoToYuan(account.AvailableAmt),
 				formatHaoToYuan(account.LockedAmt))
-			message.BroadcastToolEnd("update_account_status", "", err)
 			return model.NewErrorResult(err.Error()), nil
 		}
 		err = db.UpdateAccountStatus(database, account.ID, model.AccountStatusClosed)
 		if err != nil {
-			message.BroadcastToolEnd("update_account_status", "", err)
 			return model.NewErrorResult(err.Error()), nil
 		}
 		result = "账户已关闭"
 	default:
 		err := fmt.Errorf("无效的操作类型: %s，支持的类型: freeze/unfreeze/close", param.Action)
-		message.BroadcastToolEnd("update_account_status", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
-	message.BroadcastToolEnd("update_account_status", result, nil)
 	return model.NewSuccessResult(nil, result), nil
 }

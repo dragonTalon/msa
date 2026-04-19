@@ -8,7 +8,6 @@ import (
 	"github.com/cloudwego/eino/components/tool/utils"
 	log "github.com/sirupsen/logrus"
 
-	"msa/pkg/logic/message"
 	"msa/pkg/logic/skills"
 	"msa/pkg/logic/tools/safetool"
 	"msa/pkg/model"
@@ -56,11 +55,9 @@ func GetSkillContent(ctx context.Context, param *SkillContentParam) (string, err
 
 func doGetSkillContent(ctx context.Context, param *SkillContentParam) (string, error) {
 	log.Infof("GetSkillContent start, skill_name: %s", param.SkillName)
-	message.BroadcastToolStart("get_skill_content", fmt.Sprintf("skill_name: %s", param.SkillName))
 
 	if param.SkillName == "" {
 		err := fmt.Errorf("skill_name is required")
-		message.BroadcastToolEnd("get_skill_content", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
@@ -68,20 +65,17 @@ func doGetSkillContent(ctx context.Context, param *SkillContentParam) (string, e
 	sk, err := manager.GetSkill(param.SkillName)
 	if err != nil {
 		log.Errorf("GetSkillContent: failed to get skill %s: %v", param.SkillName, err)
-		message.BroadcastToolEnd("get_skill_content", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 	if sk == nil {
 		err = fmt.Errorf("skill '%s' not found", param.SkillName)
 		log.Warnf("GetSkillContent: %v", err)
-		message.BroadcastToolEnd("get_skill_content", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
 	content, err := sk.GetContent()
 	if err != nil {
 		log.Errorf("GetSkillContent: failed to load content for skill %s: %v", param.SkillName, err)
-		message.BroadcastToolEnd("get_skill_content", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
@@ -93,7 +87,6 @@ func doGetSkillContent(ctx context.Context, param *SkillContentParam) (string, e
 		HasAssets:     sk.HasAssets(),
 	}
 
-	message.BroadcastToolEnd("get_skill_content", fmt.Sprintf("loaded skill: %s (%d chars)", param.SkillName, len(content)), nil)
 	return model.NewSuccessResult(data, fmt.Sprintf("加载 skill: %s (%d 字符)", param.SkillName, len(content))), nil
 }
 
@@ -141,16 +134,13 @@ func GetSkillReference(ctx context.Context, param *SkillReferenceParam) (string,
 
 func doGetSkillReference(ctx context.Context, param *SkillReferenceParam) (string, error) {
 	log.Infof("GetSkillReference start, skill_name: %s, file_name: %s", param.SkillName, param.FileName)
-	message.BroadcastToolStart("get_skill_reference", fmt.Sprintf("skill_name: %s, file_name: %s", param.SkillName, param.FileName))
 
 	if param.SkillName == "" {
 		err := fmt.Errorf("skill_name is required")
-		message.BroadcastToolEnd("get_skill_reference", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 	if param.FileName == "" {
 		err := fmt.Errorf("file_name is required")
-		message.BroadcastToolEnd("get_skill_reference", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
@@ -158,13 +148,11 @@ func doGetSkillReference(ctx context.Context, param *SkillReferenceParam) (strin
 	sk, err := manager.GetSkill(param.SkillName)
 	if err != nil {
 		log.Errorf("GetSkillReference: failed to get skill %s: %v", param.SkillName, err)
-		message.BroadcastToolEnd("get_skill_reference", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 	if sk == nil {
 		err = fmt.Errorf("skill '%s' not found", param.SkillName)
 		log.Warnf("GetSkillReference: %v", err)
-		message.BroadcastToolEnd("get_skill_reference", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
@@ -172,14 +160,12 @@ func doGetSkillReference(ctx context.Context, param *SkillReferenceParam) (strin
 	if !sk.HasReferences() {
 		err = fmt.Errorf("skill '%s' has no references directory", param.SkillName)
 		log.Warnf("GetSkillReference: %v", err)
-		message.BroadcastToolEnd("get_skill_reference", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
 	content, err := sk.GetReference(param.FileName)
 	if err != nil {
 		log.Errorf("GetSkillReference: failed to load reference %s for skill %s: %v", param.FileName, param.SkillName, err)
-		message.BroadcastToolEnd("get_skill_reference", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
@@ -190,7 +176,6 @@ func doGetSkillReference(ctx context.Context, param *SkillReferenceParam) (strin
 		Length:    len(content),
 	}
 
-	message.BroadcastToolEnd("get_skill_reference", fmt.Sprintf("loaded reference: %s/%s (%d chars)", param.SkillName, param.FileName, len(content)), nil)
 	return model.NewSuccessResult(data, fmt.Sprintf("加载 reference: %s/%s (%d 字符)", param.SkillName, param.FileName, len(content))), nil
 }
 
@@ -238,16 +223,13 @@ func GetSkillAsset(ctx context.Context, param *SkillAssetParam) (string, error) 
 
 func doGetSkillAsset(ctx context.Context, param *SkillAssetParam) (string, error) {
 	log.Infof("GetSkillAsset start, skill_name: %s, file_name: %s", param.SkillName, param.FileName)
-	message.BroadcastToolStart("get_skill_asset", fmt.Sprintf("skill_name: %s, file_name: %s", param.SkillName, param.FileName))
 
 	if param.SkillName == "" {
 		err := fmt.Errorf("skill_name is required")
-		message.BroadcastToolEnd("get_skill_asset", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 	if param.FileName == "" {
 		err := fmt.Errorf("file_name is required")
-		message.BroadcastToolEnd("get_skill_asset", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
@@ -255,13 +237,11 @@ func doGetSkillAsset(ctx context.Context, param *SkillAssetParam) (string, error
 	sk, err := manager.GetSkill(param.SkillName)
 	if err != nil {
 		log.Errorf("GetSkillAsset: failed to get skill %s: %v", param.SkillName, err)
-		message.BroadcastToolEnd("get_skill_asset", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 	if sk == nil {
 		err = fmt.Errorf("skill '%s' not found", param.SkillName)
 		log.Warnf("GetSkillAsset: %v", err)
-		message.BroadcastToolEnd("get_skill_asset", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
@@ -269,14 +249,12 @@ func doGetSkillAsset(ctx context.Context, param *SkillAssetParam) (string, error
 	if !sk.HasAssets() {
 		err = fmt.Errorf("skill '%s' has no assets directory", param.SkillName)
 		log.Warnf("GetSkillAsset: %v", err)
-		message.BroadcastToolEnd("get_skill_asset", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
 	content, err := sk.GetAsset(param.FileName)
 	if err != nil {
 		log.Errorf("GetSkillAsset: failed to load asset %s for skill %s: %v", param.FileName, param.SkillName, err)
-		message.BroadcastToolEnd("get_skill_asset", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
@@ -287,6 +265,5 @@ func doGetSkillAsset(ctx context.Context, param *SkillAssetParam) (string, error
 		Length:    len(content),
 	}
 
-	message.BroadcastToolEnd("get_skill_asset", fmt.Sprintf("loaded asset: %s/%s (%d chars)", param.SkillName, param.FileName, len(content)), nil)
 	return model.NewSuccessResult(data, fmt.Sprintf("加载 asset: %s/%s (%d 字符)", param.SkillName, param.FileName, len(content))), nil
 }

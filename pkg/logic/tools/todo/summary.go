@@ -11,7 +11,6 @@ import (
 	"github.com/cloudwego/eino/components/tool/utils"
 	log "github.com/sirupsen/logrus"
 
-	"msa/pkg/logic/message"
 	"msa/pkg/logic/tools/safetool"
 	"msa/pkg/model"
 )
@@ -58,11 +57,9 @@ func FillTodoSummary(ctx context.Context, param *FillSummaryParam) (string, erro
 
 func doFillTodoSummary(ctx context.Context, param *FillSummaryParam) (string, error) {
 	log.Infof("FillTodoSummary start, path: %s", param.TodoPath)
-	message.BroadcastToolStart("fill_todo_summary", param.TodoPath)
 
 	if param.TodoPath == "" {
 		err := fmt.Errorf("todo_path is required")
-		message.BroadcastToolEnd("fill_todo_summary", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
@@ -73,7 +70,6 @@ func doFillTodoSummary(ctx context.Context, param *FillSummaryParam) (string, er
 	todo, err := ParseTodoFile(todoPath)
 	if err != nil {
 		log.Errorf("FillTodoSummary: failed to parse todo: %v", err)
-		message.BroadcastToolEnd("fill_todo_summary", "", err)
 		return model.NewErrorResult(fmt.Sprintf("解析 TODO 文件失败: %v", err)), nil
 	}
 
@@ -83,7 +79,6 @@ func doFillTodoSummary(ctx context.Context, param *FillSummaryParam) (string, er
 	// 更新文件
 	if err := updateSummarySection(todoPath, summaryContent); err != nil {
 		log.Errorf("FillTodoSummary: failed to update summary: %v", err)
-		message.BroadcastToolEnd("fill_todo_summary", "", err)
 		return model.NewErrorResult(fmt.Sprintf("更新总结失败: %v", err)), nil
 	}
 
@@ -92,8 +87,6 @@ func doFillTodoSummary(ctx context.Context, param *FillSummaryParam) (string, er
 		Success:  true,
 		Message:  "执行总结已填写",
 	}
-
-	message.BroadcastToolEnd("fill_todo_summary", "执行总结已填写", nil)
 
 	return model.NewSuccessResult(data, "执行总结已填写"), nil
 }

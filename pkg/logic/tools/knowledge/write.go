@@ -11,7 +11,6 @@ import (
 	"github.com/cloudwego/eino/components/tool/utils"
 	log "github.com/sirupsen/logrus"
 
-	"msa/pkg/logic/message"
 	"msa/pkg/logic/tools/safetool"
 	"msa/pkg/model"
 )
@@ -71,12 +70,10 @@ func WriteKnowledge(ctx context.Context, param *WriteKnowledgeParam) (string, er
 
 func doWriteKnowledge(ctx context.Context, param *WriteKnowledgeParam) (string, error) {
 	log.Infof("WriteKnowledge start, type: %s", param.Type)
-	message.BroadcastToolStart("write_knowledge", fmt.Sprintf("type: %s, content_len: %d", param.Type, len(param.Content)))
 
 	// 参数验证
 	if err := validateWriteParam(param); err != nil {
 		log.Errorf("validateWriteParam error: %v", err)
-		message.BroadcastToolEnd("write_knowledge", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
@@ -108,7 +105,6 @@ func doWriteKnowledge(ctx context.Context, param *WriteKnowledgeParam) (string, 
 			}
 
 			resultMsg := fmt.Sprintf("写入成功: type=%s, path=%s, verified=true", param.Type, path)
-			message.BroadcastToolEnd("write_knowledge", resultMsg, nil)
 			return model.NewSuccessResult(data, resultMsg), nil
 		}
 
@@ -126,7 +122,6 @@ func doWriteKnowledge(ctx context.Context, param *WriteKnowledgeParam) (string, 
 
 	errMsg := fmt.Sprintf("写入失败: 重试%d次后仍验证失败", MaxRetries)
 	log.Errorf("WriteKnowledge failed after %d retries", MaxRetries)
-	message.BroadcastToolEnd("write_knowledge", "", fmt.Errorf("%s", errMsg))
 
 	return model.NewSuccessResult(data, errMsg), nil
 }
