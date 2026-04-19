@@ -9,7 +9,6 @@ import (
 	"msa/pkg/db"
 	msadb "msa/pkg/db"
 	"msa/pkg/logic/finsvc"
-	"msa/pkg/logic/message"
 	"msa/pkg/logic/tools/safetool"
 	"msa/pkg/model"
 )
@@ -62,19 +61,14 @@ func SubmitBuyOrder(ctx context.Context, param *SubmitBuyOrderParam) (string, er
 }
 
 func doSubmitBuyOrder(ctx context.Context, param *SubmitBuyOrderParam) (string, error) {
-	message.BroadcastToolStart("submit_buy_order", fmt.Sprintf("%s %s %d股@%.4f元",
-		param.StockCode, param.StockName, param.Quantity, param.Price))
-
 	database := msadb.GetDB()
 	if database == nil {
 		err := fmt.Errorf("数据库未初始化")
-		message.BroadcastToolEnd("submit_buy_order", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
 	account, err := getActiveAccount(database)
 	if err != nil {
-		message.BroadcastToolEnd("submit_buy_order", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
@@ -97,26 +91,22 @@ func doSubmitBuyOrder(ctx context.Context, param *SubmitBuyOrderParam) (string, 
 	// 提交订单
 	transID, err := finsvc.SubmitBuyOrder(database, account.ID, order)
 	if err != nil {
-		message.BroadcastToolEnd("submit_buy_order", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
 	// 检查是否被拒绝（余额不足）
 	trans, err := db.GetTransactionByID(database, transID)
 	if err != nil {
-		message.BroadcastToolEnd("submit_buy_order", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
 	if trans.Status == model.TransactionStatusRejected {
 		err := fmt.Errorf("订单被拒绝：%s", trans.Note)
-		message.BroadcastToolEnd("submit_buy_order", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
 	// 自动成交
 	if err := finsvc.FillOrder(database, transID); err != nil {
-		message.BroadcastToolEnd("submit_buy_order", "", err)
 		return model.NewErrorResult(fmt.Sprintf("订单创建成功但成交失败: %v", err)), nil
 	}
 
@@ -130,7 +120,6 @@ func doSubmitBuyOrder(ctx context.Context, param *SubmitBuyOrderParam) (string, 
 		TotalAmount:   float64(param.Quantity)*param.Price + fee,
 	}
 
-	message.BroadcastToolEnd("submit_buy_order", "买入订单已成交", nil)
 	return model.NewSuccessResult(data, "买入订单已成交"), nil
 }
 
@@ -171,38 +160,30 @@ func SubmitSellOrder(ctx context.Context, param *SubmitSellOrderParam) (string, 
 }
 
 func doSubmitSellOrder(ctx context.Context, param *SubmitSellOrderParam) (string, error) {
-	message.BroadcastToolStart("submit_sell_order", fmt.Sprintf("%s %s %d股@%.2f元",
-		param.StockCode, param.StockName, param.Quantity, param.Price))
-
 	database := msadb.GetDB()
 	if database == nil {
 		err := fmt.Errorf("数据库未初始化")
-		message.BroadcastToolEnd("submit_sell_order", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
 	account, err := getActiveAccount(database)
 	if err != nil {
-		message.BroadcastToolEnd("submit_sell_order", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
 	// 验证持仓充足
 	position, err := finsvc.GetPosition(database, account.ID, param.StockCode)
 	if err != nil {
-		message.BroadcastToolEnd("submit_sell_order", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
 	if position == 0 {
 		err := fmt.Errorf("无持仓：请先查询持仓")
-		message.BroadcastToolEnd("submit_sell_order", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
 	if position < param.Quantity {
 		err := fmt.Errorf("持仓不足：当前持仓 %d 股，要卖出 %d 股", position, param.Quantity)
-		message.BroadcastToolEnd("submit_sell_order", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
@@ -225,13 +206,11 @@ func doSubmitSellOrder(ctx context.Context, param *SubmitSellOrderParam) (string
 	// 提交订单
 	transID, err := finsvc.SubmitSellOrder(database, account.ID, order)
 	if err != nil {
-		message.BroadcastToolEnd("submit_sell_order", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
 	// 自动成交
 	if err := finsvc.FillOrder(database, transID); err != nil {
-		message.BroadcastToolEnd("submit_sell_order", "", err)
 		return model.NewErrorResult(fmt.Sprintf("订单创建成功但成交失败: %v", err)), nil
 	}
 
@@ -245,7 +224,6 @@ func doSubmitSellOrder(ctx context.Context, param *SubmitSellOrderParam) (string
 		TotalAmount:   float64(param.Quantity)*param.Price - fee,
 	}
 
-	message.BroadcastToolEnd("submit_sell_order", "卖出订单已成交", nil)
 	return model.NewSuccessResult(data, "卖出订单已成交"), nil
 }
 
@@ -304,18 +282,14 @@ func GetTransactions(ctx context.Context, param *GetTransactionsParam) (string, 
 }
 
 func doGetTransactions(ctx context.Context, param *GetTransactionsParam) (string, error) {
-	message.BroadcastToolStart("get_transactions", "")
-
 	database := msadb.GetDB()
 	if database == nil {
 		err := fmt.Errorf("数据库未初始化")
-		message.BroadcastToolEnd("get_transactions", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
 	account, err := getActiveAccount(database)
 	if err != nil {
-		message.BroadcastToolEnd("get_transactions", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
@@ -341,7 +315,6 @@ func doGetTransactions(ctx context.Context, param *GetTransactionsParam) (string
 
 	var transactions []*model.Transaction
 	if err := query.Find(&transactions).Error; err != nil {
-		message.BroadcastToolEnd("get_transactions", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
@@ -367,6 +340,5 @@ func doGetTransactions(ctx context.Context, param *GetTransactionsParam) (string
 		Items: items,
 	}
 
-	message.BroadcastToolEnd("get_transactions", fmt.Sprintf("获取 %d 条交易记录", len(transactions)), nil)
 	return model.NewSuccessResult(data, fmt.Sprintf("获取 %d 条交易记录", len(transactions))), nil
 }

@@ -8,7 +8,6 @@ import (
 	"github.com/cloudwego/eino/components/tool/utils"
 	log "github.com/sirupsen/logrus"
 
-	"msa/pkg/logic/message"
 	"msa/pkg/logic/skills"
 	"msa/pkg/logic/tools/safetool"
 	"msa/pkg/model"
@@ -55,11 +54,9 @@ func CheckSkillTodo(ctx context.Context, param *CheckTodoParam) (string, error) 
 
 func doCheckSkillTodo(ctx context.Context, param *CheckTodoParam) (string, error) {
 	log.Infof("CheckSkillTodo start, skill_name: %s", param.SkillName)
-	message.BroadcastToolStart("check_skill_todo", fmt.Sprintf("skill_name: %s", param.SkillName))
 
 	if param.SkillName == "" {
 		err := fmt.Errorf("skill_name is required")
-		message.BroadcastToolEnd("check_skill_todo", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
@@ -67,13 +64,11 @@ func doCheckSkillTodo(ctx context.Context, param *CheckTodoParam) (string, error
 	sk, err := manager.GetSkill(param.SkillName)
 	if err != nil {
 		log.Errorf("CheckSkillTodo: failed to get skill %s: %v", param.SkillName, err)
-		message.BroadcastToolEnd("check_skill_todo", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 	if sk == nil {
 		err = fmt.Errorf("skill '%s' not found", param.SkillName)
 		log.Warnf("CheckSkillTodo: %v", err)
-		message.BroadcastToolEnd("check_skill_todo", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
@@ -94,7 +89,6 @@ func doCheckSkillTodo(ctx context.Context, param *CheckTodoParam) (string, error
 
 	resultMsg := fmt.Sprintf("Skill %s: requires_todo=%v, has_custom_template=%v",
 		param.SkillName, requiresTodo, hasCustomTemplate)
-	message.BroadcastToolEnd("check_skill_todo", resultMsg, nil)
 
 	return model.NewSuccessResult(data, resultMsg), nil
 }

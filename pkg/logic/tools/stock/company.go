@@ -7,7 +7,6 @@ import (
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"
 	log "github.com/sirupsen/logrus"
-	"msa/pkg/logic/message"
 	"msa/pkg/logic/tools/safetool"
 	"msa/pkg/model"
 	mas_utils "msa/pkg/utils"
@@ -45,18 +44,13 @@ func GetStockCompanyCode(ctx context.Context, param *CompanyParam) (string, erro
 func doGetStockCompanyCode(ctx context.Context, param *CompanyParam) (string, error) {
 	log.Debugf("GetStockCompanyCode start, stock_name: %s", param.StockName)
 
-	// 使用公共函数记录工具调用开始
-	message.BroadcastToolStart("get_stock_company_code", fmt.Sprintf("stock_name: %s", param.StockName))
-
 	// 参数校验
 	if param.StockName == "" {
 		err := fmt.Errorf("stock name is empty")
-		message.BroadcastToolEnd("get_stock_company_code", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 	if len(param.StockName) < 2 {
 		err := fmt.Errorf("stock name is too short, minimum length is 2")
-		message.BroadcastToolEnd("get_stock_company_code", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
@@ -67,24 +61,20 @@ func doGetStockCompanyCode(ctx context.Context, param *CompanyParam) (string, er
 	_, err := client.R().SetResult(resp).Get(model.FinanceSearchCode + param.StockName)
 	if err != nil {
 		log.Errorf("failed to get stock company code: %v", err)
-		message.BroadcastToolEnd("get_stock_company_code", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
 	// 处理响应
 	if len(resp.Stock) > 0 {
-		message.BroadcastToolEnd("get_stock_company_code", fmt.Sprintf("找到股票: %d 只", len(resp.Stock)), nil)
 		log.Debugf("found company info: %v", resp.Stock)
 		return model.NewSuccessResult(resp.Stock, fmt.Sprintf("找到股票: %d 只", len(resp.Stock))), nil
 	}
 	if len(resp.Fund) > 0 {
-		message.BroadcastToolEnd("get_stock_company_code", fmt.Sprintf("找到基金: %d 只", len(resp.Fund)), nil)
 		log.Debugf("found fund info: %v", resp.Fund)
 		return model.NewSuccessResult(resp.Fund, fmt.Sprintf("找到基金: %d 只", len(resp.Fund))), nil
 	}
 
 	err = fmt.Errorf("no stock found for name: %s", param.StockName)
-	message.BroadcastToolEnd("get_stock_company_code", "", err)
 	log.Warnf("no stock found for name: %s", param.StockName)
 	return model.NewErrorResult(err.Error()), nil
 }

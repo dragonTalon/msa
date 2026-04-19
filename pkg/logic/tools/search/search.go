@@ -8,7 +8,6 @@ import (
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"
 	log "github.com/sirupsen/logrus"
-	"msa/pkg/logic/message"
 	"msa/pkg/logic/tools/safetool"
 	internal "msa/pkg/logic/tools/search/internal"
 	"msa/pkg/model"
@@ -65,13 +64,9 @@ func WebSearch(ctx context.Context, param *model.WebSearchParams) (string, error
 func doWebSearch(ctx context.Context, param *model.WebSearchParams) (string, error) {
 	log.Debugf("WebSearch start, query: %s", param.Query)
 
-	// 使用公共函数记录工具调用开始
-	message.BroadcastToolStart("web_search", fmt.Sprintf("query: %s", param.Query))
-
 	// 参数校验
 	if param.Query == "" {
 		errMsg := "搜索查询不能为空 | search query cannot be empty"
-		message.BroadcastToolEnd("web_search", "", fmt.Errorf("%s", errMsg))
 		return model.NewErrorResult(errMsg), nil
 	}
 
@@ -91,16 +86,12 @@ func doWebSearch(ctx context.Context, param *model.WebSearchParams) (string, err
 			RequestID:  searchResult.RequestID,
 			UsedEngine: searchResult.UsedEngine,
 		}
-		message.BroadcastToolEnd("web_search",
-			fmt.Sprintf("找到 %d 条结果 (引擎: %s)", len(searchResult.Results), searchResult.UsedEngine), nil)
 		log.Debugf("搜索成功，返回 %d 条结果 (引擎: %s, RequestID: %s)",
 			len(searchResult.Results), searchResult.UsedEngine, searchResult.RequestID)
 		return model.NewSuccessResult(data, fmt.Sprintf("找到 %d 条结果", len(searchResult.Results))), nil
 	}
 
 	// 失败不返回错误，而是通过 error_msg 字段告知
-	message.BroadcastToolEnd("web_search",
-		fmt.Sprintf("搜索失败: %s", searchResult.Message), nil)
 	log.Warnf("搜索失败: %s (RequestID: %s)", searchResult.Error, searchResult.RequestID)
 	return model.NewErrorResult(searchResult.Message), nil
 }

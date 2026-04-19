@@ -7,7 +7,6 @@ import (
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"
 	log "github.com/sirupsen/logrus"
-	"msa/pkg/logic/message"
 	"msa/pkg/logic/tools/safetool"
 	"msa/pkg/model"
 )
@@ -44,19 +43,14 @@ func GetStockCompanyInfo(ctx context.Context, param *CompanyInfoParam) (string, 
 func doGetStockCompanyInfo(ctx context.Context, param *CompanyInfoParam) (string, error) {
 	log.Infof("GetStockCompanyInfo start")
 
-	// 使用公共函数记录工具调用开始
-	message.BroadcastToolStart("get_stock_quote", fmt.Sprintf("stock_code: %s", param.StockCode))
-
 	if param == nil {
 		err := fmt.Errorf("param is nil")
-		message.BroadcastToolEnd("get stock current quote", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
 	// 调用公共函数获取股票数据
 	stockCurrentResp, err := FetchStockData(param.StockCode)
 	if err != nil {
-		message.BroadcastToolEnd("get stock current quote", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
@@ -64,6 +58,5 @@ func doGetStockCompanyInfo(ctx context.Context, param *CompanyInfoParam) (string
 	log.Infof("日期: %s", stockCurrentResp.Date)
 	log.Infof("当前价: %s", stockCurrentResp.CurrentPrice)
 
-	message.BroadcastToolEnd("get stock current quote", fmt.Sprintf("获取股票行情成功, 当前价: %s", stockCurrentResp.CurrentPrice), nil)
 	return model.NewSuccessResult(stockCurrentResp, fmt.Sprintf("获取股票行情成功, 当前价: %s", stockCurrentResp.CurrentPrice)), nil
 }

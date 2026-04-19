@@ -8,7 +8,6 @@ import (
 	"github.com/cloudwego/eino/components/tool/utils"
 	log "github.com/sirupsen/logrus"
 
-	"msa/pkg/logic/message"
 	"msa/pkg/logic/tools/safetool"
 	"msa/pkg/model"
 )
@@ -61,11 +60,9 @@ func VerifyTodoCompletion(ctx context.Context, param *VerifyTodoParam) (string, 
 
 func doVerifyTodoCompletion(ctx context.Context, param *VerifyTodoParam) (string, error) {
 	log.Infof("VerifyTodoCompletion start, path: %s", param.TodoPath)
-	message.BroadcastToolStart("verify_todo_completion", param.TodoPath)
 
 	if param.TodoPath == "" {
 		err := fmt.Errorf("todo_path is required")
-		message.BroadcastToolEnd("verify_todo_completion", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
@@ -76,7 +73,6 @@ func doVerifyTodoCompletion(ctx context.Context, param *VerifyTodoParam) (string
 	todo, err := ParseTodoFile(todoPath)
 	if err != nil {
 		log.Errorf("VerifyTodoCompletion: failed to parse todo: %v", err)
-		message.BroadcastToolEnd("verify_todo_completion", "", err)
 		return model.NewErrorResult(fmt.Sprintf("解析 TODO 文件失败: %v", err)), nil
 	}
 
@@ -105,7 +101,6 @@ func doVerifyTodoCompletion(ctx context.Context, param *VerifyTodoParam) (string
 
 	resultMsg := fmt.Sprintf("验证完成: 总步骤 %d, 成功 %d, 待执行 %d, 失败 %d",
 		todo.StepCount.Total, todo.StepCount.Done, todo.StepCount.Pending, todo.StepCount.Failed)
-	message.BroadcastToolEnd("verify_todo_completion", resultMsg, nil)
 
 	return model.NewSuccessResult(data, resultMsg), nil
 }

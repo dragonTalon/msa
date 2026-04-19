@@ -9,7 +9,6 @@ import (
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"
 	log "github.com/sirupsen/logrus"
-	"msa/pkg/logic/message"
 	"msa/pkg/logic/tools/safetool"
 	internal "msa/pkg/logic/tools/search/internal"
 	"msa/pkg/model"
@@ -60,20 +59,15 @@ func FetchPageContent(ctx context.Context, param *model.FetchPageParams) (string
 func doFetchPageContent(ctx context.Context, param *model.FetchPageParams) (string, error) {
 	log.Infof("FetchPageContent start, url: %s", param.URL)
 
-	// 使用公共函数记录工具调用开始
-	message.BroadcastToolStart("fetch_page_content", fmt.Sprintf("url: %s", param.URL))
-
 	// 参数校验
 	if param.URL == "" {
 		errMsg := "URL 不能为空 | URL cannot be empty"
-		message.BroadcastToolEnd("fetch_page_content", "", fmt.Errorf("%s", errMsg))
 		return model.NewErrorResult(errMsg), nil
 	}
 
 	// 验证 URL 格式
 	if _, err := url.Parse(param.URL); err != nil {
 		errMsg := fmt.Sprintf("无效的 URL 格式: %v | invalid URL format: %v", err, err)
-		message.BroadcastToolEnd("fetch_page_content", "", fmt.Errorf("%s", errMsg))
 		return model.NewErrorResult(errMsg), nil
 	}
 
@@ -87,7 +81,6 @@ func doFetchPageContent(ctx context.Context, param *model.FetchPageParams) (stri
 	if err != nil {
 		log.Errorf("获取页面失败: %v", err)
 		errMsg := fmt.Sprintf("获取页面失败: %v", err)
-		message.BroadcastToolEnd("fetch_page_content", "", err)
 		return model.NewErrorResult(errMsg), nil
 	}
 
@@ -96,7 +89,6 @@ func doFetchPageContent(ctx context.Context, param *model.FetchPageParams) (stri
 	if err != nil {
 		log.Errorf("提取内容失败: %v", err)
 		errMsg := fmt.Sprintf("提取内容失败: %v", err)
-		message.BroadcastToolEnd("fetch_page_content", "", err)
 		return model.NewErrorResult(errMsg), nil
 	}
 
@@ -131,7 +123,6 @@ func doFetchPageContent(ctx context.Context, param *model.FetchPageParams) (stri
 		TotalLength: totalLength,
 	}
 
-	message.BroadcastToolEnd("fetch_page_content", fmt.Sprintf("获取 %d 字符（共 %d 字符）", returnedLength, totalLength), nil)
 	log.Debugf("页面抓取成功，返回 %d/%d 字符", returnedLength, totalLength)
 
 	return model.NewSuccessResult(data, fmt.Sprintf("获取 %d 字符（共 %d 字符）", returnedLength, totalLength)), nil

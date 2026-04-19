@@ -8,7 +8,6 @@ import (
 	"github.com/cloudwego/eino/components/tool/utils"
 	log "github.com/sirupsen/logrus"
 
-	"msa/pkg/logic/message"
 	"msa/pkg/logic/tools/safetool"
 	"msa/pkg/model"
 )
@@ -57,23 +56,19 @@ func UpdateTodoStep(ctx context.Context, param *UpdateTodoParam) (string, error)
 
 func doUpdateTodoStep(ctx context.Context, param *UpdateTodoParam) (string, error) {
 	log.Infof("UpdateTodoStep start, path: %s, step: %s, status: %s", param.TodoPath, param.StepID, param.Status)
-	message.BroadcastToolStart("update_todo_step", fmt.Sprintf("step: %s, status: %s", param.StepID, param.Status))
 
 	if param.TodoPath == "" {
 		err := fmt.Errorf("todo_path is required")
-		message.BroadcastToolEnd("update_todo_step", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
 	if param.StepID == "" {
 		err := fmt.Errorf("step_id is required")
-		message.BroadcastToolEnd("update_todo_step", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
 	if param.Status == "" {
 		err := fmt.Errorf("status is required")
-		message.BroadcastToolEnd("update_todo_step", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
@@ -95,14 +90,12 @@ func doUpdateTodoStep(ctx context.Context, param *UpdateTodoParam) (string, erro
 		stepStatus = StatusInProgress
 	default:
 		err := fmt.Errorf("invalid status: %s (must be one of: done, failed, handled, skipped, in_progress)", param.Status)
-		message.BroadcastToolEnd("update_todo_step", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
 	// 更新步骤状态
 	if err := UpdateStepStatus(todoPath, param.StepID, stepStatus, param.Note); err != nil {
 		log.Errorf("UpdateTodoStep: failed to update step: %v", err)
-		message.BroadcastToolEnd("update_todo_step", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
@@ -114,7 +107,6 @@ func doUpdateTodoStep(ctx context.Context, param *UpdateTodoParam) (string, erro
 	}
 
 	resultMsg := fmt.Sprintf("步骤 %s 状态更新为: %s", param.StepID, param.Status)
-	message.BroadcastToolEnd("update_todo_step", resultMsg, nil)
 
 	return model.NewSuccessResult(data, resultMsg), nil
 }

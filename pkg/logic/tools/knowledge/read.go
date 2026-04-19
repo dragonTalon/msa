@@ -8,7 +8,6 @@ import (
 	"github.com/cloudwego/eino/components/tool/utils"
 	log "github.com/sirupsen/logrus"
 
-	"msa/pkg/logic/message"
 	"msa/pkg/logic/tools/safetool"
 	"msa/pkg/model"
 )
@@ -56,7 +55,6 @@ func ReadKnowledge(ctx context.Context, param *ReadKnowledgeParam) (string, erro
 
 func doReadKnowledge(ctx context.Context, param *ReadKnowledgeParam) (string, error) {
 	log.Infof("ReadKnowledge start, type: %s", param.Type)
-	message.BroadcastToolStart("read_knowledge", fmt.Sprintf("type: %s", param.Type))
 
 	// 默认读取全部
 	readType := param.Type
@@ -72,7 +70,6 @@ func doReadKnowledge(ctx context.Context, param *ReadKnowledgeParam) (string, er
 		errorsPath, err := GetErrorsPath()
 		if err != nil {
 			log.Errorf("GetErrorsPath error: %v", err)
-			message.BroadcastToolEnd("read_knowledge", "", err)
 			return model.NewErrorResult(fmt.Sprintf("获取错误文件路径失败: %v", err)), nil
 		}
 		data.ErrorsPath = errorsPath
@@ -80,7 +77,6 @@ func doReadKnowledge(ctx context.Context, param *ReadKnowledgeParam) (string, er
 		entries, err := ParseErrorsFile(errorsPath)
 		if err != nil {
 			log.Errorf("ParseErrorsFile error: %v", err)
-			message.BroadcastToolEnd("read_knowledge", "", err)
 			return model.NewErrorResult(fmt.Sprintf("解析错误文件失败: %v", err)), nil
 		}
 		data.Errors = entries
@@ -92,7 +88,6 @@ func doReadKnowledge(ctx context.Context, param *ReadKnowledgeParam) (string, er
 		summaryPath, err := FindPrevSummaryFile()
 		if err != nil {
 			log.Errorf("FindPrevSummaryFile error: %v", err)
-			message.BroadcastToolEnd("read_knowledge", "", err)
 			return model.NewErrorResult(fmt.Sprintf("查找总结文件失败: %v", err)), nil
 		}
 
@@ -101,7 +96,6 @@ func doReadKnowledge(ctx context.Context, param *ReadKnowledgeParam) (string, er
 			summary, err := ParseSummaryFile(summaryPath)
 			if err != nil {
 				log.Errorf("ParseSummaryFile error: %v", err)
-				message.BroadcastToolEnd("read_knowledge", "", err)
 				return model.NewErrorResult(fmt.Sprintf("解析总结文件失败: %v", err)), nil
 			}
 			data.PrevSummary = summary
@@ -112,7 +106,6 @@ func doReadKnowledge(ctx context.Context, param *ReadKnowledgeParam) (string, er
 	// 构建结果消息
 	resultMsg := fmt.Sprintf("读取知识库完成: has_errors=%v, has_summary=%v",
 		data.HasErrors, data.HasSummary)
-	message.BroadcastToolEnd("read_knowledge", resultMsg, nil)
 
 	return model.NewSuccessResult(data, resultMsg), nil
 }
