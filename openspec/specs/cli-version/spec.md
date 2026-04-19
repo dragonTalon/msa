@@ -8,7 +8,7 @@
 
 ### Requirement: version 子命令
 
-CLI 必须提供 `msa version` 命令显示版本信息。
+CLI MUST 提供 `msa version` 命令显示版本信息。
 
 #### Scenario: 执行 version 命令
 
@@ -25,7 +25,7 @@ CLI 必须提供 `msa version` 命令显示版本信息。
 
 ### Requirement: 命令输出格式
 
-version 命令的输出必须清晰易读。
+version 命令的输出 MUST 清晰易读。
 
 #### Scenario: 标准输出格式
 
@@ -39,7 +39,7 @@ version 命令的输出必须清晰易读。
 
 ### Requirement: 命令目录结构
 
-version 命令必须遵循项目的命令目录结构规范。
+version 命令 MUST 遵循项目的命令目录结构规范。
 
 #### Scenario: 目录结构规范
 

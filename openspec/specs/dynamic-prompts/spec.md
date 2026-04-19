@@ -10,7 +10,7 @@
 
 ### Requirement: 动态 Prompt 构建
 
-系统必须能够根据选中的 Skills 动态构建完整的 System Prompt。
+系统 MUST 能够根据选中的 Skills 动态构建完整的 System Prompt。
 
 #### Scenario: 构建 System Prompt
 - **当**收到选中的 Skills 列表时
@@ -28,7 +28,7 @@
 
 ### Requirement: 基础 Prompt 保留
 
-系统必须保留现有的基础 Prompt 框架。
+系统 MUST 保留现有的基础 Prompt 框架。
 
 #### Scenario: 保留角色定义
 - **当**构建 System Prompt 时
@@ -49,7 +49,7 @@
 
 ### Requirement: 用户手动覆盖
 
-系统必须支持用户手动指定要使用的 Skills。
+系统 MUST 支持用户手动指定要使用的 Skills。
 
 #### Scenario: CLI 参数指定 Skills
 - **当**用户通过 `--skills` 参数指定 Skills 时
@@ -67,7 +67,7 @@
 
 ### Requirement: Skill 内容提取
 
-系统必须正确提取 SKILL.md 文件的 body 内容（跳过 frontmatter）。
+系统 MUST 正确提取 SKILL.md 文件的 body 内容（跳过 frontmatter）。
 
 #### Scenario: 提取标准格式的 Skill 内容
 - **当**Skill 文件以 `---` 开头的 YAML frontmatter 时
@@ -89,7 +89,7 @@
 
 ### Requirement: Prompt 变量填充
 
-系统必须在运行时填充 Prompt 中的变量。
+系统 MUST 在运行时填充 Prompt 中的变量。
 
 #### Scenario: 填充时间相关变量
 - **当**构建 Prompt 时
@@ -109,7 +109,7 @@
 
 ### Requirement: 错误处理
 
-系统必须处理 Prompt 构建过程中的各种错误。
+系统 MUST 处理 Prompt 构建过程中的各种错误。
 
 #### Scenario: Skill 文件不存在
 - **当**指定的 Skill 文件不存在时
