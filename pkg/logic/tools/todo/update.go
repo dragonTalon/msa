@@ -17,7 +17,7 @@ import (
 type UpdateTodoParam struct {
 	TodoPath string `json:"todo_path" jsonschema:"description=the path of the TODO file"`
 	StepID   string `json:"step_id" jsonschema:"description=the step ID to update (e.g. 1.1, 2.3)"`
-	Status   string `json:"status" jsonschema:"description=the new status: done, failed, handled, skipped"`
+	Status   string `json:"status" jsonschema:"description=the new status: done, failed, handled, skipped, in_progress"`
 	Note     string `json:"note,omitempty" jsonschema:"description=optional note about the status change"`
 }
 
@@ -77,6 +77,9 @@ func doUpdateTodoStep(ctx context.Context, param *UpdateTodoParam) (string, erro
 		return model.NewErrorResult(err.Error()), nil
 	}
 
+	// 自动补全路径前缀
+	todoPath := ResolveTodoPath(param.TodoPath)
+
 	// 验证状态值
 	var stepStatus StepStatus
 	switch param.Status {
@@ -88,21 +91,23 @@ func doUpdateTodoStep(ctx context.Context, param *UpdateTodoParam) (string, erro
 		stepStatus = StatusHandled
 	case "skipped":
 		stepStatus = StatusSkipped
+	case "in_progress":
+		stepStatus = StatusInProgress
 	default:
-		err := fmt.Errorf("invalid status: %s (must be one of: done, failed, handled, skipped)", param.Status)
+		err := fmt.Errorf("invalid status: %s (must be one of: done, failed, handled, skipped, in_progress)", param.Status)
 		message.BroadcastToolEnd("update_todo_step", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
 	// 更新步骤状态
-	if err := UpdateStepStatus(param.TodoPath, param.StepID, stepStatus, param.Note); err != nil {
+	if err := UpdateStepStatus(todoPath, param.StepID, stepStatus, param.Note); err != nil {
 		log.Errorf("UpdateTodoStep: failed to update step: %v", err)
 		message.BroadcastToolEnd("update_todo_step", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
 	data := &UpdateTodoData{
-		TodoPath:  param.TodoPath,
+		TodoPath:  todoPath,
 		StepID:    param.StepID,
 		Status:    param.Status,
 		NewStatus: string(stepStatus),

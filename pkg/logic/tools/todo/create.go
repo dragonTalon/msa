@@ -62,22 +62,27 @@ func doCreateTodo(ctx context.Context, param *CreateTodoParam) (string, error) {
 	log.Infof("CreateTodo start, skill_name: %s", param.SkillName)
 	message.BroadcastToolStart("create_todo", fmt.Sprintf("skill_name: %s", param.SkillName))
 
-	if param.SkillName == "" {
-		err := fmt.Errorf("skill_name is required")
+
+	// 清理 skill_name：去除首尾空白和可能的冒号前缀（模型有时会输出 ": value" 格式）
+	skillName := strings.TrimSpace(param.SkillName)
+	skillName = strings.TrimLeft(skillName, ": ")
+	skillName = strings.TrimSpace(skillName)
+	if skillName == "" {
+		err := fmt.Errorf("skill_name is required, got: %q (原始值: %q)", skillName, param.SkillName)
 		message.BroadcastToolEnd("create_todo", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
 	// 获取 Skill
 	manager := skills.GetManager()
-	sk, err := manager.GetSkill(param.SkillName)
+	sk, err := manager.GetSkill(skillName)
 	if err != nil {
-		log.Errorf("CreateTodo: failed to get skill %s: %v", param.SkillName, err)
+		log.Errorf("CreateTodo: failed to get skill %s: %v", skillName, err)
 		message.BroadcastToolEnd("create_todo", "", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 	if sk == nil {
-		err = fmt.Errorf("skill '%s' not found", param.SkillName)
+		err = fmt.Errorf("skill '%s' not found", skillName)
 		log.Warnf("CreateTodo: %v", err)
 		message.BroadcastToolEnd("create_todo", "", err)
 		return model.NewErrorResult(err.Error()), nil
@@ -116,10 +121,10 @@ func doCreateTodo(ctx context.Context, param *CreateTodoParam) (string, error) {
 	}
 
 	// 替换模板变量
-	content := replaceTemplateVariables(templateContent, param.SkillName, currentSession)
+	content := replaceTemplateVariables(templateContent, skillName, currentSession)
 
 	// 创建 TODO 文件
-	todoPath := filepath.Join(todoDir, param.SkillName+".md")
+	todoPath := filepath.Join(todoDir, skillName+".md")
 	if err := os.WriteFile(todoPath, []byte(content), 0644); err != nil {
 		log.Errorf("CreateTodo: failed to write todo file: %v", err)
 		message.BroadcastToolEnd("create_todo", "", err)
@@ -138,7 +143,7 @@ func doCreateTodo(ctx context.Context, param *CreateTodoParam) (string, error) {
 	}
 
 	data := &CreateTodoData{
-		SkillName:  param.SkillName,
+		SkillName:  skillName,
 		TodoPath:   todoPath,
 		Content:    content,
 		TotalSteps: totalSteps,

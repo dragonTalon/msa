@@ -4,19 +4,23 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
+
+	"msa/pkg/session"
 )
 
 // StepStatus 步骤状态
 type StepStatus string
 
 const (
-	StatusPending StepStatus = "pending" // [ ] 待执行
-	StatusDone    StepStatus = "done"    // [x] 成功
-	StatusFailed  StepStatus = "failed"  // [!] 失败
-	StatusHandled StepStatus = "handled" // [-] 已处理
-	StatusSkipped StepStatus = "skipped" // [~] 跳过
+	StatusPending    StepStatus = "pending"     // [ ] 待执行
+	StatusInProgress StepStatus = "in_progress" // [>] 进行中
+	StatusDone       StepStatus = "done"        // [x] 成功
+	StatusFailed     StepStatus = "failed"      // [!] 失败
+	StatusHandled    StepStatus = "handled"     // [-] 已处理
+	StatusSkipped    StepStatus = "skipped"     // [~] 跳过
 )
 
 // Step 表示 TODO 文件中的一个步骤
@@ -37,22 +41,25 @@ type TodoFile struct {
 
 // Stats 统计信息
 type Stats struct {
-	Total   int // 总步骤数
-	Done    int // 成功数
-	Failed  int // 失败数
-	Handled int // 已处理数
-	Skipped int // 跳过数
-	Pending int // 待执行数
+	Total      int // 总步骤数
+	Done       int // 成功数
+	Failed     int // 失败数
+	Handled    int // 已处理数
+	Skipped    int // 跳过数
+	Pending    int // 待执行数
+	InProgress int // 进行中数
 }
 
 // 状态标记正则
-var statusPattern = regexp.MustCompile(`^\s*- \[([ x!\-~])\]\s*(\d+\.\d+)\s*(.*)$`)
+var statusPattern = regexp.MustCompile(`^\s*- \[([ >x!\-~])\]\s*(\d+\.\d+)\s*(.*)$`)
 
 // statusCharToStatus 将字符转换为状态
 func statusCharToStatus(char string) StepStatus {
 	switch char {
 	case " ":
 		return StatusPending
+	case ">":
+		return StatusInProgress
 	case "x":
 		return StatusDone
 	case "!":
@@ -71,6 +78,8 @@ func statusToChar(status StepStatus) string {
 	switch status {
 	case StatusPending:
 		return " "
+	case StatusInProgress:
+		return ">"
 	case StatusDone:
 		return "x"
 	case StatusFailed:
@@ -82,6 +91,33 @@ func statusToChar(status StepStatus) string {
 	default:
 		return " "
 	}
+}
+
+// ResolveTodoPath 解析 todo_path，如果不是绝对路径则自动补全默认前缀
+// 规则：
+//   - 绝对路径：直接使用
+//   - 相对路径（如 afternoon-trade.md 或 2026-04-14_xxx/afternoon-trade.md）：
+//     自动补全为 ~/.msa/todos/<current-session-id>/<path>
+func ResolveTodoPath(path string) string {
+	if filepath.IsAbs(path) {
+		return path
+	}
+
+	sessionMgr := session.GetManager()
+	todosRoot := filepath.Join(filepath.Dir(sessionMgr.GetMemoryDir()), "todos")
+
+	currentSession := sessionMgr.Current()
+	if currentSession != nil {
+		// 如果 path 已经包含 session-id 目录（如 2026-04-14_xxx/file.md），直接拼接 todosRoot
+		// 否则拼接 todosRoot/<session-id>/path
+		if strings.Contains(path, string(filepath.Separator)) {
+			return filepath.Join(todosRoot, path)
+		}
+		return filepath.Join(todosRoot, currentSession.SessionID(), path)
+	}
+
+	// 没有当前 session，只拼接 todosRoot
+	return filepath.Join(todosRoot, path)
 }
 
 // ParseTodoFile 解析 TODO 文件
@@ -156,6 +192,8 @@ func CountSteps(steps []*Step) Stats {
 			stats.Skipped++
 		case StatusPending:
 			stats.Pending++
+		case StatusInProgress:
+			stats.InProgress++
 		}
 	}
 

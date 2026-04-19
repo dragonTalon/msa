@@ -69,8 +69,11 @@ func doVerifyTodoCompletion(ctx context.Context, param *VerifyTodoParam) (string
 		return model.NewErrorResult(err.Error()), nil
 	}
 
+	// 自动补全路径前缀
+	todoPath := ResolveTodoPath(param.TodoPath)
+
 	// 解析 TODO 文件
-	todo, err := ParseTodoFile(param.TodoPath)
+	todo, err := ParseTodoFile(todoPath)
 	if err != nil {
 		log.Errorf("VerifyTodoCompletion: failed to parse todo: %v", err)
 		message.BroadcastToolEnd("verify_todo_completion", "", err)
@@ -87,7 +90,7 @@ func doVerifyTodoCompletion(ctx context.Context, param *VerifyTodoParam) (string
 	suggestion := generateSuggestion(todo)
 
 	data := &VerifyTodoData{
-		TodoPath:         param.TodoPath,
+		TodoPath:         todoPath,
 		AllComplete:      todo.IsAllComplete(),
 		HasPending:       todo.HasPending(),
 		HasUnhandledFail: todo.HasUnhandledFail(),
