@@ -1,4 +1,10 @@
-## ADDED Requirements
+# 规格：tool-response-format
+
+## Purpose
+
+所有 tool 函数 SHALL 返回统一的 JSON 响应结构，系统 MUST 提供辅助函数生成标准响应，确保 LLM 能够一致地解析工具返回结果。
+
+## Requirements
 
 ### Requirement: 统一的 Tool 响应结构
 
