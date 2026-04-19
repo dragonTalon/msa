@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -107,7 +108,7 @@ func (a *Agent) run(ctx context.Context, messages []*schema.Message, ch chan<- e
 
 		result, err := a.adapter.Process(ctx, sr, ch)
 		if err != nil {
-			if err == context.Canceled {
+			if errors.Is(err, context.Canceled) {
 				logger.Warnf("[Agent] 第 %d 轮 context canceled，干净退出", round)
 				return
 			}
