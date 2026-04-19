@@ -2,50 +2,54 @@
 
 > 📚 **知识上下文**：基于推荐模式 error-handling-strategy 和 config-auto-fill-on-provider-change
 
-## 增加需求
+## Purpose
 
-### 需求：CLI 单轮对话参数
+CLI chat 功能 SHALL 允许用户通过命令行参数直接发起单轮对话，无需进入 TUI 界面。
 
-用户可以通过命令行参数快速发起单轮对话，无需进入 TUI 界面。
+## Requirements
 
-#### 场景：使用默认模型发起对话
+### Requirement: CLI 单轮对话参数
+
+系统 SHALL 支持通过命令行参数快速发起单轮对话，无需进入 TUI 界面。
+
+#### Scenario: 使用默认模型发起对话
 
 - **当** 用户执行 `msa -q "茅台最近走势怎么样"`
 - **那么** 系统使用配置文件中的默认模型发起对话
 - **那么** 流式输出响应内容到终端
 - **那么** 对话完成后程序退出，返回退出码 0
 
-#### 场景：指定模型发起对话
+#### Scenario: 指定模型发起对话
 
 - **当** 用户执行 `msa -q "茅台最近走势怎么样" -m "deepseek-r1"`
 - **那么** 系统使用指定的模型发起对话
 - **那么** 模型参数优先级高于配置文件
 
-#### 场景：无 TUI 模式启动
+#### Scenario: 无 TUI 模式启动
 
 - **当** 用户执行 `msa` 不带 `-q` 参数
 - **那么** 系统启动 TUI 界面（现有行为保持不变）
 
 ---
 
-### 需求：流式输出格式
+### Requirement: 流式输出格式
 
-CLI 模式通过 `Runner.Ask` + `CLIRenderer` 处理流式输出，直接写 stdout。
+CLI 模式 SHALL 通过 `Runner.Ask` + `CLIRenderer` 处理流式输出，直接写 stdout。
 
-#### 场景：正文消息输出
+#### Scenario: 正文消息输出
 
 - **当** 收到 `event.EventTextChunk` 类型事件
 - **那么** 直接输出 `e.Text` 到 stdout（不加换行）
 - **当** 收到 `event.EventTextDone`
 - **那么** 输出换行
 
-#### 场景：思考过程输出
+#### Scenario: 思考过程输出
 
 - **当** 收到 `event.EventThinking` 类型事件
 - **那么** 如果 verbose=true，输出思考内容到 stdout
 - **那么** 默认（verbose=false）不输出思考内容
 
-#### 场景：工具调用输出
+#### Scenario: 工具调用输出
 
 - **当** 收到 `event.EventToolStart` 类型事件
 - **那么** 输出 `⚙ 正在调用 <tool_name>...` 格式
@@ -54,7 +58,7 @@ CLI 模式通过 `Runner.Ask` + `CLIRenderer` 处理流式输出，直接写 std
 - **当** 收到 `event.EventToolError`
 - **那么** 输出 `✗ <tool_name> 失败: <err>`
 
-#### 场景：流式输出完成
+#### Scenario: 流式输出完成
 
 - **当** 收到 `event.EventRoundDone` 或 event channel 关闭
 - **那么** `Runner.Ask` 返回
@@ -62,32 +66,32 @@ CLI 模式通过 `Runner.Ask` + `CLIRenderer` 处理流式输出，直接写 std
 
 ---
 
-### 需求：错误处理
+### Requirement: 错误处理
+
+CLI 模式 SHALL 分类错误处理，提供清晰的错误信息和退出码。
 
 > 📚 **历史问题参考**：基于模式 error-handling-strategy
 
-分类错误处理，提供清晰的错误信息和退出码。
-
-#### 场景：参数错误
+#### Scenario: 参数错误
 
 - **当** 用户执行 `msa -q ""` (空问题)
 - **那么** 输出错误信息 "问题内容不能为空"
 - **那么** 程序退出，返回退出码 1
 
-#### 场景：配置缺失（永久错误）
+#### Scenario: 配置缺失（永久错误）
 
 - **当** 配置文件中 API Key 为空
 - **那么** 输出错误信息 "请先配置 API Key，运行 'msa config'"
 - **那么** 程序退出，返回退出码 1
 - **那么** 不进行重试
 
-#### 场景：模型未配置（永久错误）
+#### Scenario: 模型未配置（永久错误）
 
 - **当** 未指定 `-m` 参数且配置文件中 Model 为空
 - **那么** 输出错误信息 "请指定模型 (-m) 或配置默认模型"
 - **那么** 程序退出，返回退出码 1
 
-#### 场景：流式请求失败
+#### Scenario: 流式请求失败
 
 - **当** AI 请求过程中发生错误
 - **那么** 输出错误信息到 stderr
@@ -95,17 +99,17 @@ CLI 模式通过 `Runner.Ask` + `CLIRenderer` 处理流式输出，直接写 std
 
 ---
 
-### 需求：模型参数优先级
+### Requirement: 模型参数优先级
 
-> 📚 **历史问题参考**：基于模式 config-auto-fill-on-provider-change
+CLI 模式 SHALL 按照特定优先级处理模型参数配置。
 
-#### 场景：-m 参数覆盖模型配置
+#### Scenario: -m 参数覆盖模型配置
 
 - **当** 用户指定 `-m "deepseek-r1"`
 - **那么** 使用指定模型，忽略配置文件中的 Model 字段
 - **那么** 其他配置（Provider, APIKey, BaseURL）仍从配置文件读取
 
-#### 场景：-m 参数未指定
+#### Scenario: -m 参数未指定
 
 - **当** 用户未指定 `-m` 参数
 - **那么** 使用配置文件中的 Model 字段
@@ -113,9 +117,11 @@ CLI 模式通过 `Runner.Ask` + `CLIRenderer` 处理流式输出，直接写 std
 
 ---
 
-### 需求：参数互斥
+### Requirement: 参数互斥
 
-#### 场景：-q 与 --resume 互斥
+系统 SHALL 处理互斥参数的冲突情况。
+
+#### Scenario: -q 与 --resume 互斥
 
 - **当** 用户同时指定 `-q` 和 `--resume` 参数
 - **那么** 输出警告信息 "-q 和 --resume 不能同时使用"
@@ -123,14 +129,16 @@ CLI 模式通过 `Runner.Ask` + `CLIRenderer` 处理流式输出，直接写 std
 
 ---
 
-### 需求：退出码规范
+### Requirement: 退出码规范
 
-#### 场景：成功退出
+CLI 模式 SHALL 遵循统一的退出码规范。
+
+#### Scenario: 成功退出
 
 - **当** 对话正常完成
 - **那么** 返回退出码 0
 
-#### 场景：错误退出
+#### Scenario: 错误退出
 
 - **当** 任何错误发生
 - **那么** 返回退出码 1
