@@ -91,17 +91,21 @@ The update command automatically downloads the latest release from GitHub Releas
 ### Configuration
 
 ```bash
-# Configure API key
+# Configure API key and model
 msa config
-
-# Select model
-msa chat
 ```
 
 ### Start Chatting
 
 ```bash
-msa chat
+# TUI interactive mode
+msa
+
+# Single-round CLI mode
+msa -q "What's Tencent's stock code?"
+
+# Single-round with specific model
+msa -q "Analyze AAPL" -m "deepseek-r1"
 ```
 
 ## 📸 Demo
@@ -173,7 +177,12 @@ For detailed documentation, see [docs/SKILLS.md](docs/SKILLS.md).
 ### Chat Mode
 
 ```bash
-msa chat
+# TUI multi-round mode (default)
+msa
+
+# CLI single-round mode
+msa -q "your question"
+msa -q "your question" -m "model-name"
 ```
 
 In chat mode, you can:
@@ -302,8 +311,10 @@ msa --config /path/to/config.json --config apikey=sk-xxx chat
 
 | Parameter | Short | Description | Example |
 |-----------|-------|-------------|---------|
+| `--question` | `-q` | Single-round question (no TUI) | `msa -q "Tencent stock code?"` |
+| `--model` | `-m` | Override model for this run | `-m "deepseek-r1"` |
+| `--resume` | - | Resume a previous session by ID | `--resume 2026-01-01_uuid` |
 | `--config` | - | Set configuration (file or key=value) | `--config apikey=sk-xxx` |
-| `--resume` | `-r` | Resume a previous session by ID | `--resume abc-123-def-456` |
 
 #### View Configuration in TUI
 
@@ -467,59 +478,69 @@ msa/ (Project Root)
 ├── go.sum                    # Go module dependency verification
 ├── main.go                   # Project entry, initializes Cobra CLI
 ├── cmd/                      # Cobra CLI command routing layer
-│   └── root.go              # Root command definition, routing only
+│   └── root.go              # Root command, routing only
 └── pkg/                      # Business implementation layer
-    ├── app/                 # Application core module
-    │   └── app.go           # Application startup
-    ├── db/                  # Database layer
+    ├── app/                 # Application startup (TUI mode)
+    ├── extcli/              # CLI single-round mode (msa -q)
+    ├── core/                # Core pipeline (no UI dependency)
+    │   ├── event/           # Event type system (pipeline data flow)
+    │   ├── logger/          # Structured logging with requestID
+    │   ├── agent/           # Agent: Run() returns <-chan Event
+    │   └── runner/          # Runner: agent → renderer orchestration
+    ├── renderer/            # Output adapters
+    │   ├── renderer.go      # Renderer interface
+    │   ├── cli.go           # CLI: writes to stdout
+    │   └── tui.go           # TUI: forwards to Bubble Tea
+    ├── db/                  # Database layer (SQLite + GORM)
     │   ├── db.go            # Database initialization
-    │   ├── global.go        # Global database management
+    │   ├── global.go        # Global DB management
     │   ├── migrate.go       # Schema migration
     │   ├── account.go       # Account operations
     │   └── transaction.go   # Transaction operations
     ├── model/               # Data models
-    │   ├── account.go       # Account model
-    │   ├── transaction.go   # Transaction model
-    │   └── stock.go         # Stock data model
-    ├── service/             # Business services
-    │   ├── account_service.go    # Account service
-    │   ├── trade_service.go      # Trading service
-    │   └── position_service.go   # Position calculation
-    ├── tui/                 # Terminal UI module
+    ├── session/             # Session persistence and resume
+    ├── tui/                 # Terminal UI (Bubble Tea, pure UI)
     │   ├── style/           # UI styling
     │   ├── config/          # Configuration TUI
-    │   ├── chat.go          # Chat interface
-    │   └── model_selector.go # Model selector
+    │   └── chat.go          # Chat interface
     ├── config/              # Configuration management
-    │   ├── local_config.go  # Local storage configuration
-    │   ├── env.go           # Environment variables
-    │   ├── validator.go     # Configuration validator
-    │   └── logger.go        # Logging configuration
     ├── logic/               # Business logic
-    │   ├── agent/           # AI agent
     │   ├── command/         # Command handling
-    │   ├── message/         # Message management
     │   ├── provider/        # LLM providers
     │   ├── skills/          # Dynamic Skills system
-    │   └── tools/           # Tools
-    │       ├── stock/       # Stock tools
-    │       ├── search/      # Search tools
-    │       └── finance/     # Finance tools
+    │   ├── finsvc/          # Finance services (trade, position)
+    │   └── tools/           # Tools (stock, search, finance, etc.)
     └── utils/               # Utility functions
-        ├── file.go
-        ├── http.go
-        └── format.go
+```
+
+### Core Data Flow
+
+```
+User Input
+  ↓
+Runner.Ask(ctx, input)
+  ↓
+Agent.Run(ctx, messages) → <-chan Event
+  ↓  StreamAdapter handles Eino stream
+  ↓  ReAct loop: LLM → tool → LLM → ...
+  ↓  emits structured Events
+Runner consumes eventCh
+  ↓
+Renderer.Handle(ctx, event)
+  ↓
+CLI: fmt.Print          TUI: bubbletea msg
 ```
 
 ### Architecture Principles
 
 - **cmd/** - Command routing only, keeps code minimal
-- **pkg/** - All business implementations with clear responsibilities
-  - **app/** - Application lifecycle management
-  - **tui/** - Terminal user interface (Bubble Tea)
-  - **config/** - Configuration and logging
-  - **logic/** - Core business logic
-  - **utils/** - Common utility functions
+- **pkg/core/** - Business core, zero UI dependency; can be tested independently
+  - **event/** - Typed event system replacing global broadcast
+  - **agent/** - Eino wrapper with clean stream handling (replaces toolCallChecker)
+  - **runner/** - Orchestration layer shared by CLI and TUI
+- **pkg/renderer/** - UI adapter layer absorbing CLI/TUI differences
+- **pkg/tui/** - Pure UI components, no business logic
+- **pkg/logic/tools/** - Tool implementations, all receive `ctx`
 
 ## 🗺️ Roadmap
 
