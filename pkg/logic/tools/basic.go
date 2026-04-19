@@ -46,3 +46,12 @@ func RegisterTool(tool MsaTool) {
 	})
 	toolMap[tool.GetName()] = tool
 }
+
+// GetToolsMap 返回工具名称到 MsaTool 的映射（供 core/agent 使用）
+func GetToolsMap() map[string]MsaTool {
+	result := make(map[string]MsaTool, len(toolMap))
+	for k, v := range toolMap {
+		result[k] = v
+	}
+	return result
+}
