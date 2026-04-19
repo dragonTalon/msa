@@ -32,7 +32,7 @@
 
 ### Requirement: 对话入口统一为 Runner.Ask
 
-对话发起统一通过 `Runner.Ask(ctx, input, history)` 完成，不再直接调用 `agent.Ask`。
+对话发起 SHALL 统一通过 `Runner.Ask(ctx, input, history)` 完成，不再直接调用 `agent.Ask`。
 
 #### Scenario: TUI 发起对话
 - **WHEN** TUI 层用户按 Enter 提交输入
@@ -54,7 +54,7 @@
 
 ### Requirement: 错误处理
 
-Skill 内容加载失败时必须优雅降级，不影响对话功能。
+Skill 内容加载失败时 MUST 优雅降级，不影响对话功能。
 
 #### Scenario: Skill 内容加载失败
 - **WHEN** `get_skill_content` tool 调用失败时
@@ -70,7 +70,7 @@ Skill 内容加载失败时必须优雅降级，不影响对话功能。
 
 ### Requirement: 日志记录
 
-对话流程中的关键节点必须记录结构化日志，支持 requestID 链路追踪。
+对话流程中的关键节点 MUST 记录结构化日志，支持 requestID 链路追踪。
 
 #### Scenario: requestID 注入
 - **WHEN** `Runner.Ask` 被调用
@@ -90,7 +90,7 @@ Skill 内容加载失败时必须优雅降级，不影响对话功能。
 
 ### Requirement: 会话初始化增强
 
-聊天会话初始化时必须同时初始化记忆管理器。
+聊天会话初始化时 MUST 同时初始化记忆管理器。
 
 #### Scenario: 启动时初始化记忆系统
 
@@ -106,7 +106,7 @@ Skill 内容加载失败时必须优雅降级，不影响对话功能。
 
 ### Requirement: 消息记录增强
 
-每条消息必须同时记录到历史和记忆系统。
+每条消息 MUST 同时记录到历史和记忆系统。
 
 #### Scenario: 用户输入消息
 
@@ -136,7 +136,7 @@ Skill 内容加载失败时必须优雅降级，不影响对话功能。
 
 ### Requirement: 会话结束增强
 
-会话结束时必须保存完整会话并触发知识提取。
+会话结束时 MUST 保存完整会话并触发知识提取。
 
 #### Scenario: 正常退出保存会话
 
@@ -160,7 +160,7 @@ Skill 内容加载失败时必须优雅降级，不影响对话功能。
 
 ### Requirement: 短期内存管理
 
-系统必须维护最近 10 条消息的快速访问内存。
+系统 MUST 维护最近 10 条消息的快速访问内存。
 
 #### Scenario: 维护短期内存
 
@@ -180,7 +180,7 @@ Skill 内容加载失败时必须优雅降级，不影响对话功能。
 
 ### Requirement: 记忆系统状态显示
 
-用户应能看到记忆系统的状态。
+用户 SHALL 能够看到记忆系统的状态。
 
 #### Scenario: 显示记忆系统状态
 
@@ -203,7 +203,7 @@ Skill 内容加载失败时必须优雅降级，不影响对话功能。
 
 ### Requirement: 记忆系统可选禁用
 
-用户应能选择不使用记忆系统。
+用户 SHALL 能够选择不使用记忆系统。
 
 #### Scenario: 禁用记忆系统
 
@@ -224,7 +224,7 @@ Skill 内容加载失败时必须优雅降级，不影响对话功能。
 
 ### Requirement: 输入处理增强
 
-聊天输入框必须处理命令自动补全相关的按键事件。
+聊天输入框 MUST 处理命令自动补全相关的按键事件。
 
 #### Scenario: 处理 Tab 键补全
 
@@ -255,7 +255,7 @@ Skill 内容加载失败时必须优雅降级，不影响对话功能。
 
 ### Requirement: 命令建议数据
 
-Chat 模型必须维护命令建议的状态数据。
+Chat 模型 MUST 维护命令建议的状态数据。
 
 #### Scenario: 维护建议状态
 
