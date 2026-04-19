@@ -30,14 +30,20 @@
 
 ---
 
-### Requirement: Ask 函数签名简化
+### Requirement: 对话入口统一为 Runner.Ask
 
-`Ask` 函数 SHALL 移除 `manualSkills []string` 参数。
+对话发起统一通过 `Runner.Ask(ctx, input, history)` 完成，不再直接调用 `agent.Ask`。
 
-#### Scenario: 调用 Ask
-- **WHEN** TUI 层调用 `agent.Ask`
-- **THEN** 签名为 `Ask(ctx context.Context, messages string, history []model.Message) error`
-- **AND** 不再需要传入 skills 列表
+#### Scenario: TUI 发起对话
+- **WHEN** TUI 层用户按 Enter 提交输入
+- **THEN** 调用 `runner.Runner.Ask(ctx, input, history []model.Message)`
+- **AND** Runner 内部创建 `core/agent.Agent`，调用 `Agent.Run(ctx, messages)` 返回 `<-chan event.Event`
+- **AND** Runner 消费 event channel，通过注入的 `Renderer` 接口输出
+
+#### Scenario: CLI 发起对话
+- **WHEN** CLI 模式（`msa -q "..."`)
+- **THEN** 同样调用 `runner.Runner.Ask`，注入 `CLIRenderer`（写 stdout）
+- **AND** 单次对话，无历史
 
 #### Scenario: BaseUserPrompt 简化
 - **WHEN** 构建 user message
@@ -64,7 +70,17 @@ Skill 内容加载失败时必须优雅降级，不影响对话功能。
 
 ### Requirement: 日志记录
 
-对话流程中的 Skill 相关操作必须记录适当的日志。
+对话流程中的关键节点必须记录结构化日志，支持 requestID 链路追踪。
+
+#### Scenario: requestID 注入
+- **WHEN** `Runner.Ask` 被调用
+- **THEN** 系统必须通过 `corelogger.WithRequestID(ctx)` 生成 6 位十六进制 requestID 注入 ctx
+- **AND** 整条链路（Runner → Agent → StreamAdapter → Tool）所有日志均携带 `req` 字段
+
+#### Scenario: 记录关键节点
+- **WHEN** 一轮对话执行中
+- **THEN** 系统必须记录 INFO 日志，包含：Runner 收到输入、每轮 LLM 调用开始/结束、工具执行开始/完成
+- **AND** 工具执行记录包含 name、elapsed、outputLen
 
 #### Scenario: 记录消息构建
 - **WHEN** `BuildQueryMessages` 被调用

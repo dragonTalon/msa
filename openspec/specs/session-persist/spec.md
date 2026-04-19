@@ -44,7 +44,7 @@
 - **那么** 更新 frontmatter 中的 `updated_at`
 
 #### 场景：助手消息持久化
-- **当** 助手回复完成（IsDone=true）时
+- **当** 助手回复完成（收到 `event.EventRoundDone`）时
 - **那么** 系统追加 `## 🤖 MSA\n{回复内容}\n\n` 到会话文件
 - **那么** 更新 frontmatter 中的 `updated_at`
 

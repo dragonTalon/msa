@@ -30,21 +30,38 @@ context: |
   - 所有金额以"毫"为单位存储（1 元 = 10000 毫）
   - 配置优先级: 命令行参数 > 环境变量 > 配置文件 > 默认值
   
-  ## 架构说明
-  - cmd/ - CLI 命令路由 (Cobra)
-  - pkg/app/ - 应用启动
+  ## 架构说明（事件驱动 Pipeline 架构）
+  - cmd/ - CLI 命令路由 (Cobra)，组装依赖并注入
+  - pkg/app/ - 应用启动（TUI 模式入口）
   - pkg/config/ - 配置管理
   - pkg/db/ - 数据库层 (GORM)
+  - pkg/core/ - 核心业务逻辑（无 UI 依赖）
+    - agent/ - AI 代理：Agent.Run() 返回 <-chan Event，包含 StreamAdapter（处理 Eino stream）
+    - runner/ - Runner：消费 event channel，协调 agent → renderer，持久化会话
+    - event/ - Event 类型系统（pipeline 通信数据结构）
+    - logger/ - 结构化日志，requestID 注入与传播
+  - pkg/renderer/ - 输出适配层
+    - Renderer 接口：Handle(ctx, event.Event) error
+    - cli.go - CLI 实现（写 stdout）
+    - tui.go - TUI 实现（转发给 bubbletea）
   - pkg/logic/ - 业务逻辑
-    - agent/ - AI 代理实现
     - command/ - TUI 命令处理
-    - message/ - 消息/流管理
     - provider/ - LLM 提供商实现
-    - tools/ - 工具实现（股票、搜索、金融）
+    - tools/ - 工具实现（股票、搜索、金融），工具通过 safetool.SafeExecute 包装
+    - skills/ - Skill 动态加载系统
+    - finsvc/ - 金融服务（交易、持仓）
   - pkg/model/ - 数据模型
-  - pkg/service/ - 业务服务
-  - pkg/tui/ - 终端 UI 组件
+  - pkg/tui/ - 终端 UI 组件（纯 UI，无业务逻辑）
+  - pkg/extcli/ - CLI 单次对话模式
+  - pkg/session/ - 会话管理与持久化
   - pkg/utils/ - 工具函数
+
+  ## 核心数据流
+  用户输入 → Runner.Ask(ctx, input) → Agent.Run(ctx, messages) → <-chan Event → Renderer.Handle() → CLI/TUI 输出
+
+  ## 已删除的旧包（勿再引用）
+  - pkg/logic/agent/ - 已被 pkg/core/agent/ 替代
+  - pkg/logic/message/ - 已被 event channel 替代（StreamOutputManager 已删除）
   
   ## 领域知识
   - 股票交易模拟与虚拟账户
