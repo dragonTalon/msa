@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"strings"
 
+	coreagent "msa/pkg/core/agent"
+	"msa/pkg/core/event"
+	"msa/pkg/core/runner"
 	"msa/pkg/config"
-	"msa/pkg/logic/agent"
 	command "msa/pkg/logic/command"
-	"msa/pkg/logic/message"
 	"msa/pkg/model"
 	"msa/pkg/session"
 	"msa/pkg/tui/style"
@@ -30,9 +31,6 @@ const (
 	minAPIKeyDisplayLen = 8
 	apiKeyPrefixLen     = 4
 	apiKeySuffixLen     = 4
-
-	// 流式输出相关常量
-	streamBufferSize = 100
 
 	// 提示信息
 	placeholderText     = "输入你的理财问题..."
@@ -60,8 +58,7 @@ type Chat struct {
 	isStreaming          bool                        // 是否正在流式输出
 	fullStreamContent    strings.Builder             // 当前 segment 的流式内容
 	allStreamContent     strings.Builder             // 完整的 assistant 回复（跨 segment 累积）
-	streamOutputCh       <-chan *model.StreamChunk   // 流式输出 channel
-	streamUnregister     func()                      // 取消订阅函数
+	eventCh              chan event.Event             // 事件 channel
 	currentSegment       strings.Builder             // 当前消息段内容
 	currentSegmentType   model.StreamMsgType         // 当前消息段类型
 	streamSegments       []model.Message             // 流式输出的消息段
@@ -261,8 +258,8 @@ func (c *Chat) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			log.Warnf("更新 Markdown 渲染器宽度失败: %v", err)
 		}
 
-	case *model.StreamChunk:
-		return c.chatStreamMsg(msg)
+	case event.Event:
+		return c.handleEvent(msg)
 	case tea.KeyMsg:
 		log.Debugf("捕获按键: %s, Type: %v", msg.String(), msg.Type)
 		switch msg.Type {
@@ -377,17 +374,17 @@ func (c *Chat) View() string {
 	return sb.String()
 }
 
-// chatStreamMsg 处理流式消息
-func (c *Chat) chatStreamMsg(msg *model.StreamChunk) (tea.Model, tea.Cmd) {
-	if msg.Err != nil {
-		log.Errorf("流式消息错误: %v", msg.Err)
+// handleEvent handles pipeline events from the Runner.
+func (c *Chat) handleEvent(e event.Event) (tea.Model, tea.Cmd) {
+	switch e.Type {
+	case event.EventError:
+		log.Errorf("事件错误: %v", e.Err)
 		c.clearStreamState()
-		c.addMessage(model.RoleSystem, fmt.Sprintf("接收消息失败: %v", msg.Err), model.StreamMsgTypeText)
+		c.addMessage(model.RoleSystem, fmt.Sprintf("接收消息失败: %v", e.Err), model.StreamMsgTypeText)
 		return c, c.Flush()
-	}
 
-	if msg.IsDone {
-		// 将当前 segment 内容追加到完整回复（跳过工具调用文本，避免污染历史消息）
+	case event.EventRoundDone:
+		// Accumulate full reply for history
 		if c.fullStreamContent.Len() > 0 && c.currentSegmentType != model.StreamMsgTypeTool {
 			if c.allStreamContent.Len() > 0 {
 				c.allStreamContent.WriteString("\n")
@@ -395,49 +392,68 @@ func (c *Chat) chatStreamMsg(msg *model.StreamChunk) (tea.Model, tea.Cmd) {
 			c.allStreamContent.WriteString(c.fullStreamContent.String())
 		}
 
-		// 使用 allStreamContent 作为完整的 assistant 回复存入 history
 		allContent := c.allStreamContent.String()
-		log.Debugf("流式输出结束，总长度: %d", len(allContent))
-
-		// 获取当前 segment 内容用于 UI 显示
 		latestSegmentContent := c.fullStreamContent.String()
 		latestSegmentType := c.currentSegmentType
 
 		c.clearStreamState()
 
 		if allContent != "" {
-			// 完整内容存入 history（包含所有 segment）
 			c.history = append(c.history, model.Message{
 				Role:    model.RoleAssistant,
 				Content: allContent,
 				MsgType: model.StreamMsgTypeText,
 			})
-
-			// 持久化助手消息
 			sess := c.sessionMgr.Current()
 			if sess != nil {
 				c.sessionMgr.AppendMessage(sess, "assistant", allContent)
 			}
 		}
 
-		// UI 只显示最后一个 segment
 		if latestSegmentContent != "" {
 			c.addMessage(model.RoleAssistant, latestSegmentContent, latestSegmentType)
 		}
 		return c, c.Flush()
-	}
 
-	// 跳过空消息（继续接收下一个）
-	if msg.Content == "" {
+	case event.EventTextChunk:
+		if e.Text == "" {
+			return c, c.receiveNextChunk()
+		}
+		return c.handleStreamContent(e.Text, model.StreamMsgTypeText)
+
+	case event.EventThinking:
+		if e.Text == "" {
+			return c, c.receiveNextChunk()
+		}
+		return c.handleStreamContent(e.Text, model.StreamMsgTypeReason)
+
+	case event.EventToolStart:
+		toolMsg := fmt.Sprintf("\n正在调用工具: %s, 参数: %s", e.Tool.Name, e.Tool.Input)
+		return c.handleStreamContent(toolMsg, model.StreamMsgTypeTool)
+
+	case event.EventToolResult:
+		toolMsg := fmt.Sprintf("工具 %s 执行完成\n", e.Result.Name)
+		return c.handleStreamContent(toolMsg, model.StreamMsgTypeTool)
+
+	case event.EventToolError:
+		toolMsg := fmt.Sprintf("工具 %s 执行失败: %v\n", e.Result.Name, e.Err)
+		return c.handleStreamContent(toolMsg, model.StreamMsgTypeTool)
+
+	case event.EventTextDone:
+		// Text output ended for this segment — keep streaming state
 		return c, c.receiveNextChunk()
 	}
 
-	// 判断是否是第一个消息块
+	return c, c.receiveNextChunk()
+}
+
+// handleStreamContent handles streaming content of a specific type.
+// Extracted to reduce duplication in handleEvent.
+func (c *Chat) handleStreamContent(content string, msgType model.StreamMsgType) (tea.Model, tea.Cmd) {
 	isFirst := c.fullStreamContent.Len() == 0
 
-	// 如果当前有流式内容，且新消息类型与当前不同，先flush之前的内容
-	if !isFirst && c.currentSegmentType != "" && c.currentSegmentType != msg.MsgType {
-		// 保存之前的内容到完整回复累积器（跳过工具调用文本，避免污染历史消息）
+	// If segment type changed, flush previous segment
+	if !isFirst && c.currentSegmentType != "" && c.currentSegmentType != msgType {
 		prevContent := c.fullStreamContent.String()
 		prevMsgType := c.currentSegmentType
 
@@ -448,44 +464,34 @@ func (c *Chat) chatStreamMsg(msg *model.StreamChunk) (tea.Model, tea.Cmd) {
 			c.allStreamContent.WriteString(prevContent)
 		}
 
-		// 清空当前 segment 的流式状态
 		c.fullStreamContent.Reset()
 		c.streamingMsg = ""
 
-		// 将之前的内容添加到 UI 显示
 		if prevContent != "" {
 			c.addMessage(model.RoleAssistant, prevContent, prevMsgType)
 		}
 
-		// 重置为第一个消息块
 		isFirst = true
 	}
 
-	// 正常流式内容
-	c.fullStreamContent.WriteString(msg.Content)
-	c.currentSegmentType = msg.MsgType
+	c.fullStreamContent.WriteString(content)
+	c.currentSegmentType = msgType
 
-	// 根据消息类型选择样式
 	var contentStyle lipgloss.Style
-	switch msg.MsgType {
+	switch msgType {
 	case model.StreamMsgTypeTool:
-		// 工具消息 - 黄色
 		contentStyle = style.ChatToolMsgStyle
 	case model.StreamMsgTypeReason:
-		// 思考消息 - 灰色
 		contentStyle = style.ChatReasonMsgStyle
-	case model.StreamMsgTypeText:
-		fallthrough
 	default:
-		// 正文消息 - 白色
 		contentStyle = style.ChatNormalMsgStyle
 	}
 
 	if isFirst {
 		c.streamingMsg = style.ChatSystemMsgStyle.Render("🤖 MSA: ") +
-			contentStyle.Render(msg.Content) + "\n"
+			contentStyle.Render(content) + "\n"
 	} else {
-		c.streamingMsg += contentStyle.Render(msg.Content)
+		c.streamingMsg += contentStyle.Render(content)
 	}
 	return c, c.receiveNextChunk()
 }
@@ -639,22 +645,20 @@ func (c *Chat) startStreaming() tea.Cmd {
 	return c.receiveNextChunk()
 }
 
-// receiveNextChunk 接收下一个流式消息块
+// receiveNextChunk 接收下一个事件
 func (c *Chat) receiveNextChunk() tea.Cmd {
 	return func() tea.Msg {
-		if c.streamOutputCh == nil {
-			log.Error("流式输出 channel 为空")
-			return &model.StreamChunk{Err: fmt.Errorf("stream output channel is nil")}
+		if c.eventCh == nil {
+			log.Error("event channel 为空")
+			return event.Event{Type: event.EventError, Err: fmt.Errorf("event channel is nil")}
 		}
-
-		chunk, ok := <-c.streamOutputCh
+		e, ok := <-c.eventCh
 		if !ok {
-			log.Debug("流式输出 channel 已关闭")
-			return &model.StreamChunk{IsDone: true}
+			log.Debug("event channel 已关闭")
+			return event.Event{Type: event.EventRoundDone}
 		}
-
-		log.Debugf("接收流式块: Content长度=%d, IsDone=%v, Err=%v", len(chunk.Content), chunk.IsDone, chunk.Err)
-		return chunk
+		log.Debugf("接收 event: type=%d", e.Type)
+		return e
 	}
 }
 
@@ -668,12 +672,7 @@ func (c *Chat) clearStreamState() {
 	c.currentSegmentType = ""
 	c.streamSegments = nil
 
-	if c.streamUnregister != nil {
-		log.Debug("取消流式输出订阅")
-		c.streamUnregister()
-		c.streamUnregister = nil
-	}
-	c.streamOutputCh = nil
+	c.eventCh = nil
 
 	// 重新启用输入框
 	c.textInput.Focus()
@@ -743,15 +742,39 @@ func (c *Chat) handleClearHistory() (tea.Model, tea.Cmd) {
 
 // startChatRequest 发起聊天请求
 func (c *Chat) startChatRequest(input string) (tea.Model, tea.Cmd) {
-	c.streamOutputCh, c.streamUnregister = message.RegisterStreamOutput(streamBufferSize)
-
-	err := agent.Ask(c.ctx, input, c.history)
+	ag, err := coreagent.New(c.ctx)
 	if err != nil {
-		log.Errorf("聊天请求失败: %v", err)
-		c.clearStreamState()
-		c.addMessage(model.RoleSystem, "聊天出错: "+err.Error(), model.StreamMsgTypeText)
+		log.Errorf("创建 Agent 失败: %v", err)
+		c.addMessage(model.RoleSystem, "创建 Agent 失败: "+err.Error(), model.StreamMsgTypeText)
 		return c, c.Flush()
 	}
 
+	c.eventCh = make(chan event.Event, 64)
+
+	// Create a channel-based renderer that writes directly to eventCh
+	chanRenderer := &channelRenderer{ch: c.eventCh}
+	r := runner.New(ag, c.sessionMgr, chanRenderer)
+
+	go func() {
+		defer close(c.eventCh)
+		if err := r.Ask(c.ctx, input, c.history); err != nil {
+			log.Errorf("[TUI] Runner.Ask 失败: %v", err)
+		}
+	}()
+
 	return c, tea.Batch(c.Flush(), c.startStreaming())
+}
+
+// channelRenderer is a Renderer that writes events directly to a channel.
+// Used by TUI to receive events from Runner without going through program.Send.
+type channelRenderer struct {
+	ch chan<- event.Event
+}
+
+func (r *channelRenderer) Handle(ctx context.Context, e event.Event) error {
+	select {
+	case r.ch <- e:
+	case <-ctx.Done():
+	}
+	return nil
 }
