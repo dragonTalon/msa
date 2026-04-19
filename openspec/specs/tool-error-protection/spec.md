@@ -85,12 +85,16 @@ Panic 恢复后返回的错误 JSON 必须符合现有 `ToolResult` 格式。
 
 > 📚 **历史问题参考**：问题 #005 Google CAPTCHA 检测、问题 #004 浏览器超时
 
-### 需求：R-7 广播消息
+### 需求：R-7 工具事件由 Agent 层统一处理
 
-Panic 发生时必须广播工具结束消息，保持 UI 一致性。
+工具的开始/结束事件由 `pkg/core/agent` 层的 `executeTools()` 统一发射到 event channel，工具实现层不再需要手动广播。
 
-#### 场景：广播 panic 错误
+#### 场景：工具执行事件发射
 
-- **当** panic 被捕获
-- **那么** 调用 `message.BroadcastToolEnd` 通知 UI
-- **那么** 用户能看到工具失败的提示
+- **当** Agent 执行工具调用
+- **那么** `executeTools()` 在执行前发射 `event.EventToolStart`（携带 name、input）
+- **那么** 执行成功后发射 `event.EventToolResult`（携带 output、elapsed）
+- **那么** 执行失败后发射 `event.EventToolError`（携带 err）
+- **那么** 工具实现函数本身无需调用任何广播函数
+
+> 注：旧的 `message.BroadcastToolStart/BroadcastToolEnd` 已删除（`pkg/logic/message` 包已移除）

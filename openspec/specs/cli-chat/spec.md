@@ -30,31 +30,35 @@
 
 ### 需求：流式输出格式
 
-CLI 模式复用现有流式架构，直接输出到 stdout。
-
-> 📚 **历史问题参考**：基于模式 error-handling-strategy
+CLI 模式通过 `Runner.Ask` + `CLIRenderer` 处理流式输出，直接写 stdout。
 
 #### 场景：正文消息输出
 
-- **当** 收到 `StreamMsgTypeText` 类型消息
-- **那么** 直接输出消息内容到 stdout
+- **当** 收到 `event.EventTextChunk` 类型事件
+- **那么** 直接输出 `e.Text` 到 stdout（不加换行）
+- **当** 收到 `event.EventTextDone`
+- **那么** 输出换行
 
 #### 场景：思考过程输出
 
-- **当** 收到 `StreamMsgTypeReason` 类型消息
-- **那么** 输出 "🤔 思考中..." 前缀
-- **那么** 输出思考内容
+- **当** 收到 `event.EventThinking` 类型事件
+- **那么** 如果 verbose=true，输出思考内容到 stdout
+- **那么** 默认（verbose=false）不输出思考内容
 
 #### 场景：工具调用输出
 
-- **当** 收到 `StreamMsgTypeTool` 类型消息
-- **那么** 输出 "🔧 调用工具: <tool_name>" 格式
-- **那么** 输出工具参数和结果
+- **当** 收到 `event.EventToolStart` 类型事件
+- **那么** 输出 `⚙ 正在调用 <tool_name>...` 格式
+- **当** 收到 `event.EventToolResult`
+- **那么** 输出 `✓ <tool_name> 完成`
+- **当** 收到 `event.EventToolError`
+- **那么** 输出 `✗ <tool_name> 失败: <err>`
 
 #### 场景：流式输出完成
 
-- **当** 收到 `IsDone: true` 标志
-- **那么** 程序退出，返回退出码 0
+- **当** 收到 `event.EventRoundDone` 或 event channel 关闭
+- **那么** `Runner.Ask` 返回
+- **那么** CLI 程序输出会话 ID 后退出，返回退出码 0
 
 ---
 
