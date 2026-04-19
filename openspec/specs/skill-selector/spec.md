@@ -10,7 +10,7 @@ Skill 选择相关的规格（排序、过滤、日志）。
 
 ### Requirement: Priority 排序
 
-选中的 Skills 必须按 priority 降序排序。
+选中的 Skills MUST 按 priority 降序排序。
 
 #### Scenario: 排序多个 Skills
 - **当**选择了多个 Skills 时
@@ -25,7 +25,7 @@ Skill 选择相关的规格（排序、过滤、日志）。
 
 ### Requirement: 禁用 Skills 过滤
 
-系统必须在构建 skill 列表时过滤掉配置中禁用的 Skills。
+系统 MUST 在构建 skill 列表时过滤掉配置中禁用的 Skills。
 
 #### Scenario: 过滤禁用的 Skills
 - **当**构建可用 Skills 列表时
@@ -42,7 +42,7 @@ Skill 选择相关的规格（排序、过滤、日志）。
 
 ### Requirement: 选择结果日志
 
-系统必须记录详细的 skill 构建过程日志。
+系统 MUST 记录详细的 skill 构建过程日志。
 
 #### Scenario: 记录选择输入
 - **当**构建 skill 元数据列表时

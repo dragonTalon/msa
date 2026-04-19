@@ -8,7 +8,7 @@
 
 ### Requirement: Tag 触发自动发布
 
-系统必须在创建符合格式的 Git Tag 时自动触发发布流程。
+系统 MUST 在创建符合格式的 Git Tag 时自动触发发布流程。
 
 #### Scenario: 创建 v 前缀 Tag 触发发布
 
@@ -24,7 +24,7 @@
 
 ### Requirement: 多平台二进制构建
 
-系统必须构建 Linux、macOS、Windows 平台的二进制文件。
+系统 MUST 构建 Linux、macOS、Windows 平台的二进制文件。
 
 #### Scenario: 构建所有目标平台
 
@@ -40,7 +40,7 @@
 
 ### Requirement: 版本信息注入
 
-编译时必须注入版本号、commit hash 和构建时间。
+编译时 MUST 注入版本号、commit hash 和构建时间。
 
 #### Scenario: 发布版本注入真实信息
 
@@ -51,7 +51,7 @@
 
 ### Requirement: 校验和生成
 
-系统必须为所有发布产物生成 SHA256 校验和文件。
+系统 MUST 为所有发布产物生成 SHA256 校验和文件。
 
 #### Scenario: 生成校验和文件
 
@@ -61,7 +61,7 @@
 
 ### Requirement: Changelog 自动生成
 
-系统必须从 git commits 自动生成发布说明。
+系统 MUST 从 git commits 自动生成发布说明。
 
 #### Scenario: 生成 Changelog
 
