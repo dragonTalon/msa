@@ -1,6 +1,8 @@
-# Self-Update
+# 规格：self-update
 
-MSA 自更新能力，包括版本检查、下载、替换二进制文件以及一键安装脚本。
+## Purpose
+
+系统 SHALL 提供自更新能力，包括版本检查、下载、替换二进制文件以及一键安装脚本。
 
 ## Requirements
 

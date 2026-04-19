@@ -1,54 +1,57 @@
 # 规格：write-knowledge-file
 
-> **能力**: 写入知识文件
-> **目的**: 系统必须提供工具来写入知识库目录下的文件，用于 SKILL 记录错误经验、交易总结等信息。
+## Purpose
 
-## 需求：安全写入知识文件
+系统 SHALL 提供工具来写入知识库目录下的文件，用于 SKILL 记录错误经验、交易总结等信息。
 
-系统必须提供工具来写入知识库目录下的文件，用于 SKILL 记录错误经验、交易总结等信息。
+## Requirements
 
-### 场景：创建新文件
-- **当** 调用工具写入新文件 `summaries/2026-03-15.md`
-- **那么** 在 `.msa/knowledge/summaries/` 下创建文件
+### Requirement: 安全写入知识文件
 
-### 场景：覆盖已存在的文件
-- **当** 调用工具写入已存在的文件
-- **那么** 使用新内容覆盖旧文件
+系统 SHALL 提供工具来写入知识库目录下的文件，用于 SKILL 记录错误经验、交易总结等信息。
 
-### 场景：自动创建目录
-- **当** 目标目录不存在
-- **那么** 自动创建必要的目录结构
+#### Scenario: 创建新文件
+- **WHEN** 调用工具写入新文件 `summaries/2026-03-15.md`
+- **THEN** 在 `.msa/knowledge/summaries/` 下创建文件
 
----
+#### Scenario: 覆盖已存在的文件
+- **WHEN** 调用工具写入已存在的文件
+- **THEN** 使用新内容覆盖旧文件
 
-## 需求：路径安全校验
-
-所有写入路径必须经过安全校验，确保只能写入 `.msa/knowledge/` 目录下。
-
-### 场景：拒绝路径遍历
-- **当** 写入路径包含 `..` 或绝对路径前缀
-- **那么** 返回错误 "path traversal not allowed"
+#### Scenario: 自动创建目录
+- **WHEN** 目标目录不存在
+- **THEN** 自动创建必要的目录结构
 
 ---
 
-## 需求：原子写入
+### Requirement: 路径安全校验
 
-写入操作必须使用原子方式，避免部分写入导致的数据损坏。
+所有写入路径 SHALL 经过安全校验，确保只能写入 `.msa/knowledge/` 目录下。
 
-### 场景：原子写入文件
-- **当** 执行写入操作
-- **那么** 先写入临时文件，成功后重命名为目标文件
+#### Scenario: 拒绝路径遍历
+- **WHEN** 写入路径包含 `..` 或绝对路径前缀
+- **THEN** 返回错误 "path traversal not allowed"
 
 ---
 
-## 需求：YAML Frontmatter 支持
+### Requirement: 原子写入
 
-写入内容可能包含 YAML frontmatter，系统必须正确处理。
+写入操作 SHALL 使用原子方式，避免部分写入导致的数据损坏。
 
-### 场景：写入带 frontmatter 的内容
-- **当** 内容包含 YAML frontmatter
-- **那么** 保持原样写入，不做修改
+#### Scenario: 原子写入文件
+- **WHEN** 执行写入操作
+- **THEN** 先写入临时文件，成功后重命名为目标文件
 
-### 场景：自动生成 frontmatter
-- **当** 提供 metadata 参数
-- **那么** 自动生成 YAML frontmatter 并追加内容
+---
+
+### Requirement: YAML Frontmatter 支持
+
+写入内容可能包含 YAML frontmatter，系统 SHALL 正确处理。
+
+#### Scenario: 写入带 frontmatter 的内容
+- **WHEN** 内容包含 YAML frontmatter
+- **THEN** 保持原样写入，不做修改
+
+#### Scenario: 自动生成 frontmatter
+- **WHEN** 提供 metadata 参数
+- **THEN** 自动生成 YAML frontmatter 并追加内容

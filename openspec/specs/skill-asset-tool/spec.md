@@ -1,8 +1,14 @@
-## ADDED Requirements
+# 规格：skill-asset-tool
+
+## Purpose
+
+系统 SHALL 提供工具让 Agent 按需加载指定 Skill 的 assets 目录下的文件。
+
+## Requirements
 
 ### Requirement: 加载 Skill Asset 文件
 
-系统必须提供工具让 Agent 按需加载指定 Skill 的 assets 目录下的文件。
+系统 SHALL 提供工具让 Agent 按需加载指定 Skill 的 assets 目录下的文件。
 
 #### Scenario: 成功加载 asset 文件
 - **WHEN** Agent 调用 `get_skill_asset` 工具，指定 skill_name 和 file_name
