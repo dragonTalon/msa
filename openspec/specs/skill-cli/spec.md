@@ -10,7 +10,7 @@ Skills 管理的 CLI 命令界面。
 
 ### Requirement: Skills 列表命令
 
-系统必须提供 `msa skills list` 命令来列出所有可用的 Skills。
+系统 MUST 提供 `msa skills list` 命令来列出所有可用的 Skills。
 
 #### Scenario: 列出所有 Skills
 - **当**用户执行 `msa skills list` 时
@@ -31,7 +31,7 @@ Skills 管理的 CLI 命令界面。
 
 ### Requirement: Skill 详情命令
 
-系统必须提供 `msa skills show <name>` 命令来查看 Skill 的详细信息。
+系统 MUST 提供 `msa skills show <name>` 命令来查看 Skill 的详细信息。
 
 #### Scenario: 显示 Skill 详情
 - **当**用户执行 `msa skills show <name>` 时
@@ -49,7 +49,7 @@ Skills 管理的 CLI 命令界面。
 
 ### Requirement: Skill 禁用命令
 
-系统必须提供 `msa skills disable <name>` 命令来禁用指定的 Skill。
+系统 MUST 提供 `msa skills disable <name>` 命令来禁用指定的 Skill。
 
 #### Scenario: 禁用单个 Skill
 - **当**用户执行 `msa skills disable <name>` 时
@@ -72,7 +72,7 @@ Skills 管理的 CLI 命令界面。
 
 ### Requirement: Skill 启用命令
 
-系统必须提供 `msa skills enable <name>` 命令来启用已禁用的 Skill。
+系统 MUST 提供 `msa skills enable <name>` 命令来启用已禁用的 Skill。
 
 #### Scenario: 启用已禁用的 Skill
 - **当**用户执行 `msa skills enable <name>` 时
@@ -88,7 +88,7 @@ Skills 管理的 CLI 命令界面。
 
 ### Requirement: 配置文件管理
 
-系统必须正确管理 `~/.msa/config.json` 文件中的 Skill 配置。
+系统 MUST 正确管理 `~/.msa/config.json` 文件中的 Skill 配置。
 
 #### Scenario: 配置文件不存在时创建
 - **当**配置文件不存在时执行 disable/enable 操作
@@ -109,7 +109,7 @@ Skills 管理的 CLI 命令界面。
 
 ### Requirement: 输出格式
 
-CLI 命令必须提供清晰易读的输出格式。
+CLI 命令 MUST 提供清晰易读的输出格式。
 
 #### Scenario: 列表命令表格输出
 - **当**执行 `msa skills list` 时

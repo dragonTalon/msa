@@ -10,7 +10,7 @@ Provider 注册表能力，管理 LLM 提供商的元信息和验证规则。
 
 ### 需求：Provider 注册表
 
-维护所有可用 Provider 的元信息注册表。
+系统 SHALL 系统 SHALL 维护所有可用 Provider 的元信息注册表。
 
 #### 场景：注册 Provider
 - **当** 新的 Provider 被添加到系统
@@ -39,7 +39,7 @@ Provider 注册表能力，管理 LLM 提供商的元信息和验证规则。
 
 ### 需求：Provider 信息结构
 
-定义 Provider 元信息的标准结构。
+系统 SHALL 系统 SHALL 定义 Provider 元信息的标准结构。
 
 #### 场景：ProviderInfo 结构
 - **当** 定义 Provider 信息
@@ -69,7 +69,7 @@ Provider 注册表能力，管理 LLM 提供商的元信息和验证规则。
 
 ### 需求：API Key 验证
 
-为每个 Provider 提供 API Key 格式验证。
+系统 SHALL 系统 SHALL 为每个 Provider 提供 API Key 格式验证。
 
 #### 场景：验证 API Key 前缀
 - **当** 用户输入 API Key
@@ -89,7 +89,7 @@ Provider 注册表能力，管理 LLM 提供商的元信息和验证规则。
 
 ### 需求：Provider 扩展性
 
-支持动态添加新的 Provider。
+系统 SHALL 系统 SHALL 支持动态添加新的 Provider。
 
 #### 场景：添加新 Provider
 - **当** 开发者添加新的 LLM Provider
@@ -104,7 +104,7 @@ Provider 注册表能力，管理 LLM 提供商的元信息和验证规则。
 
 ### 需求：与现有 Provider 系统集成
 
-与现有的 `providerMap` 系统协同工作。
+系统 SHALL 与现有的 `providerMap` 系统协同工作。
 
 #### 场景：导出 Provider 列表
 - **当** TUI 需要获取可用 Provider 列表
