@@ -66,8 +66,11 @@ func doFillTodoSummary(ctx context.Context, param *FillSummaryParam) (string, er
 		return model.NewErrorResult(err.Error()), nil
 	}
 
+	// 自动补全路径前缀
+	todoPath := ResolveTodoPath(param.TodoPath)
+
 	// 解析 TODO 文件获取统计信息
-	todo, err := ParseTodoFile(param.TodoPath)
+	todo, err := ParseTodoFile(todoPath)
 	if err != nil {
 		log.Errorf("FillTodoSummary: failed to parse todo: %v", err)
 		message.BroadcastToolEnd("fill_todo_summary", "", err)
@@ -78,14 +81,14 @@ func doFillTodoSummary(ctx context.Context, param *FillSummaryParam) (string, er
 	summaryContent := buildSummaryContent(todo, param.Summary, param.Conclusion)
 
 	// 更新文件
-	if err := updateSummarySection(param.TodoPath, summaryContent); err != nil {
+	if err := updateSummarySection(todoPath, summaryContent); err != nil {
 		log.Errorf("FillTodoSummary: failed to update summary: %v", err)
 		message.BroadcastToolEnd("fill_todo_summary", "", err)
 		return model.NewErrorResult(fmt.Sprintf("更新总结失败: %v", err)), nil
 	}
 
 	data := &FillSummaryData{
-		TodoPath: param.TodoPath,
+		TodoPath: todoPath,
 		Success:  true,
 		Message:  "执行总结已填写",
 	}
