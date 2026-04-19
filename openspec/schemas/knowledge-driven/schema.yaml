@@ -289,7 +289,6 @@ artifacts:
       参考 instructions/fix.md 获取详细步骤。
     requires:
       - tasks
-    optional: true
 
 apply:
   requires: [tasks]
