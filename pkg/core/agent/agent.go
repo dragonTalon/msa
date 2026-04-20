@@ -4,22 +4,22 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
 	"strings"
 	"time"
 
 	"github.com/cloudwego/eino-ext/components/model/openai"
-	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/components/tool"
+	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/flow/agent/react"
 	"github.com/cloudwego/eino/schema"
+	log "github.com/sirupsen/logrus"
 
 	"msa/pkg/config"
 	"msa/pkg/core/event"
 	corelogger "msa/pkg/core/logger"
 	"msa/pkg/logic/tools"
 	"msa/pkg/model"
-
-	log "github.com/sirupsen/logrus"
 )
 
 // Agent wraps the Eino ReAct agent, exposing only the Run() interface.
@@ -93,12 +93,38 @@ func (a *Agent) run(ctx context.Context, messages []*schema.Message, ch chan<- e
 	logger := corelogger.FromCtx(ctx)
 	logger.Infof("[Agent] 开始对话, 历史消息数=%d", len(messages))
 
+	const (
+		maxRetries     = 3
+		retryBaseDelay = 2 * time.Second
+	)
+
 	round := 0
 	for {
 		round++
 		logger.Infof("[Agent] 第 %d 轮 LLM 调用开始", round)
 
-		sr, err := a.einoAgent.Stream(ctx, messages)
+		var sr *schema.StreamReader[*schema.Message]
+		var err error
+		for attempt := 0; attempt <= maxRetries; attempt++ {
+			if attempt > 0 {
+				// 指数退避 + 随机抖动
+				delay := retryBaseDelay * time.Duration(1<<uint(attempt-1))
+				jitter := time.Duration(rand.Int63n(int64(delay / 2)))
+				waitDur := delay + jitter
+				logger.Warnf("[Agent] 第 %d 轮 LLM 调用遇到临时错误，%v 后重试 (attempt %d/%d)", round, waitDur, attempt, maxRetries)
+				select {
+				case <-time.After(waitDur):
+				case <-ctx.Done():
+					logger.Warnf("[Agent] 重试等待期间 context canceled")
+					return
+				}
+			}
+			sr, err = a.einoAgent.Stream(ctx, messages)
+			if err == nil || !isRetryableError(err) {
+				break
+			}
+			logger.Warnf("[Agent] 第 %d 轮 LLM 调用临时失败 (attempt %d/%d): %v", round, attempt+1, maxRetries, err)
+		}
 		if err != nil {
 			logger.Errorf("[Agent] 第 %d 轮 LLM 调用失败: %v", round, err)
 			sendEvent(ctx, ch, event.Event{Type: event.EventError, Err: err})
@@ -238,4 +264,28 @@ func FilterAndTrimHistory(history []model.Message, maxRounds int) []model.Messag
 		filtered = filtered[len(filtered)-maxMessages:]
 	}
 	return filtered
+}
+
+// isRetryableError 判断错误是否为可重试的临时性错误（如 503 服务繁忙、429 限流）。
+func isRetryableError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	// 匹配 HTTP 状态码
+	retryableCodes := []string{"status code: 503", "status code: 429", "status code: 502", "status code: 504"}
+	for _, code := range retryableCodes {
+		if strings.Contains(msg, code) {
+			return true
+		}
+	}
+	// 匹配常见的临时性错误关键词
+	retryableKeywords := []string{"too busy", "rate limit", "overloaded", "try again later", "service unavailable"}
+	lower := strings.ToLower(msg)
+	for _, kw := range retryableKeywords {
+		if strings.Contains(lower, kw) {
+			return true
+		}
+	}
+	return false
 }

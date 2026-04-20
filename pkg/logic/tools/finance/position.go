@@ -6,13 +6,13 @@ import (
 	"strings"
 
 	"encoding/json"
-	"github.com/cloudwego/eino/components/tool"
-	"github.com/cloudwego/eino/components/tool/utils"
-	log "github.com/sirupsen/logrus"
 	msadb "msa/pkg/db"
 	"msa/pkg/logic/finsvc"
 	"msa/pkg/logic/tools/safetool"
 	"msa/pkg/model"
+
+	"github.com/cloudwego/eino/components/tool"
+	"github.com/cloudwego/eino/components/tool/utils"
 )
 
 // GetPositionsParam 查询持仓参数
@@ -75,12 +75,8 @@ func doGetPositions(ctx context.Context, param *GetPositionsParam) (string, erro
 		return model.NewErrorResult(err.Error()), nil
 	}
 
-	// 获取所有持仓股票代码
-	var stockCodes []string
-	err = database.Model(&model.Transaction{}).
-		Select("DISTINCT stock_code").
-		Where("account_id = ? AND status = ?", account.ID, model.TransactionStatusFilled).
-		Pluck("stock_code", &stockCodes).Error
+	// 获取当前实际有持仓（净持仓 > 0）的股票代码，排除已平仓股票
+	stockCodes, err := finsvc.GetActiveStockCodes(database, account.ID)
 	if err != nil {
 		return model.NewErrorResult(err.Error()), nil
 	}
@@ -194,12 +190,8 @@ func doGetAccountSummary(ctx context.Context, param *GetAccountSummaryParam) (st
 		return model.NewErrorResult(err.Error()), nil
 	}
 
-	// 获取所有持仓股票代码
-	var stockCodes []string
-	err = database.Model(&model.Transaction{}).
-		Select("DISTINCT stock_code").
-		Where("account_id = ? AND status = ?", account.ID, model.TransactionStatusFilled).
-		Pluck("stock_code", &stockCodes).Error
+	// 获取当前实际有持仓（净持仓 > 0）的股票代码，排除已平仓股票
+	stockCodes, err := finsvc.GetActiveStockCodes(database, account.ID)
 	if err != nil {
 		return model.NewErrorResult(err.Error()), nil
 	}
@@ -209,8 +201,7 @@ func doGetAccountSummary(ctx context.Context, param *GetAccountSummaryParam) (st
 	if len(stockCodes) > 0 {
 		prices, err := fetchAllPrices(stockCodes)
 		if err != nil {
-			// 价格获取失败时记录日志，但不中断流程
-			log.Warnf("批量获取价格失败: %v", err)
+			return model.NewErrorResult(fmt.Sprintf("获取持仓价格失败，无法计算市值: %v", err)), nil
 		}
 		for code, price := range prices {
 			priceMap[code] = price

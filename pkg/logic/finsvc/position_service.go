@@ -33,6 +33,33 @@ type AccountValueResult struct {
 	FailedStocks  []string // 价格获取失败的股票代码列表
 }
 
+// GetActiveStockCodes 获取当前实际有持仓（净持仓 > 0）的股票代码列表
+// 通过 SQL 聚合计算买入量 - 卖出量，过滤掉已平仓的股票
+func GetActiveStockCodes(database *gorm.DB, accountID uint) ([]string, error) {
+	type StockQty struct {
+		StockCode string
+		NetQty    int64
+	}
+	var rows []StockQty
+	err := database.Model(&model.Transaction{}).
+		Select(`stock_code,
+			SUM(CASE WHEN type = ? THEN quantity ELSE 0 END) -
+			SUM(CASE WHEN type = ? THEN quantity ELSE 0 END) AS net_qty`,
+			model.TransactionTypeBuy, model.TransactionTypeSell).
+		Where("account_id = ? AND status = ?", accountID, model.TransactionStatusFilled).
+		Group("stock_code").
+		Having("net_qty > 0").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to query active stock codes: %w", err)
+	}
+	codes := make([]string, 0, len(rows))
+	for _, r := range rows {
+		codes = append(codes, r.StockCode)
+	}
+	return codes, nil
+}
+
 // GetPosition 获取指定股票的持仓数量
 // 计算：SUM(BUY) - SUM(SELL)
 func GetPosition(database *gorm.DB, accountID uint, stockCode string) (int64, error) {
@@ -138,15 +165,11 @@ func GetAccountTotalValue(database *gorm.DB, accountID uint, prices PriceMap) (*
 		return nil, err
 	}
 
-	// 查询所有持仓股票
-	var stockCodes []string
-	err = database.Model(&model.Transaction{}).
-		Select("DISTINCT stock_code").
-		Where("account_id = ? AND status = ?", accountID, model.TransactionStatusFilled).
-		Pluck("stock_code", &stockCodes).Error
+	// 查询当前实际有持仓的股票（净持仓 > 0，排除已平仓）
+	stockCodes, err := GetActiveStockCodes(database, accountID)
 	if err != nil {
-		log.Errorf("查询股票列表失败: %v", err)
-		return nil, fmt.Errorf("failed to query stocks: %w", err)
+		log.Errorf("查询持仓股票列表失败: %v", err)
+		return nil, err
 	}
 
 	positionValue := int64(0)

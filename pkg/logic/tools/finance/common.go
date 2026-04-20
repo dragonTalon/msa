@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"strconv"
 
-	log "github.com/sirupsen/logrus"
-	"gorm.io/gorm"
 	"msa/pkg/logic/tools/stock"
 	"msa/pkg/model"
+
+	log "github.com/sirupsen/logrus"
+	"gorm.io/gorm"
 )
 
 // getActiveAccount 获取当前活跃账户
@@ -31,31 +32,54 @@ func getActiveAccount(db *gorm.DB) (*model.Account, error) {
 
 // fetchCurrentPrice 获取股票当前价格（毫）
 // 复用 stock/FetchStockData()
+// 当前价为空时（如停牌），降级使用昨收价（PrevClose）
 func fetchCurrentPrice(stockCode string) (int64, error) {
 	resp, err := stock.FetchStockData(stockCode)
 	if err != nil {
 		return 0, err
 	}
-	// resp.CurrentPrice 是字符串，如 "10.50"
-	price, err := strconv.ParseFloat(resp.CurrentPrice, 64)
+
+	// 优先使用当前价，停牌时降级使用昨收价
+	priceStr := resp.CurrentPrice
+	usedFallback := false
+	if priceStr == "" {
+		priceStr = resp.PrevClose
+		usedFallback = true
+	}
+
+	if priceStr == "" {
+		return 0, fmt.Errorf("股票 %s 当前价和昨收价均为空，无法获取价格", stockCode)
+	}
+
+	price, err := strconv.ParseFloat(priceStr, 64)
 	if err != nil {
 		return 0, fmt.Errorf("解析价格失败: %w", err)
 	}
+
+	if usedFallback {
+		log.Warnf("股票 %s 当前价为空（可能停牌），使用昨收价 %s 计算市值", stockCode, priceStr)
+	}
+
 	return model.YuanToHao(price), nil
 }
 
 // fetchAllPrices 批量获取股票价格
 // 返回 map[stockCode]price (毫)
-// 如果某只股票获取失败，跳过该股票
+// 任意一只股票价格获取失败，则返回 error，避免市值计算不完整
 func fetchAllPrices(stockCodes []string) (map[string]int64, error) {
 	prices := make(map[string]int64)
+	var failedCodes []string
 	for _, stockCode := range stockCodes {
 		price, err := fetchCurrentPrice(stockCode)
 		if err != nil {
 			log.Errorf("获取股票价格失败: stockCode=%s, err=%v", stockCode, err)
+			failedCodes = append(failedCodes, stockCode)
 			continue
 		}
 		prices[stockCode] = price
+	}
+	if len(failedCodes) > 0 {
+		return nil, fmt.Errorf("以下股票价格获取失败: %v", failedCodes)
 	}
 	return prices, nil
 }

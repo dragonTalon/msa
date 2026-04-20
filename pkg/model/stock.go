@@ -99,10 +99,15 @@ func (s *StockQuoteData) UnmarshalJSON(data []byte) error {
 	for key, value := range raw {
 		s.RawData[key] = value
 		if strings.HasPrefix(key, "v_ff_") {
+			// 分时成交明细
 			var vffData []interface{}
 			json.Unmarshal(value, &vffData)
 			s.Vff = vffData
+		} else if key == "market" {
+			// 市场状态信息，跳过，不作为行情数组
+			continue
 		} else {
+			// 股票代码对应的行情数组（如 sh600000、sz000001 等）
 			var arr []string
 			if err := json.Unmarshal(value, &arr); err == nil && len(arr) > 0 {
 				s.StockQuoteArray = arr

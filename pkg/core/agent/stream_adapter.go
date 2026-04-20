@@ -178,6 +178,13 @@ func (a *StreamAdapter) Process(
 	// Assemble assistant message for appending to messages
 	assistantMsg := buildAssistantMsg(allChunks)
 
+	// For standard tool calls, use the fully merged ToolCalls from assistantMsg
+	// (ConcatMessages properly merges streaming chunks into complete ToolCalls).
+	// For non-standard tool calls (specialDetected), toolCalls was already set from parseToolCalls.
+	if !specialDetected && len(assistantMsg.ToolCalls) > 0 {
+		toolCalls = assistantMsg.ToolCalls
+	}
+
 	return ProcessResult{
 		ToolCalls:    toolCalls,
 		AssistantMsg: assistantMsg,
