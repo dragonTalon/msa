@@ -1,6 +1,7 @@
 #!/bin/sh
 # MSA 一键安装脚本
 # 用法: curl -fsSL https://raw.githubusercontent.com/dragonTalon/msa/main/install.sh | sh
+# 或在项目根目录直接运行: sh install.sh
 
 set -e
 
@@ -50,11 +51,9 @@ detect_arch() {
 
 # 获取最新版本号（包括预发布版本）
 get_latest_version() {
-    # 使用 /releases 获取所有版本，取第一个（最新的）
-    version=$(curl -fsSL https://api.github.com/repos/dragonTalon/msa/releases | grep -m1 '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
-    if [ -z "$version" ]; then
-        error "无法获取最新版本信息"
-    fi
+    # 先把响应存到变量，再处理，避免 grep -m1 关闭管道导致 curl 报错
+    response=$(curl -sSL --max-time 10 https://api.github.com/repos/dragonTalon/msa/releases 2>/dev/null) || true
+    version=$(echo "$response" | grep -m1 '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/')
     echo "$version"
 }
 
@@ -97,6 +96,46 @@ check_path() {
     esac
 }
 
+# 从源码构建安装
+install_from_source() {
+    install_dir="$1"
+
+    info "尝试从源码构建安装..."
+
+    # 检查是否在项目根目录
+    if [ ! -f "go.mod" ] || ! grep -q 'module msa' go.mod 2>/dev/null; then
+        error "未找到项目源码（go.mod），请在 msa 项目根目录运行此脚本，或确保网络可访问 GitHub"
+    fi
+
+    # 检查 go 是否安装
+    if ! command -v go >/dev/null 2>&1; then
+        error "未找到 go 命令，请先安装 Go: https://golang.org/dl/"
+    fi
+
+    info "正在编译..."
+    if ! go build -o msa_tmp ./main.go 2>/dev/null && ! go build -o msa_tmp . 2>/dev/null; then
+        error "编译失败，请检查 Go 环境"
+    fi
+
+    install_target="$install_dir/msa"
+    info "正在安装到: $install_target"
+
+    if [ -f "$install_target" ] && [ ! -w "$install_target" ]; then
+        warn "需要管理员权限安装到 $install_dir"
+        if command -v sudo >/dev/null 2>&1; then
+            sudo mv msa_tmp "$install_target"
+            sudo chmod +x "$install_target"
+        else
+            error "无法写入 $install_target，请手动安装"
+        fi
+    else
+        mv msa_tmp "$install_target"
+        chmod +x "$install_target"
+    fi
+
+    success "从源码安装完成!"
+}
+
 # 下载并安装
 install_msa() {
     os=$(detect_os)
@@ -106,6 +145,42 @@ install_msa() {
     version=$(get_latest_version)
 
     install_dir=$(get_install_dir)
+
+    # 如果无法获取版本（私有仓库/无 Release），切换到源码构建
+    if [ -z "$version" ]; then
+        warn "无法从 GitHub 获取版本信息（可能是私有仓库或尚无 Release）"
+        install_from_source "$install_dir"
+
+        # 检查 PATH
+        if ! check_path "$install_dir"; then
+            echo ""
+            warn "安装目录 $install_dir 不在 PATH 中"
+            echo ""
+            echo "请运行以下命令添加到 PATH:"
+            echo ""
+            if [ -n "$(echo $SHELL | grep zsh)" ]; then
+                echo "  echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.zshrc"
+                echo "  source ~/.zshrc"
+            elif [ -n "$(echo $SHELL | grep bash)" ]; then
+                echo "  echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.bashrc"
+                echo "  source ~/.bashrc"
+            else
+                echo "  export PATH=\"$install_dir:\$PATH\""
+            fi
+            echo ""
+        fi
+
+        if command -v msa >/dev/null 2>&1; then
+            echo ""
+            info "已安装版本:"
+            msa version
+        else
+            echo ""
+            info "请重新打开终端或运行: export PATH=\"$install_dir:\$PATH\""
+            info "然后运行: msa version"
+        fi
+        return
+    fi
 
     info "检测到系统: $os/$arch"
     info "最新版本: $version"
