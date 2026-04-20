@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type SearchResponse struct {
@@ -101,7 +103,10 @@ func (s *StockQuoteData) UnmarshalJSON(data []byte) error {
 		if strings.HasPrefix(key, "v_ff_") {
 			// 分时成交明细
 			var vffData []interface{}
-			json.Unmarshal(value, &vffData)
+			err := json.Unmarshal(value, &vffData)
+			if err != nil {
+				log.Errorf("failed to unmarshal vff data for key %s: %v", key, err)
+			}
 			s.Vff = vffData
 		} else if key == "market" {
 			// 市场状态信息，跳过，不作为行情数组
