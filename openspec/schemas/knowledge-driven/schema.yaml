@@ -157,9 +157,49 @@ artifacts:
     template: tasks.md
     instruction: |
       创建任务列表，分解实现工作。
-      
-      强制执行`superpowers:write-plan`生成 任务列表
-    
+
+      **⚠️ 强制使用 superpowers:writing-plans skill**
+
+      步骤：
+      1. 使用 Skill 工具调用 `superpowers:writing-plans`
+      2. 按照 skill 的格式要求创建详细的实现计划
+      3. 将计划内容保存到 `tasks.md`（变更目录下）
+
+      Skill 要求的格式：
+      ```markdown
+      # [Feature Name] Implementation Plan
+
+      > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development...
+
+      **Goal:** [一句话描述]
+
+      **Architecture:** [2-3 句架构说明]
+
+      **Tech Stack:** [关键技术]
+
+      ---
+
+      ### Task N: [组件名称]
+
+      **Files:**
+      - Create: `exact/path/to/file`
+      - Modify: `exact/path/to/existing.py:123-145`
+
+      - [ ] **Step 1: Write the failing test**
+      [完整代码]
+
+      - [ ] **Step 2: Run test to verify it fails**
+      Run: `command`
+      Expected: FAIL with ...
+      ```
+
+      **关键要求**：
+      - 每个步骤是一个动作（2-5 分钟）
+      - 必须包含完整代码，不能有占位符
+      - 必须有精确的文件路径
+      - 必须有验证命令和预期输出
+      - DRY, YAGNI, TDD, 频繁提交
+
       参考 instructions/tasks.md 获取详细步骤。
     requires:
       - design
@@ -241,7 +281,7 @@ apply:
   requires: [tasks]
   tracks: tasks.md
   instruction: |
-    使用 `superpowers:executing-plan` 执行 tasks.md 中的任务。
+    使用 `superpowers:execute-plan` 执行 tasks.md 中的任务。
 
     执行完成后，额外执行知识驱动验证：
     - 应用知识库中推荐的模式，避免知识库中的反模式

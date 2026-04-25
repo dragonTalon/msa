@@ -1,4 +1,14 @@
-# 实现任务：{{changeName}}
+# {{changeName}} Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** [一句话描述此变更要实现什么]
+
+**Architecture:** [2-3 句关于实现方法]
+
+**Tech Stack:** [关键技术和库]
+
+---
 
 {{#if riskAlerts}}
 ## ⚠️ 风险警报
@@ -14,18 +24,41 @@
 {{/each}}
 {{/if}}
 
-## 1. <!-- 任务组名称 -->
+## 1. [任务组名称]
 
-- [ ] 1.1 <!-- 任务描述 -->
-{{#if knowledgeContext}}
-> 📚 **知识上下文**：{{knowledgeContext}}
-{{/if}}
-- [ ] 1.2 <!-- 任务描述 -->
+**Files:**
+- Modify: `exact/path/to/file`
 
-## 2. <!-- 任务组名称 -->
+- [ ] **Step 1: [动作描述]**
 
-- [ ] 2.1 <!-- 任务描述 -->
-- [ ] 2.2 <!-- 任务描述 -->
+```bash
+# 完整代码或命令
+```
+
+- [ ] **Step 2: [动作描述]**
+
+Run: `command`
+Expected: [预期输出]
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add <files>
+git commit -m "feat: [描述]"
+```
+
+## 2. [任务组名称]
+
+**Files:**
+- Modify: `exact/path/to/file`
+
+- [ ] **Step 1: [动作描述]**
+
+```bash
+# 完整代码
+```
+
+---
 
 {{#if hasHistoricalIssues}}
 ## 基于知识的测试
@@ -46,3 +79,9 @@
 
 {{/each}}
 {{/if}}
+
+---
+
+**知识引用**：
+- 模式：[相关模式]
+- 问题：[相关问题]
