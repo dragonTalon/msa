@@ -39,3 +39,4 @@ go.work.sum
 .msa
 # Git worktrees
 .worktrees/
+openspec/changes/

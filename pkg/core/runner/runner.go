@@ -5,6 +5,7 @@ package runner
 import (
 	"context"
 	"fmt"
+	"msa/pkg/utils"
 	"strings"
 	"time"
 
@@ -53,11 +54,12 @@ func (r *Runner) Ask(ctx context.Context, input string, history []model.Message)
 	}
 
 	// Filter and trim history
-	filteredHistory := agent.FilterAndTrimHistory(history, 10)
+	filteredHistory := agent.FilterAndTrimHistory(history, 20)
 	schemaHistory := convertToSchemaMessages(filteredHistory)
 
 	// Build query messages (system prompt + history + user input)
 	now := time.Now()
+	log.Infof("[Runner] 构建消息开始 ，历史消息 %d 条", len(schemaHistory))
 	messages, err := agent.BuildQueryMessages(ctx, input, schemaHistory, map[string]any{
 		"role":    "专业股票分析助手",
 		"style":   "理性、专业、客观且严谨",
@@ -76,6 +78,7 @@ func (r *Runner) Ask(ctx context.Context, input string, history []model.Message)
 	// Consume events, hand to renderer; collect full reply for persistence
 	var assistantReply strings.Builder
 	for e := range eventCh {
+		log.Infof("[Runner] 收到事件: %v", utils.ToJSONString(e))
 		if err := r.renderer.Handle(ctx, e); err != nil {
 			return err
 		}

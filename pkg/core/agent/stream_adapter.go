@@ -3,11 +3,9 @@ package agent
 import (
 	"context"
 	"errors"
+	"github.com/cloudwego/eino/schema"
 	"io"
 	"strings"
-	"time"
-
-	"github.com/cloudwego/eino/schema"
 
 	"msa/pkg/core/event"
 	corelogger "msa/pkg/core/logger"
@@ -35,36 +33,12 @@ func (a *StreamAdapter) Process(
 	logger := corelogger.FromCtx(ctx)
 
 	var (
-		textBuf         strings.Builder
-		toolCalls       []schema.ToolCall
-		chunkCount      int
-		specialDetected bool
-		toolCallBuf     strings.Builder
-		contentOnlyLen  int
-		allChunks       []*schema.Message
+		textBuf        strings.Builder
+		toolCalls      []schema.ToolCall
+		chunkCount     int
+		contentOnlyLen int
+		allChunks      []*schema.Message
 	)
-
-	// Thinking progress ticker goroutine
-	thinkingDone := make(chan struct{})
-	thinkingReset := make(chan struct{}, 1)
-	go func() {
-		ticker := time.NewTicker(15 * time.Second)
-		defer ticker.Stop()
-		elapsed := 0
-		for {
-			select {
-			case <-thinkingDone:
-				return
-			case <-thinkingReset:
-				ticker.Reset(15 * time.Second)
-				elapsed = 0
-			case <-ticker.C:
-				elapsed += 15
-				logger.Infof("[StreamAdapter] 正在思考中...(%ds)", elapsed)
-			}
-		}
-	}()
-	defer close(thinkingDone)
 
 	for {
 		msg, err := reader.Recv()
@@ -82,13 +56,6 @@ func (a *StreamAdapter) Process(
 			return ProcessResult{}, err
 		}
 		chunkCount++
-
-		// Reset thinking ticker on each chunk received
-		select {
-		case thinkingReset <- struct{}{}:
-		default:
-		}
-
 		// Standard tool call: collect directly, don't broadcast
 		// (executeTools will emit EventToolStart/Result later)
 		if len(msg.ToolCalls) > 0 {
@@ -100,74 +67,19 @@ func (a *StreamAdapter) Process(
 
 		// Handle ReasoningContent (thinking)
 		if msg.ReasoningContent != "" {
-			if !specialDetected {
-				if tagIdx := findToolCallTag(msg.ReasoningContent); tagIdx >= 0 {
-					if tagIdx > 0 {
-						sendEvent(ctx, out, event.Event{Type: event.EventThinking, Text: msg.ReasoningContent[:tagIdx]})
-					}
-					toolCallBuf.WriteString(msg.ReasoningContent[tagIdx:])
-					specialDetected = true
-					logger.Infof("[StreamAdapter] chunk#%d 在 ReasoningContent 中检测到非标准工具调用标记", chunkCount)
-				} else {
-					logger.Debugf("[StreamAdapter] chunk#%d thinking len=%d", chunkCount, len(msg.ReasoningContent))
-					sendEvent(ctx, out, event.Event{Type: event.EventThinking, Text: msg.ReasoningContent})
-				}
-			} else {
-				toolCallBuf.WriteString(msg.ReasoningContent)
-			}
-			msg.ReasoningContent = ""
+			logger.Debugf("[StreamAdapter] chunk#%d thinking len=%d", chunkCount, len(msg.ReasoningContent))
+			sendEvent(ctx, out, event.Event{Type: event.EventThinking, Text: msg.ReasoningContent})
 		}
 
 		// Handle Content (main text)
 		if msg.Content != "" {
-			if !specialDetected {
-				if tagIdx := findToolCallTagWithOffset(msg.Content, contentOnlyLen); tagIdx >= 0 {
-					relIdx := tagIdx - contentOnlyLen
-					if relIdx > 0 {
-						sendEvent(ctx, out, event.Event{Type: event.EventTextChunk, Text: msg.Content[:relIdx]})
-						textBuf.WriteString(msg.Content[:relIdx])
-					}
-					toolCallBuf.WriteString(msg.Content[relIdx:])
-					contentOnlyLen += len(msg.Content)
-					specialDetected = true
-					logger.Infof("[StreamAdapter] chunk#%d 检测到非标准工具调用标记（Content）", chunkCount)
-					// Clear previous chunks' Content to avoid ConcatMessages merging dirty data
-					for _, prev := range allChunks {
-						prev.Content = ""
-					}
-					msg.Content = ""
-				} else {
-					logger.Debugf("[StreamAdapter] chunk#%d text len=%d", chunkCount, len(msg.Content))
-					sendEvent(ctx, out, event.Event{Type: event.EventTextChunk, Text: msg.Content})
-					textBuf.WriteString(msg.Content)
-					contentOnlyLen += len(msg.Content)
-				}
-			} else {
-				toolCallBuf.WriteString(msg.Content)
-				msg.Content = ""
-			}
+			logger.Infof("[StreamAdapter] chunk#%d text len=%d", chunkCount, len(msg.Content))
+			sendEvent(ctx, out, event.Event{Type: event.EventTextChunk, Text: msg.Content})
+			textBuf.WriteString(msg.Content)
+			contentOnlyLen += len(msg.Content)
 		}
 
 		allChunks = append(allChunks, msg)
-	}
-
-	// Handle non-standard tool call format
-	if specialDetected {
-		fullContent := toolCallBuf.String()
-		parsedCalls := parseToolCalls(fullContent)
-		if len(parsedCalls) > 0 {
-			logger.Infof("[StreamAdapter] 解析到非标准工具调用: %v", toolCallNames(parsedCalls))
-			// Inject into last chunk (eino internal processing needs this)
-			if len(allChunks) > 0 {
-				lastChunk := allChunks[len(allChunks)-1]
-				lastChunk.ToolCalls = parsedCalls
-				lastChunk.Content = ""
-			}
-			toolCalls = append(toolCalls, parsedCalls...)
-		} else {
-			logger.Warnf("[StreamAdapter] specialDetected=true 但解析失败，内容: %q",
-				truncate(fullContent, 200))
-		}
 	}
 
 	// Signal end of text output
@@ -175,13 +87,9 @@ func (a *StreamAdapter) Process(
 		sendEvent(ctx, out, event.Event{Type: event.EventTextDone})
 	}
 
-	// Assemble assistant message for appending to messages
 	assistantMsg := buildAssistantMsg(allChunks)
 
-	// For standard tool calls, use the fully merged ToolCalls from assistantMsg
-	// (ConcatMessages properly merges streaming chunks into complete ToolCalls).
-	// For non-standard tool calls (specialDetected), toolCalls was already set from parseToolCalls.
-	if !specialDetected && len(assistantMsg.ToolCalls) > 0 {
+	if len(assistantMsg.ToolCalls) > 0 {
 		toolCalls = assistantMsg.ToolCalls
 	}
 

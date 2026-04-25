@@ -92,6 +92,7 @@ const (
 	RoleUser      MessageRole = "user"      // 用户消息
 	RoleSystem    MessageRole = "system"    // 系统消息
 	RoleAssistant MessageRole = "assistant" // AI 助手消息
+	RoleDivider   MessageRole = "divider"   // 分割线（仅 UI，不持久化）
 )
 
 // Message 聊天消息结构
@@ -99,4 +100,5 @@ type Message struct {
 	Role    MessageRole   // 消息角色
 	Content string        // 消息内容
 	MsgType StreamMsgType // 消息类型（text/tool/reason）
+	Prefix  string        // 可选：渲染时使用的 emoji 前缀（仅 UI，不持久化）
 }

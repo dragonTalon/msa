@@ -127,3 +127,20 @@ var (
 func GetStyledLogo() string {
 	return logoStyle.Render(Logo)
 }
+
+// ==================== 流式输出样式 ====================
+var (
+	// ChatDividerStyle 分割线样式
+	ChatDividerStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#555555"))
+
+	// 流式输出 emoji 前缀
+	ChatThinkingPrefix   = "💭 思考: "
+	ChatToolCallPrefix   = "⚙️ 工具: "
+	ChatToolResultPrefix = "✅ 工具: "
+	ChatToolErrorPrefix  = "❌ 工具: "
+	ChatTextPrefix       = "💬 正文: "
+)
+
+// DividerLine 分割线内容
+const DividerLine = "────────────────────────────"
