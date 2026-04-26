@@ -2,7 +2,7 @@
 name: "OPSX: Collect"
 description: Collect knowledge from archived changes that contain fix.md files
 category: Workflow
-tags: [workflow, collect, knowledge, knowledge-driven]
+tags: [workflow, collect, knowledge, msa-spec]
 ---
 
 Collect knowledge from archived changes and extract it into the knowledge base.
