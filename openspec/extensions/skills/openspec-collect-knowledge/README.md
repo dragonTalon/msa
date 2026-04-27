@@ -366,7 +366,7 @@ A: Yes, add the fix artifact to any workflow that wants knowledge tracking.
 This feature works best with the `knowledge-driven` schema:
 
 ```bash
-/opsx:new my-feature --schema knowledge-driven
+/opsx:new my-feature --schema msa-spec
 ```
 
 The knowledge-driven schema includes:
@@ -465,8 +465,8 @@ grep 'timeout' knowledge/index.yaml
 
 ## See Also
 
-- [Knowledge-Driven Schema](../../../schemas/knowledge-driven/)
-- [Fix Template](../../../schemas/knowledge-driven/artifacts/fix.md)
+- [Knowledge-Driven Schema](../../../schemas/msa-spec/)
+- [Fix Template](../../../schemas/msa-spec/artifacts/fix.md)
 - [Archive Skill](../openspec-archive-change/)
 
 ---

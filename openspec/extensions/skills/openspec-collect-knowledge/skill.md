@@ -2,7 +2,7 @@
 name: openspec-collect-knowledge
 description: Collect and extract knowledge from archived changes that contain fix.md files. Use after archiving changes with fixes to build the knowledge base.
 license: MIT
-compatibility: Requires openspec CLI and knowledge-driven schema.
+compatibility: Requires openspec CLI and msa-spec schema.
 metadata:
   author: openspec
   version: "1.0"

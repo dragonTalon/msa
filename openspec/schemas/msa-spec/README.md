@@ -75,7 +75,7 @@ Use **knowledge-driven** when:
 ### 1. Create New Change
 
 ```bash
-/opsx:new add-feature --schema knowledge-driven
+/opsx:new add-feature --schema msa-spec
 ```
 
 **What happens**:
@@ -278,7 +278,7 @@ They automatically get:
 
 ```bash
 # Create new change with knowledge context
-/opsx:new feature-name --schema knowledge-driven
+/opsx:new feature-name --schema msa-spec
 
 # Continue work (creates fix.md if needed)
 /opsx:continue
@@ -308,12 +308,12 @@ You can migrate existing changes:
 /opsx:status
 # Current schema: spec-driven
 
-# Switch to knowledge-driven
-/opsx:new feature-name --schema knowledge-driven
+# Switch to msa-spec
+/opsx:new feature-name --schema msa-spec
 
 # Or update existing change
-# Edit openspec/config.yaml: schema: knowledge-driven
-/opsx:continue  # Will use knowledge-driven templates
+# Edit openspec/config.yaml: schema: msa-spec
+/opsx:continue  # Will use msa-spec templates
 ```
 
 ## Example Workflow
