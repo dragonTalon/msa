@@ -8,11 +8,11 @@ version: "1.0"
 components:
   streaming:
     display_name: "Streaming"
-    description: "流式输出处理，包括消息广播、订阅管理"
+    description: "流式输出处理，包括 Event channel、StreamAdapter、Renderer"
     files:
-      - pkg/logic/message/stream_manage.go
-      - pkg/logic/agent/chat.go
-      - pkg/tui/chat.go
+      - pkg/core/agent/stream.go
+      - pkg/renderer/tui.go
+      - pkg/renderer/cli.go
     related_components:
       - agent
       - tui
@@ -24,10 +24,11 @@ components:
 
   agent:
     display_name: "AI Agent"
-    description: "AI Agent 逻辑，包括模型调用、工具调用、流式处理"
+    description: "AI Agent 逻辑，包括模型调用、工具调用、Event channel 输出"
     files:
-      - pkg/logic/agent/chat.go
-      - pkg/logic/agent/tempate.go
+      - pkg/core/agent/agent.go
+      - pkg/core/runner/runner.go
+      - pkg/core/event/event.go
     related_components:
       - streaming
       - tools
@@ -81,11 +82,26 @@ components:
     files:
       - pkg/logic/command/cmd.go
       - pkg/logic/command/model.go
+      - cmd/
     related_components:
       - tui
     common_tags:
       - validation
       - error-handling
+
+  runner:
+    display_name: "Runner"
+    description: "消费 event channel，协调 agent → renderer，持久化会话"
+    files:
+      - pkg/core/runner/runner.go
+      - pkg/session/
+    related_components:
+      - agent
+      - streaming
+    common_tags:
+      - channel
+      - goroutine
+      - session
 
 # Component hierarchy
 # Defines parent-child relationships between components
@@ -93,6 +109,7 @@ hierarchy:
   core:
     children:
       - agent
+      - runner
       - config
   ui:
     children:

@@ -183,13 +183,13 @@ artifacts:
 
       **Files:**
       - Create: `exact/path/to/file`
-      - Modify: `exact/path/to/existing.py:123-145`
+      - Modify: `exact/path/to/existing.go:123-145`
 
       - [ ] **Step 1: Write the failing test**
       [完整代码]
 
       - [ ] **Step 2: Run test to verify it fails**
-      Run: `command`
+      Run: `go test ./... -run TestXxx`
       Expected: FAIL with ...
       ```
 
@@ -197,8 +197,9 @@ artifacts:
       - 每个步骤是一个动作（2-5 分钟）
       - 必须包含完整代码，不能有占位符
       - 必须有精确的文件路径
-      - 必须有验证命令和预期输出
+      - 必须有验证命令和预期输出（使用 `go vet ./...` 验证编译）
       - DRY, YAGNI, TDD, 频繁提交
+      - 计划完成后提供两种执行选项：subagent-driven（推荐）或 inline execution
 
       参考 instructions/tasks.md 获取详细步骤。
     requires:
@@ -281,10 +282,12 @@ apply:
   requires: [tasks]
   tracks: tasks.md
   instruction: |
-    使用 `superpowers:execute-plan` 执行 tasks.md 中的任务。
+    **优先使用 superpowers:subagent-driven-development 执行 tasks.md 中的任务（推荐）。**
+    无 subagent 支持时使用 superpowers:executing-plans。
 
     执行完成后，额外执行知识驱动验证：
     - 应用知识库中推荐的模式，避免知识库中的反模式
     - 如果遇到问题，创建 fix.md 来记录
+    - 运行 `go vet ./...` 验证编译
 
     如果 superpowers 不可用：读取 tasks.md 逐步完成，遇到阻塞请暂停。

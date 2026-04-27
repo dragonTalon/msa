@@ -1,18 +1,15 @@
-# 修复：{{changeName}}
-
 ---
-id: "{{fixId}}"
-title: "{{title}}"
-type: "{{type}}"              <!-- runtime|compile|logic|config -->
-severity: "{{severity}}"       <!-- critical|high|medium|low -->
-component: "{{component}}"
+id: "<!-- 自动生成，如 001 -->"
+title: "Fix: <!-- 简短标题 -->"
+type: "<!-- runtime|compile|logic|config -->"
+severity: "<!-- critical|high|medium|low -->"
+component: "<!-- 参考 openspec/knowledge/metadata/components.yaml -->"
 tags:
-  - "{{tag1}}"
-  - "{{component}}"
-created_at: "{{createdAt}}"
-resolved_at: "{{resolvedAt}}"
-change: "{{changePath}}"
-status: "{{status}}"           <!-- open|investigating|resolved|cancelled -->
+  - "<!-- 参考 openspec/knowledge/metadata/tags.yaml -->"
+created_at: "<!-- ISO 8601 时间戳 -->"
+resolved_at: "<!-- ISO 8601 时间戳 -->"
+change: "changes/<!-- 变更名称 -->"
+status: "resolved"
 ---
 
 ## 问题
@@ -23,8 +20,8 @@ status: "{{status}}"           <!-- open|investigating|resolved|cancelled -->
 
 ### 重现步骤
 
-1. <!-- 步骤1 -->
-2. <!-- 步骤2 -->
+1. <!-- 步骤 1 -->
+2. <!-- 步骤 2 -->
 3. <!-- 观察到错误 -->
 
 ### 错误消息
@@ -37,13 +34,13 @@ status: "{{status}}"           <!-- open|investigating|resolved|cancelled -->
 
 - **用户影响**：<!-- 用户遇到什么 -->
 - **系统影响**：<!-- 哪些系统部分受影响 -->
-- **业务影响**：<!-- 业务后果 -->
+- **频率**：<!-- 发生频率 -->
 
 ## 根本原因
 
 ### 调查过程
 
-<!-- 你如何调查的 -->
+<!-- 如何调查的 -->
 
 ### 根本原因
 
@@ -51,9 +48,7 @@ status: "{{status}}"           <!-- open|investigating|resolved|cancelled -->
 
 ### 相关文件
 
-- `{{file_path}}`
-  - 行：{{line_numbers}}
-  - 说明：{{notes}}
+- `<!-- path/to/file.go -->` 行 <!-- 行号 -->：<!-- 说明 -->
 
 ## 解决方案
 
@@ -63,83 +58,62 @@ status: "{{status}}"           <!-- open|investigating|resolved|cancelled -->
 
 ### 代码变更
 
-#### 变更描述
-
-**文件**：`{{file_path}}`
-
 ```diff
-+ // 新增代码
-- // 删除代码
-  // 修改代码
+--- a/<!-- path/to/file.go -->
++++ b/<!-- path/to/file.go -->
+- // 旧代码
++ // 新代码
 ```
-
-**说明**：{{description}}
-**原因**：{{rationale}}
 
 ## 验证
 
-### 验证步骤
+1. <!-- 验证步骤 1 -->
+2. <!-- 验证步骤 2 -->
 
-1. <!-- 步骤1 -->
-2. <!-- 步骤2 -->
+Run: `go vet ./...`
+Expected: no output
 
-### 测试结果
-
-- 单元测试：<!-- PASS/FAIL -->
-- 集成测试：<!-- PASS/FAIL -->
-
-{{#if hasPattern}}
 ## 可复用模式
 
-**模式名称**：{{patternName}}
-**模式ID**：{{patternId}}
+<!-- 如果解决方案可复用，填写此节；否则删除 -->
 
-**描述**：
-{{patternDescription}}
+**模式名称**：<!-- 名称 -->
+**模式ID**：<!-- pXXX（新 ID）-->
+
+**描述**：<!-- 模式描述 -->
 
 **适用场景**：
-- {{scenario1}}
-- {{scenario2}}
+- <!-- 场景 1 -->
 
 **实现**：
-```typescript
-{{patternImplementation}}
+```go
+// 示例代码
 ```
 
-**收益**：
-- {{benefit1}}
-- {{benefit2}}
-{{/if}}
-
-{{#if hasAntiPattern}}
 ## 反模式
 
-**反模式名称**：{{antiPatternName}}
-**反模式ID**：{{antiPatternId}}
+<!-- 如果发现需要避免的做法，填写此节；否则删除 -->
 
-**问题所在**：
-{{antiPatternProblem}}
+**反模式名称**：<!-- 名称 -->
+**反模式ID**：<!-- aXXX（新 ID）-->
 
-**避免**：
-```typescript
-// 不要这样做
-{{badExample}}
+**问题所在**：<!-- 描述 -->
+
+**不要这样做**：
+```go
+// 错误示例
 ```
-{{/if}}
 
 ## 经验教训
 
 ### 出了什么问题
 
-- <!-- 错误1 -->
-- <!-- 错误2 -->
+- <!-- 错误 1 -->
 
 ### 学到了什么
 
-- <!-- 经验1 -->
-- <!-- 经验2 -->
+- <!-- 经验 1 -->
 
 ### 预防措施
 
-1. <!-- 措施1 -->
-2. <!-- 措施2 -->
+1. <!-- 措施 1 -->

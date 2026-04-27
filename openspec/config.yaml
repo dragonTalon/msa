@@ -1,7 +1,7 @@
 # OpenSpec 配置文件
 # https://github.com/open-s4e/openspec
 
-schema: spec-driven
+schema: knowledge-driven
 version: "1.0"
 
 # 项目上下文
@@ -40,6 +40,7 @@ context: |
     - runner/ - Runner：消费 event channel，协调 agent → renderer，持久化会话
     - event/ - Event 类型系统（pipeline 通信数据结构）
     - logger/ - 结构化日志，requestID 注入与传播
+  - pkg/session/ - 会话管理与持久化（Runner 依赖）
   - pkg/renderer/ - 输出适配层
     - Renderer 接口：Handle(ctx, event.Event) error
     - cli.go - CLI 实现（写 stdout）
@@ -53,7 +54,6 @@ context: |
   - pkg/model/ - 数据模型
   - pkg/tui/ - 终端 UI 组件（纯 UI，无业务逻辑）
   - pkg/extcli/ - CLI 单次对话模式
-  - pkg/session/ - 会话管理与持久化
   - pkg/utils/ - 工具函数
 
   ## 核心数据流
@@ -86,22 +86,34 @@ rules:
     - 场景使用 Given-When-Then 格式
     - 每个需求应可测试
     - 修改行为时引用现有组件
+    - 场景必须使用 4 个井号（####），否则会静默失败
+
+  design:
+    - 仅在跨领域变更、新架构模式、新外部依赖、安全/性能复杂性时创建
+    - 必须包含推荐模式和反模式警告（来自 openspec/knowledge/）
+    - 设计决策需说明理由（为什么选 X 而不选 Y）
+    - 引用相关历史问题（openspec/knowledge/issues/）
 
   tasks:
-    - 优先使用 superpower 插件体功能任务 编写任务
-    - 将任务拆分为不超过 4 小时的子任务
-    - 包含验证步骤
-    - 引用 knowledge/metadata/components.yaml 中的相关组件
-    - 使用 knowledge/metadata/tags.yaml 中的标签
+    - 优先使用 superpowers:writing-plans skill 编写任务计划
+    - 将任务拆分为不超过 4 小时的子任务，每步 2-5 分钟
+    - 包含验证步骤和精确的命令（go vet ./...）
+    - 引用 openspec/knowledge/metadata/components.yaml 中的相关组件
+    - 使用 openspec/knowledge/metadata/tags.yaml 中的标签
+    - 每步必须包含完整代码，不能有占位符
 
   fix:
-    - 使用 .templates/fix.md 模板
+    - 使用 openspec/.templates/fix.md 模板
+    - 优先使用 superpowers:systematic-debugging skill 进行系统性调试
+    - 收到代码审查反馈时使用 superpowers:receiving-code-review skill
     - 必须包含根因分析
     - 适用时关联相关模式或反模式
-    - 标记适当的组件和严重程度
+    - 标记适当的组件（参考 openspec/knowledge/metadata/components.yaml）和严重程度
 
 apply:
-  - 优先使用 superpower 插件体功能任务执行任务
+  - 优先使用 superpowers:subagent-driven-development skill 执行任务（推荐）
+  - 无 subagent 支持时使用 superpowers:executing-plans skill
+  - 执行完成后运行 go vet ./... 验证编译
 
 
 # OpenSpec CLI 日志配置
