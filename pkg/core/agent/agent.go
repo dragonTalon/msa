@@ -51,7 +51,9 @@ func New(ctx context.Context) (*Agent, error) {
 		BaseURL: cfg.BaseURL,
 	}
 	if strings.HasPrefix(cfg.Model, "deepseek-") {
-		modelConfig.ExtraFields = map[string]any{"enable_thinking": true}
+		modelConfig.ExtraFields = map[string]any{
+			"thinking": map[string]any{"type": "enabled"},
+		}
 	} else {
 		modelConfig.ReasoningEffort = openai.ReasoningEffortLevelMedium
 	}

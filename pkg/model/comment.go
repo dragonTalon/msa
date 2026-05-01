@@ -9,6 +9,7 @@ type LlmProvider string
 
 const (
 	Siliconflow LlmProvider = "siliconflow"
+	Deepseek    LlmProvider = "deepseek"
 )
 
 // ProviderInfo Provider 元信息
@@ -27,6 +28,13 @@ var ProviderRegistry = map[LlmProvider]ProviderInfo{
 		DisplayName:    "SiliconFlow (硅基流动)",
 		Description:    "国内 LLM API 提供商，兼容 OpenAI 格式",
 		DefaultBaseURL: "https://api.siliconflow.cn/v1",
+		KeyPrefix:      "sk-",
+	},
+	Deepseek: {
+		ID:             Deepseek,
+		DisplayName:    "DeepSeek (深度求索)",
+		Description:    "DeepSeek 官方 API，支持思考模式和工具调用",
+		DefaultBaseURL: "https://api.deepseek.com",
 		KeyPrefix:      "sk-",
 	},
 }
