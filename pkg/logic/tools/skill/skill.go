@@ -3,6 +3,7 @@ package skill
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"
@@ -94,8 +95,8 @@ func doGetSkillContent(ctx context.Context, param *SkillContentParam) (string, e
 
 // SkillReferenceParam get_skill_reference 工具的输入参数
 type SkillReferenceParam struct {
-	SkillName string `json:"skill_name" jsonschema:"description=the name of the skill"`
-	FileName  string `json:"file_name"  jsonschema:"description=the name of the reference file to load"`
+	SkillName string `json:"skill_name" jsonschema:"description=the name of the skill (can be omitted if file_name contains a cross-skill path like 'other-skill/references/file.md')"`
+	FileName  string `json:"file_name"  jsonschema:"description=the reference file to load. Supports cross-skill paths: 'other-skill/references/file.md' auto-resolves the skill, 'references/file.md' or 'file.md' for same skill"`
 }
 
 // SkillReferenceTool 查询 skill reference 文件的工具
@@ -110,7 +111,7 @@ func (s *SkillReferenceTool) GetName() string {
 }
 
 func (s *SkillReferenceTool) GetDescription() string {
-	return "获取指定 skill 的 reference 文件内容（按需加载知识库）| Get the content of a reference file from a specified skill (on-demand knowledge loading)"
+	return "获取指定 skill 的 reference 文件内容（按需加载知识库）。支持跨 Skill 引用: file_name 可使用 \"other-skill/references/file.md\" 格式自动解析目标 Skill | Get the content of a reference file from a specified skill (on-demand knowledge loading). Cross-skill: file_name can use \"other-skill/references/file.md\" format for auto-resolution"
 }
 
 func (s *SkillReferenceTool) GetToolGroup() model.ToolGroup {
@@ -132,11 +133,45 @@ func GetSkillReference(ctx context.Context, param *SkillReferenceParam) (string,
 	})
 }
 
+// parseReferencePath 解析跨 Skill 引用路径
+// 支持三种格式:
+//   - "skill-name/references/filename.md" → 提取 skill_name 和 filename
+//   - "references/filename.md"             → 提取 filename (同 Skill)
+//   - "filename.md"                        → 原样返回 (同 Skill)
+//
+// 返回: skillName (空字符串表示使用原始 skill_name), fileName
+func parseReferencePath(fileName string) (string, string) {
+	if !strings.Contains(fileName, "/") {
+		return "", fileName
+	}
+
+	parts := strings.SplitN(fileName, "/", 3)
+	if len(parts) == 2 {
+		// "references/filename.md" → 同 Skill
+		if parts[0] == "references" {
+			return "", parts[1]
+		}
+		// "skill-name/filename.md" → 跨 Skill (无 references 前缀)
+		return parts[0], parts[1]
+	}
+
+	if len(parts) >= 3 {
+		// "skill-name/references/filename.md" → 跨 Skill
+		if parts[1] == "references" {
+			return parts[0], parts[2]
+		}
+		// "skill-name/other/filename.md" → 尝试提取第一段作为 skill_name
+		return parts[0], parts[2]
+	}
+
+	return "", fileName
+}
+
 func doGetSkillReference(ctx context.Context, param *SkillReferenceParam) (string, error) {
 	log.Infof("GetSkillReference start, skill_name: %s, file_name: %s", param.SkillName, param.FileName)
 
-	if param.SkillName == "" {
-		err := fmt.Errorf("skill_name is required")
+	if param.SkillName == "" && !strings.Contains(param.FileName, "/") {
+		err := fmt.Errorf("skill_name is required (file_name does not contain a path)")
 		return model.NewErrorResult(err.Error()), nil
 	}
 	if param.FileName == "" {
@@ -144,39 +179,63 @@ func doGetSkillReference(ctx context.Context, param *SkillReferenceParam) (strin
 		return model.NewErrorResult(err.Error()), nil
 	}
 
+	// 智能解析跨 Skill 引用路径
+	resolvedSkill, resolvedFile := parseReferencePath(param.FileName)
+	skillName := param.SkillName
+	fileName := param.FileName
+
+	if resolvedSkill != "" {
+		// 从路径中提取了 skill_name
+		if param.SkillName != "" && param.SkillName != resolvedSkill {
+			log.Infof("GetSkillReference: overriding skill_name from '%s' to '%s' based on path", param.SkillName, resolvedSkill)
+		}
+		skillName = resolvedSkill
+		fileName = resolvedFile
+		log.Infof("GetSkillReference: resolved cross-skill reference -> skill: %s, file: %s", skillName, fileName)
+	} else if resolvedFile != fileName {
+		// 同 Skill 的 "references/filename.md" 格式
+		fileName = resolvedFile
+		log.Infof("GetSkillReference: resolved same-skill reference -> file: %s", fileName)
+	}
+
+	if skillName == "" {
+		err := fmt.Errorf("skill_name is required (could not resolve from path: %s)", param.FileName)
+		return model.NewErrorResult(err.Error()), nil
+	}
+
 	manager := skills.GetManager()
-	sk, err := manager.GetSkill(param.SkillName)
+	sk, err := manager.GetSkill(skillName)
 	if err != nil {
-		log.Errorf("GetSkillReference: failed to get skill %s: %v", param.SkillName, err)
+		log.Errorf("GetSkillReference: failed to get skill %s: %v", skillName, err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 	if sk == nil {
-		err = fmt.Errorf("skill '%s' not found", param.SkillName)
+		err = fmt.Errorf("skill '%s' not found", skillName)
 		log.Warnf("GetSkillReference: %v", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
 	// 检查是否有 references 目录
 	if !sk.HasReferences() {
-		err = fmt.Errorf("skill '%s' has no references directory", param.SkillName)
+		err = fmt.Errorf("skill '%s' has no references directory", skillName)
 		log.Warnf("GetSkillReference: %v", err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
-	content, err := sk.GetReference(param.FileName)
+	content, err := sk.GetReference(fileName)
 	if err != nil {
-		log.Errorf("GetSkillReference: failed to load reference %s for skill %s: %v", param.FileName, param.SkillName, err)
+		log.Errorf("GetSkillReference: failed to load reference %s for skill %s: %v", fileName, skillName, err)
 		return model.NewErrorResult(err.Error()), nil
 	}
 
 	data := &SkillReferenceData{
-		SkillName: param.SkillName,
-		FileName:  param.FileName,
+		SkillName: skillName,
+		FileName:  fileName,
 		Content:   content,
 		Length:    len(content),
 	}
 
-	return model.NewSuccessResult(data, fmt.Sprintf("加载 reference: %s/%s (%d 字符)", param.SkillName, param.FileName, len(content))), nil
+	return model.NewSuccessResult(data, fmt.Sprintf("加载 reference: %s/%s (%d 字符)", skillName, fileName, len(content))), nil
 }
 
 // ========== Skill Asset Tool ==========

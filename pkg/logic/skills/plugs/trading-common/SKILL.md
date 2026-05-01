@@ -61,11 +61,30 @@ dependencies: []
 
 当执行交易相关操作时，按需加载以下文件：
 
+### 交易执行
 | 文件 | 用途 | 加载时机 |
 |------|------|----------|
-| `position-rules.md` | 仓位管理规则 | 计算买入数量时 |
+| `position-rules.md` | 仓位管理规则（动态比例） | 计算买入数量时 |
 | `execution-rules.md` | 交易执行规范 | 执行买卖操作前 |
 | `file-formats.md` | 文件格式定义 | 读写知识文件时 |
+
+### 信息质量管理 (C1)
+| 文件 | 用途 | 加载时机 |
+|------|------|----------|
+| `news-quality-gate.md` | 信息质量门 4 步过滤器 | 搜索信息后、决策前 |
+| `search-query-tactics.md` | 多角度搜索策略 | 执行 web_search 前 |
+
+### 市场状态分类 (C2)
+| 文件 | 用途 | 加载时机 |
+|------|------|----------|
+| `market-regime-classifier.md` | 市场状态分类器（8种状态） | 每次决策前 |
+| `market-regime-decision-logic.md` | 牛/熊/震荡差异化规则 | 确定市场状态后 |
+
+### 决策推理 (C3)
+| 文件 | 用途 | 加载时机 |
+|------|------|----------|
+| `decision-reasoning-template.md` | 6 段推理链模板 | 输出决策时 |
+| `decision-log-format.md` | JSON 决策日志格式 | 写入 Session 时 |
 
 ---
 
