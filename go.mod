@@ -11,6 +11,7 @@ require (
 	github.com/chromedp/cdproto v0.0.0-20250724212937-08a3db8b4327
 	github.com/chromedp/chromedp v0.14.2
 	github.com/cloudwego/eino v0.7.13
+	github.com/cloudwego/eino-ext/components/model/deepseek v0.1.5
 	github.com/cloudwego/eino-ext/components/model/openai v0.1.13
 	github.com/glebarez/sqlite v1.11.0
 	github.com/go-resty/resty/v2 v2.17.1
@@ -38,8 +39,9 @@ require (
 	github.com/chromedp/sysutil v1.1.0 // indirect
 	github.com/cloudwego/base64x v0.1.6 // indirect
 	github.com/cloudwego/eino-ext/libs/acl/openai v0.1.17 // indirect
+	github.com/cohesion-org/deepseek-go v1.3.4 // indirect
 	github.com/containerd/console v1.0.4-0.20230313162750-1ae8d489ac81 // indirect
-	github.com/dlclark/regexp2 v1.11.0 // indirect
+	github.com/dlclark/regexp2 v1.11.4 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/eino-contrib/jsonschema v1.0.3 // indirect
 	github.com/evanphx/json-patch v0.5.2 // indirect
@@ -52,6 +54,7 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
+	github.com/joho/godotenv v1.5.1 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.9 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
@@ -68,7 +71,8 @@ require (
 	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/nikolalohinski/gonja v1.5.3 // indirect
-	github.com/pelletier/go-toml/v2 v2.0.9 // indirect
+	github.com/ollama/ollama v0.6.5 // indirect
+	github.com/pelletier/go-toml/v2 v2.2.2 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect

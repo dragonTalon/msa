@@ -2,13 +2,13 @@ package agent
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand"
 	"strings"
 	"time"
 
+	"github.com/cloudwego/eino-ext/components/model/deepseek"
 	"github.com/cloudwego/eino-ext/components/model/openai"
 	einoModel "github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/components/tool"
@@ -38,46 +38,25 @@ func New(ctx context.Context) (*Agent, error) {
 		return nil, fmt.Errorf("config is nil, please run `msa config` first")
 	}
 	if cfg.APIKey == "" {
-		return nil, fmt.Errorf("openai api key is empty, please run `msa config` first")
+		return nil, fmt.Errorf("api key is empty, please run `msa config` first")
 	}
 	if cfg.BaseURL == "" {
-		return nil, fmt.Errorf("openai base url is empty, please run `msa config` first")
+		return nil, fmt.Errorf("base url is empty, please run `msa config` first")
 	}
 	if cfg.Model == "" {
-		return nil, fmt.Errorf("openai model is empty, please run `/models choose model` first")
+		return nil, fmt.Errorf("model is empty, please run `/models choose model` first")
 	}
 
-	modelConfig := &openai.ChatModelConfig{
-		Model:   cfg.Model,
-		APIKey:  cfg.APIKey,
-		BaseURL: cfg.BaseURL,
-	}
-	if strings.HasPrefix(cfg.Model, "deepseek-") {
-		modelConfig.ExtraFields = map[string]any{
-			"thinking": map[string]any{"type": "enabled"},
-		}
-	} else {
-		modelConfig.ReasoningEffort = openai.ReasoningEffortLevelMedium
-	}
-
-	chatModel, err := openai.NewChatModel(ctx, modelConfig)
+	chatModel, err := createChatModel(ctx, cfg)
 	if err != nil {
-		return nil, fmt.Errorf("创建 chat model 失败: %w", err)
-	}
-
-	// DeepSeek requires reasoning_content to be passed back in multi-turn tool calling.
-	// Eino's genRequest drops ReasoningContent because OpenAI Go SDK lacks this field.
-	// Wrap the chat model to inject reasoning_content via RequestPayloadModifier.
-	var toolCallingModel einoModel.ToolCallingChatModel = chatModel
-	if strings.HasPrefix(cfg.Model, "deepseek-") {
-		toolCallingModel = &reasoningContentWrapper{inner: chatModel}
+		return nil, err
 	}
 
 	allTools := tools.GetAllTools()
 	log.Infof("[Agent] 注册工具数: %d", len(allTools))
 
 	einoAgent, err := react.NewAgent(ctx, &react.AgentConfig{
-		ToolCallingModel: toolCallingModel,
+		ToolCallingModel: chatModel,
 		ToolsConfig:      compose.ToolsNodeConfig{Tools: allTools},
 		MaxStep:          100,
 	})
@@ -91,67 +70,25 @@ func New(ctx context.Context) (*Agent, error) {
 	}, nil
 }
 
-// reasoningContentWrapper wraps a ToolCallingChatModel to inject reasoning_content
-// into outgoing requests for DeepSeek. Eino's genRequest drops ReasoningContent
-// because the OpenAI Go SDK lacks this field, so we modify the raw JSON body.
-type reasoningContentWrapper struct {
-	inner einoModel.ToolCallingChatModel
-}
-
-func (w *reasoningContentWrapper) Generate(ctx context.Context, in []*schema.Message, opts ...einoModel.Option) (*schema.Message, error) {
-	opts = append(opts, openai.WithRequestPayloadModifier(injectReasoningContent))
-	return w.inner.Generate(ctx, in, opts...)
-}
-
-func (w *reasoningContentWrapper) Stream(ctx context.Context, in []*schema.Message, opts ...einoModel.Option) (*schema.StreamReader[*schema.Message], error) {
-	opts = append(opts, openai.WithRequestPayloadModifier(injectReasoningContent))
-	return w.inner.Stream(ctx, in, opts...)
-}
-
-func (w *reasoningContentWrapper) WithTools(tools []*schema.ToolInfo) (einoModel.ToolCallingChatModel, error) {
-	inner, err := w.inner.WithTools(tools)
-	if err != nil {
-		return nil, err
-	}
-	return &reasoningContentWrapper{inner: inner}, nil
-}
-
-// injectReasoningContent adds reasoning_content from schema.Message to the raw JSON request body.
-func injectReasoningContent(_ context.Context, msgs []*schema.Message, rawBody []byte) ([]byte, error) {
-	hasReasoning := false
-	for _, m := range msgs {
-		if m.Role == schema.Assistant && m.ReasoningContent != "" && len(m.ToolCalls) > 0 {
-			hasReasoning = true
-			break
-		}
-	}
-	if !hasReasoning {
-		return rawBody, nil
+// createChatModel creates the appropriate chat model based on the configured provider.
+func createChatModel(ctx context.Context, cfg *config.LocalStoreConfig) (einoModel.ToolCallingChatModel, error) {
+	if cfg.Provider == model.Deepseek {
+		return deepseek.NewChatModel(ctx, &deepseek.ChatModelConfig{
+			Model:          cfg.Model,
+			APIKey:         cfg.APIKey,
+			BaseURL:        cfg.BaseURL,
+			ThinkingConfig: &deepseek.ThinkingConfig{Type: "enabled"},
+		})
 	}
 
-	var body map[string]any
-	if err := json.Unmarshal(rawBody, &body); err != nil {
-		return rawBody, nil
+	// Default: OpenAI-compatible providers (SiliconFlow, etc.)
+	modelConfig := &openai.ChatModelConfig{
+		Model:           cfg.Model,
+		APIKey:          cfg.APIKey,
+		BaseURL:         cfg.BaseURL,
+		ReasoningEffort: openai.ReasoningEffortLevelMedium,
 	}
-
-	messages, ok := body["messages"].([]any)
-	if !ok || len(messages) != len(msgs) {
-		return rawBody, nil
-	}
-
-	for i, m := range msgs {
-		if m.Role == schema.Assistant && m.ReasoningContent != "" && len(m.ToolCalls) > 0 {
-			if msgMap, ok := messages[i].(map[string]any); ok {
-				msgMap["reasoning_content"] = m.ReasoningContent
-			}
-		}
-	}
-
-	modified, err := json.Marshal(body)
-	if err != nil {
-		return rawBody, nil
-	}
-	return modified, nil
+	return openai.NewChatModel(ctx, modelConfig)
 }
 
 // Run starts a conversation round (ReAct loop) and returns a read-only event channel.
