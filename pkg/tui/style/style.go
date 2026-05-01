@@ -144,3 +144,40 @@ var (
 
 // DividerLine 分割线内容
 const DividerLine = "────────────────────────────"
+
+// ==================== Markdown 渲染样式 ====================
+var (
+	// MDHeadingStyle 标题样式 (H1-H6) — bold + 主色调
+	MDHeadingStyle = lipgloss.NewStyle().
+			Foreground(PrimaryColor).
+			Bold(true)
+
+	// MDBoldStyle 加粗样式
+	MDBoldStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(WhiteColor)
+
+	// MDItalicStyle 斜体样式
+	MDItalicStyle = lipgloss.NewStyle().
+			Italic(true).
+			Foreground(TextColor)
+
+	// MDCodeStyle 行内代码样式 — 灰底
+	MDCodeStyle = lipgloss.NewStyle().
+			Background(lipgloss.Color("#2d2d2d")).
+			Foreground(lipgloss.Color("#e5c07b"))
+
+	// MDCodeBlockStyle 代码块样式 — 缩进 + 灰底边框
+	MDCodeBlockStyle = lipgloss.NewStyle().
+			PaddingLeft(2).
+			Background(lipgloss.Color("#1a1a1a"))
+
+	// MDBlockquoteStyle 引用块样式 — 竖线前缀 + 灰色
+	MDBlockquoteStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#9ca3af")).
+			Italic(true).
+			PaddingLeft(2)
+
+	// MDListBullet 列表子弹
+	MDListBullet = "•"
+)

@@ -513,23 +513,37 @@ func (c *Chat) handleStreamContent(content string, msgType model.StreamMsgType, 
 	c.currentPrefix = prefix
 
 	// 渲染流式内容
-	var contentStyle lipgloss.Style
-	switch msgType {
-	case model.StreamMsgTypeTool:
-		contentStyle = style.ChatToolMsgStyle
-	case model.StreamMsgTypeReason:
-		contentStyle = style.ChatReasonMsgStyle
-	default:
-		contentStyle = style.ChatNormalMsgStyle
-	}
-
-	// 流式输出使用简单渲染，不应用宽度限制（避免每个 chunk 换行）
-	// 宽度限制会在 flush 后的 Markdown 渲染中处理
-	if isFirst {
-		c.streamingMsg = style.ChatSystemMsgStyle.Render(prefix) +
-			contentStyle.Render(content) + "\n"
+	// 对于正文类型，流式期间在换行边界使用 Markdown 渲染
+	if msgType == model.StreamMsgTypeText {
+		fullContent := c.fullStreamContent.String()
+		if isFirst {
+			c.streamingMsg = style.ChatSystemMsgStyle.Render(prefix) + "\n" +
+				style.RenderMarkdown(fullContent)
+		} else if strings.Contains(content, "\n") {
+			c.streamingMsg = style.ChatSystemMsgStyle.Render(prefix) + "\n" +
+				style.RenderMarkdown(fullContent)
+		} else {
+			// 无换行的增量 chunk，简单追加（下一行边界时完整重渲染）
+			c.streamingMsg += content
+		}
 	} else {
-		c.streamingMsg += contentStyle.Render(content)
+		// 工具和思考消息保持原有简单渲染
+		var contentStyle lipgloss.Style
+		switch msgType {
+		case model.StreamMsgTypeTool:
+			contentStyle = style.ChatToolMsgStyle
+		case model.StreamMsgTypeReason:
+			contentStyle = style.ChatReasonMsgStyle
+		default:
+			contentStyle = style.ChatNormalMsgStyle
+		}
+
+		if isFirst {
+			c.streamingMsg = style.ChatSystemMsgStyle.Render(prefix) +
+				contentStyle.Render(content) + "\n"
+		} else {
+			c.streamingMsg += contentStyle.Render(content)
+		}
 	}
 	return c, c.receiveNextChunk()
 }
