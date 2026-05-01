@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/cloudwego/eino-ext/components/model/openai"
+	einoModel "github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/flow/agent/react"
@@ -63,11 +65,19 @@ func New(ctx context.Context) (*Agent, error) {
 		return nil, fmt.Errorf("创建 chat model 失败: %w", err)
 	}
 
+	// DeepSeek requires reasoning_content to be passed back in multi-turn tool calling.
+	// Eino's genRequest drops ReasoningContent because OpenAI Go SDK lacks this field.
+	// Wrap the chat model to inject reasoning_content via RequestPayloadModifier.
+	var toolCallingModel einoModel.ToolCallingChatModel = chatModel
+	if strings.HasPrefix(cfg.Model, "deepseek-") {
+		toolCallingModel = &reasoningContentWrapper{inner: chatModel}
+	}
+
 	allTools := tools.GetAllTools()
 	log.Infof("[Agent] 注册工具数: %d", len(allTools))
 
 	einoAgent, err := react.NewAgent(ctx, &react.AgentConfig{
-		ToolCallingModel: chatModel,
+		ToolCallingModel: toolCallingModel,
 		ToolsConfig:      compose.ToolsNodeConfig{Tools: allTools},
 		MaxStep:          100,
 	})
@@ -79,6 +89,69 @@ func New(ctx context.Context) (*Agent, error) {
 		einoAgent: einoAgent,
 		adapter:   &StreamAdapter{},
 	}, nil
+}
+
+// reasoningContentWrapper wraps a ToolCallingChatModel to inject reasoning_content
+// into outgoing requests for DeepSeek. Eino's genRequest drops ReasoningContent
+// because the OpenAI Go SDK lacks this field, so we modify the raw JSON body.
+type reasoningContentWrapper struct {
+	inner einoModel.ToolCallingChatModel
+}
+
+func (w *reasoningContentWrapper) Generate(ctx context.Context, in []*schema.Message, opts ...einoModel.Option) (*schema.Message, error) {
+	opts = append(opts, openai.WithRequestPayloadModifier(injectReasoningContent))
+	return w.inner.Generate(ctx, in, opts...)
+}
+
+func (w *reasoningContentWrapper) Stream(ctx context.Context, in []*schema.Message, opts ...einoModel.Option) (*schema.StreamReader[*schema.Message], error) {
+	opts = append(opts, openai.WithRequestPayloadModifier(injectReasoningContent))
+	return w.inner.Stream(ctx, in, opts...)
+}
+
+func (w *reasoningContentWrapper) WithTools(tools []*schema.ToolInfo) (einoModel.ToolCallingChatModel, error) {
+	inner, err := w.inner.WithTools(tools)
+	if err != nil {
+		return nil, err
+	}
+	return &reasoningContentWrapper{inner: inner}, nil
+}
+
+// injectReasoningContent adds reasoning_content from schema.Message to the raw JSON request body.
+func injectReasoningContent(_ context.Context, msgs []*schema.Message, rawBody []byte) ([]byte, error) {
+	hasReasoning := false
+	for _, m := range msgs {
+		if m.Role == schema.Assistant && m.ReasoningContent != "" && len(m.ToolCalls) > 0 {
+			hasReasoning = true
+			break
+		}
+	}
+	if !hasReasoning {
+		return rawBody, nil
+	}
+
+	var body map[string]any
+	if err := json.Unmarshal(rawBody, &body); err != nil {
+		return rawBody, nil
+	}
+
+	messages, ok := body["messages"].([]any)
+	if !ok || len(messages) != len(msgs) {
+		return rawBody, nil
+	}
+
+	for i, m := range msgs {
+		if m.Role == schema.Assistant && m.ReasoningContent != "" && len(m.ToolCalls) > 0 {
+			if msgMap, ok := messages[i].(map[string]any); ok {
+				msgMap["reasoning_content"] = m.ReasoningContent
+			}
+		}
+	}
+
+	modified, err := json.Marshal(body)
+	if err != nil {
+		return rawBody, nil
+	}
+	return modified, nil
 }
 
 // Run starts a conversation round (ReAct loop) and returns a read-only event channel.
