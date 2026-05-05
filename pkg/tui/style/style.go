@@ -147,9 +147,34 @@ const DividerLine = "───────────────────�
 
 // ==================== Markdown 渲染样式 ====================
 var (
-	// MDHeadingStyle 标题样式 (H1-H6) — bold + 主色调
+	// MDHeadingStyle 标题样式 (H1-H6) — bold + 主色调（默认回退）
 	MDHeadingStyle = lipgloss.NewStyle().
 			Foreground(PrimaryColor).
+			Bold(true)
+
+	// MDH1Style ~ MDH6Style 标题层级样式 — 通过颜色和样式区分层级
+	MDH1Style = lipgloss.NewStyle().
+			Foreground(PrimaryColor).
+			Bold(true).
+			Underline(true)
+
+	MDH2Style = lipgloss.NewStyle().
+			Foreground(PrimaryColor).
+			Bold(true)
+
+	MDH3Style = lipgloss.NewStyle().
+			Foreground(SecondaryColor).
+			Bold(true)
+
+	MDH4Style = lipgloss.NewStyle().
+			Foreground(SecondaryColor)
+
+	MDH5Style = lipgloss.NewStyle().
+			Foreground(TextColor).
+			Bold(true)
+
+	MDH6Style = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#9ca3af")).
 			Bold(true)
 
 	// MDBoldStyle 加粗样式

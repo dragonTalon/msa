@@ -41,7 +41,25 @@ func (r *mdRenderer) renderBlock(n goldmarkAst.Node) {
 	switch n.Kind() {
 	case goldmarkAst.KindHeading:
 		text := r.collectText(n)
-		r.buf.WriteString(MDHeadingStyle.Render(text))
+		heading := n.(*goldmarkAst.Heading)
+		var style lipgloss.Style
+		switch heading.Level {
+		case 1:
+			style = MDH1Style
+		case 2:
+			style = MDH2Style
+		case 3:
+			style = MDH3Style
+		case 4:
+			style = MDH4Style
+		case 5:
+			style = MDH5Style
+		case 6:
+			style = MDH6Style
+		default:
+			style = MDHeadingStyle
+		}
+		r.buf.WriteString(style.Render(text))
 		r.buf.WriteString("\n")
 
 	case goldmarkAst.KindParagraph:
@@ -123,7 +141,16 @@ func (r *mdRenderer) renderInlines(n goldmarkAst.Node) string {
 			buf.WriteString(MDCodeStyle.Render(strings.TrimSpace(text)))
 		case goldmarkAst.KindLink:
 			text := r.collectText(c)
+			link := c.(*goldmarkAst.Link)
+			url := string(link.Destination)
 			buf.WriteString(text)
+			if url != "" {
+				buf.WriteString(" " + MDLinkURLStyle.Render("("+url+")"))
+			}
+		case goldmarkAst.KindAutoLink:
+			link := c.(*goldmarkAst.AutoLink)
+			url := string(link.URL(r.source))
+			buf.WriteString(MDLinkURLStyle.Render(url))
 		case extast.KindStrikethrough:
 			text := r.collectText(c)
 			buf.WriteString(MDStrikethroughStyle.Render(text))

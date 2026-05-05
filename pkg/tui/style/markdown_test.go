@@ -183,6 +183,49 @@ func TestRenderMarkdown_EmptyTable(t *testing.T) {
 	_ = result // 不应 panic
 }
 
+func TestRenderMarkdown_LinkShowsURL(t *testing.T) {
+	result := RenderMarkdown("请[点击这里](https://example.com)查看")
+
+	if !strings.Contains(result, "点击这里") {
+		t.Errorf("output should contain link text '点击这里', got: %s", result)
+	}
+	if !strings.Contains(result, "https://example.com") {
+		t.Errorf("output should contain link URL, got: %s", result)
+	}
+	if strings.Contains(result, "[点击这里]") {
+		t.Errorf("output should not contain markdown link syntax, got: %s", result)
+	}
+}
+
+func TestRenderMarkdown_AutoLink(t *testing.T) {
+	result := RenderMarkdown("访问 https://example.com 了解更多")
+
+	if !strings.Contains(result, "https://example.com") {
+		t.Errorf("output should contain autolink URL, got: %s", result)
+	}
+}
+
+func TestRenderMarkdown_AutoLinkEmail(t *testing.T) {
+	result := RenderMarkdown("联系 user@example.com 获取帮助")
+
+	if !strings.Contains(result, "user@example.com") {
+		t.Errorf("output should contain email autolink, got: %s", result)
+	}
+}
+
+func TestRenderMarkdown_HeadingLevels(t *testing.T) {
+	result := RenderMarkdown("# H1\n## H2\n### H3\n#### H4\n##### H5\n###### H6")
+
+	if strings.Contains(result, "#") {
+		t.Errorf("output should not contain '#' syntax, got: %s", result)
+	}
+	for _, h := range []string{"H1", "H2", "H3", "H4", "H5", "H6"} {
+		if !strings.Contains(result, h) {
+			t.Errorf("output should contain heading text '%s', got: %s", h, result)
+		}
+	}
+}
+
 func TestRenderMarkdown_TaskList(t *testing.T) {
 	input := "- [ ] 待办事项\n- [x] 已完成\n- [ ] 另一待办"
 	result := RenderMarkdown(input)
