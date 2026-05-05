@@ -3,13 +3,12 @@ package tui
 import (
 	"context"
 	"fmt"
+	"msa/pkg/core/runner"
 	"strings"
 
 	"msa/pkg/config"
-	coreagent "m
 	coreagent "msa/pkg/core/agent"
 	"msa/pkg/core/event"
-	"msa/pkg/config"
 	command "msa/pkg/logic/command"
 	"msa/pkg/model"
 	"msa/pkg/session"
@@ -58,8 +57,8 @@ type Chat struct {
 	streamingMsg         string                      // 流式输出的临时内容
 	isStreaming          bool                        // 是否正在流式输出
 	fullStreamContent    strings.Builder             // 当前 segment 的流式内容
+	allStreamContent     strings.Builder             // 所有 segment 的流式内容
 	eventCh              chan event.Event            // 事件 channel
-	eventCh              chan event.Event             // 事件 channel
 	currentSegment       strings.Builder             // 当前消息段内容
 	currentSegmentType   model.StreamMsgType         // 当前消息段类型
 	currentPrefix        string                      // 当前消息段的前缀
