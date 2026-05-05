@@ -183,6 +183,24 @@ func TestRenderMarkdown_EmptyTable(t *testing.T) {
 	_ = result // 不应 panic
 }
 
+func TestRenderMarkdown_TaskList(t *testing.T) {
+	input := "- [ ] 待办事项\n- [x] 已完成\n- [ ] 另一待办"
+	result := RenderMarkdown(input)
+
+	if !strings.Contains(result, "[ ]") {
+		t.Errorf("output should contain '[ ]' checkbox, got: %s", result)
+	}
+	if !strings.Contains(result, "[x]") {
+		t.Errorf("output should contain '[x]' checkbox, got: %s", result)
+	}
+	if strings.Contains(result, "- [ ]") || strings.Contains(result, "- [x]") {
+		t.Errorf("output should not contain '- [ ]' raw syntax, got: %s", result)
+	}
+	if !strings.Contains(result, "待办事项") || !strings.Contains(result, "已完成") {
+		t.Errorf("output should contain task text, got: %s", result)
+	}
+}
+
 func TestRenderMarkdown_Strikethrough(t *testing.T) {
 	result := RenderMarkdown("这是~~删除的~~文字")
 

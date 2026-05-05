@@ -148,18 +148,40 @@ func (r *mdRenderer) collectText(n goldmarkAst.Node) string {
 	return buf.String()
 }
 
+// findTaskCheckBox 递归查找 TaskCheckBox 节点
+func findTaskCheckBox(n goldmarkAst.Node) *extast.TaskCheckBox {
+	for c := n.FirstChild(); c != nil; c = c.NextSibling() {
+		if c.Kind() == extast.KindTaskCheckBox {
+			return c.(*extast.TaskCheckBox)
+		}
+		if found := findTaskCheckBox(c); found != nil {
+			return found
+		}
+	}
+	return nil
+}
+
 // renderList 渲染有序/无序列表
 func (r *mdRenderer) renderList(n goldmarkAst.Node) {
 	list := n.(*goldmarkAst.List)
 	itemIndex := 0
 	for c := n.FirstChild(); c != nil; c = c.NextSibling() {
 		if c.Kind() == goldmarkAst.KindListItem {
+			// 检查是否有 TaskCheckBox 子节点（可能嵌套在 TextBlock 下）
+			var checkbox string
+			if tcb := findTaskCheckBox(c); tcb != nil {
+				if tcb.IsChecked {
+					checkbox = "[x] "
+				} else {
+					checkbox = "[ ] "
+				}
+			}
 			text := strings.TrimSpace(r.collectText(c))
 			if list.IsOrdered() {
 				itemIndex++
-				r.buf.WriteString(fmt.Sprintf("  %d. %s\n", itemIndex, text))
+				r.buf.WriteString(fmt.Sprintf("  %d. %s%s\n", itemIndex, checkbox, text))
 			} else {
-				r.buf.WriteString(fmt.Sprintf("  %s %s\n", MDListBullet, text))
+				r.buf.WriteString(fmt.Sprintf("  %s %s%s\n", MDListBullet, checkbox, text))
 			}
 		}
 	}
