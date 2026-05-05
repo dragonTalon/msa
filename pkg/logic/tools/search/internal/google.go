@@ -156,39 +156,56 @@ func (g *GoogleSearchEngine) isCAPTCHA(html string) bool {
 	return false
 }
 
-// parseSearchResults 解析搜索结果
+// parseSearchResults 解析搜索结果（多策略 fallback）
 func (g *GoogleSearchEngine) parseSearchResults(htmlStr string) ([]searchmsa_model.SearchResultItem, error) {
 	doc, err := html.Parse(strings.NewReader(htmlStr))
 	if err != nil {
 		return nil, fmt.Errorf("解析 HTML 失败: %w", err)
 	}
 
+	// 策略1: 按已知 class 名匹配（当前逻辑）
+	results := g.strategy1ClassBased(doc)
+	if len(results) > 0 {
+		return results, nil
+	}
+	log.Warn("[Google] 策略1 (class匹配) 失败，尝试策略2 (语义结构)")
+
+	// 策略2: 按 <h3> + <a> 语义结构
+	results = g.strategy2Semantic(doc)
+	if len(results) > 0 {
+		return results, nil
+	}
+	log.Warn("[Google] 策略2 (语义结构) 失败，尝试策略3 (通用链接)")
+
+	// 策略3: 通用链接提取（最终兜底）
+	results = g.strategy3LinkExtract(doc)
+	if len(results) > 0 {
+		return results, nil
+	}
+
+	return nil, fmt.Errorf("所有解析策略均失败，未找到搜索结果")
+}
+
+// strategy1ClassBased 策略1: 按已知 class 名匹配搜索结果
+func (g *GoogleSearchEngine) strategy1ClassBased(doc *html.Node) []searchmsa_model.SearchResultItem {
 	var results []searchmsa_model.SearchResultItem
 
-	// 遍历 DOM 树查找搜索结果
 	var traverse func(*html.Node)
 	traverse = func(n *html.Node) {
 		if n.Type == html.ElementNode {
-			// Google 搜索结果通常在 <div class="g"> 中
 			if g.isSearchResultContainer(n) {
 				if result := g.extractSearchResult(n); result != nil {
 					results = append(results, *result)
 				}
 			}
 		}
-
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
 			traverse(c)
 		}
 	}
 
 	traverse(doc)
-
-	if len(results) == 0 {
-		return nil, fmt.Errorf("未找到搜索结果，可能是页面结构变化或被反爬虫拦截")
-	}
-
-	return results, nil
+	return results
 }
 
 // isSearchResultContainer 判断是否为搜索结果容器
@@ -320,4 +337,111 @@ func (g *GoogleSearchEngine) extractTextContent(n *html.Node) string {
 
 	extract(n)
 	return strings.TrimSpace(content.String())
+}
+
+// strategy2Semantic 策略2: 基于 <h3> + <a> 语义结构提取搜索结果
+// Google 搜索结果核心结构：<h3><a href="...">标题</a></h3> — 近20年不变
+func (g *GoogleSearchEngine) strategy2Semantic(doc *html.Node) []searchmsa_model.SearchResultItem {
+	var results []searchmsa_model.SearchResultItem
+	seenURLs := make(map[string]bool)
+
+	var findH3 func(*html.Node)
+	findH3 = func(n *html.Node) {
+		if n.Type == html.ElementNode && n.DataAtom == atom.H3 {
+			result := g.extractFromH3(n)
+			if result != nil && !seenURLs[result.URL] {
+				seenURLs[result.URL] = true
+				// 过滤 Google 内部链接
+				if !strings.Contains(result.URL, "google.com") &&
+					!strings.Contains(result.URL, "youtube.com") {
+					results = append(results, *result)
+				}
+			}
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			findH3(c)
+		}
+	}
+	findH3(doc)
+
+	log.Infof("[Google] 策略2 (语义) 提取 %d 条结果", len(results))
+	return results
+}
+
+// extractFromH3 从 <h3> 节点提取搜索结果
+func (g *GoogleSearchEngine) extractFromH3(h3Node *html.Node) *searchmsa_model.SearchResultItem {
+	var result searchmsa_model.SearchResultItem
+
+	var findLink func(*html.Node)
+	findLink = func(n *html.Node) {
+		if n.Type == html.ElementNode && n.DataAtom == atom.A {
+			for _, attr := range n.Attr {
+				if attr.Key == "href" {
+					result.URL = g.cleanURL(attr.Val)
+				}
+			}
+			result.Title = g.extractTextContent(n)
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			findLink(c)
+		}
+	}
+	findLink(h3Node)
+
+	if result.Title == "" || result.URL == "" {
+		return nil
+	}
+
+	if u, err := url.Parse(result.URL); err == nil {
+		result.Source = u.Hostname()
+	}
+	return &result
+}
+
+// strategy3LinkExtract 策略3: 通用链接提取 — 最终兜底
+func (g *GoogleSearchEngine) strategy3LinkExtract(doc *html.Node) []searchmsa_model.SearchResultItem {
+	var results []searchmsa_model.SearchResultItem
+	seenURLs := make(map[string]bool)
+
+	var findLinks func(*html.Node)
+	findLinks = func(n *html.Node) {
+		if n.Type == html.ElementNode && n.DataAtom == atom.A {
+			var href string
+			for _, attr := range n.Attr {
+				if attr.Key == "href" {
+					href = g.cleanURL(attr.Val)
+				}
+			}
+			if href != "" && !seenURLs[href] && strings.HasPrefix(href, "http") {
+				seenURLs[href] = true
+				if !strings.Contains(href, "google.com") &&
+					!strings.Contains(href, "gstatic.com") &&
+					!strings.Contains(href, "youtube.com") {
+					title := strings.TrimSpace(g.extractTextContent(n))
+					if title != "" {
+						results = append(results, searchmsa_model.SearchResultItem{
+							Title:  title,
+							URL:    href,
+							Source: extractHostname(href),
+						})
+					}
+				}
+			}
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			findLinks(c)
+		}
+	}
+	findLinks(doc)
+
+	log.Infof("[Google] 策略3 (通用链接) 提取 %d 条结果", len(results))
+	return results
+}
+
+// extractHostname 从 URL 提取域名
+func extractHostname(rawURL string) string {
+	if u, err := url.Parse(rawURL); err == nil {
+		return u.Hostname()
+	}
+	return ""
 }
