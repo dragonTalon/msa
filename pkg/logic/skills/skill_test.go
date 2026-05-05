@@ -234,7 +234,7 @@ func TestSkillSourceString(t *testing.T) {
 	}
 }
 
-// TestExtractBody 测试 extractBody 函数
+// TestExtractBody 测试 extractFrontmatterAndBody 函数
 func TestExtractBody(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -285,7 +285,7 @@ func TestExtractBody(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := extractBody([]byte(tt.input))
+			_, result := extractFrontmatterAndBody([]byte(tt.input))
 			if result != tt.expected {
 				t.Errorf("Expected %q, got %q", tt.expected, result)
 			}

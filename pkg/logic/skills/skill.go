@@ -72,12 +72,13 @@ type Skill struct {
 	Metadata    SkillMetadata // 扩展元数据
 
 	// 私有字段
-	dirPath    string            // Skill 目录路径
-	content    string            // Skill 主内容（懒加载）
-	references map[string]string // references/ 目录内容（懒加载）
-	assets     map[string]string // assets/ 目录内容（懒加载）
-	loaded     bool              // 主内容是否已加载
-	mu         sync.RWMutex      // 并发保护
+	dirPath     string            // Skill 目录路径
+	content     string            // Skill 主内容（懒加载）
+	frontmatter string            // YAML frontmatter 元数据（懒加载）
+	references  map[string]string // references/ 目录内容（懒加载）
+	assets      map[string]string // assets/ 目录内容（懒加载）
+	loaded      bool              // 主内容是否已加载
+	mu          sync.RWMutex      // 并发保护
 }
 
 // GetContent 懒加载 Skill 主内容
@@ -103,14 +104,49 @@ func (s *Skill) GetContent() (string, error) {
 
 	// 从文件加载内容
 	skillPath := filepath.Join(s.dirPath, "SKILL.md")
-	content, err := loadSkillContent(skillPath)
+	fm, content, err := loadSkillContent(skillPath)
 	if err != nil {
 		return "", err
 	}
 
+	s.frontmatter = fm
 	s.content = content
 	s.loaded = true
 	return s.content, nil
+}
+
+// GetFrontmatter 懒加载 Skill 的 YAML frontmatter 元数据
+// 使用双重检查锁定模式确保线程安全
+func (s *Skill) GetFrontmatter() (string, error) {
+	// 快速路径：已加载，直接返回
+	s.mu.RLock()
+	if s.loaded {
+		fm := s.frontmatter
+		s.mu.RUnlock()
+		return fm, nil
+	}
+	s.mu.RUnlock()
+
+	// 慢速路径：需要加载
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// 双重检查
+	if s.loaded {
+		return s.frontmatter, nil
+	}
+
+	// 从文件加载内容（同时加载 frontmatter 和 body）
+	skillPath := filepath.Join(s.dirPath, "SKILL.md")
+	fm, content, err := loadSkillContent(skillPath)
+	if err != nil {
+		return "", err
+	}
+
+	s.frontmatter = fm
+	s.content = content
+	s.loaded = true
+	return s.frontmatter, nil
 }
 
 // GetReference 按需加载 references/ 目录下的文件
@@ -226,26 +262,27 @@ func (s *Skill) GetTodoTemplate() (string, error) {
 	return s.GetReference("todo-template.md")
 }
 
-// loadSkillContent 从文件加载 Skill 内容，跳过 YAML frontmatter
-func loadSkillContent(path string) (string, error) {
+// loadSkillContent 从文件加载 Skill 内容，同时返回 YAML frontmatter 和 body
+func loadSkillContent(path string) (string, string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
-	content := extractBody(data)
+	frontmatter, body := extractFrontmatterAndBody(data)
 	log.Debugf("Loaded skill content from %s", path)
-	return content, nil
+	return frontmatter, body, nil
 }
 
-// extractBody 提取 Markdown body 内容，跳过 YAML frontmatter
+// extractFrontmatterAndBody 提取 YAML frontmatter 和 Markdown body
 // 格式：---\nYAML\n---\nBody
-func extractBody(data []byte) string {
+// 返回 (frontmatter, body)
+func extractFrontmatterAndBody(data []byte) (string, string) {
 	content := string(data)
 
 	// 检查是否以 YAML frontmatter 开头
 	if !strings.HasPrefix(content, "---") {
-		return content
+		return "", content
 	}
 
 	// 查找第二个 "---" 标记
@@ -253,20 +290,20 @@ func extractBody(data []byte) string {
 	idx := strings.Index(content[4:], "---")
 	if idx == -1 {
 		// 没有找到结束标记，返回整个内容
-		return content
+		return "", content
 	}
 
-	// 提取第二个 "---" 之后的内容
-	// idx + 4 是因为 content[4:] 跳过了前 4 个字符
-	// idx + 4 + 3 是因为 "---" 是 3 个字符
+	// 提取 frontmatter
+	frontmatter := content[4 : 4+idx]
+
+	// 提取 body
 	bodyStart := 4 + idx + 3
 	if bodyStart >= len(content) {
-		return ""
+		return strings.TrimSpace(frontmatter), ""
 	}
 
-	// 跳过换行符
 	body := content[bodyStart:]
 	body = strings.TrimLeft(body, "\n\r")
 
-	return body
+	return strings.TrimSpace(frontmatter), body
 }

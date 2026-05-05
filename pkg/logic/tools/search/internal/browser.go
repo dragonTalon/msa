@@ -2,8 +2,11 @@ package internal
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/rand"
+	"net/http"
+	"os"
 	"os/exec"
 	"strings"
 	"sync"
@@ -44,6 +47,118 @@ func NewBrowserManager() *BrowserManager {
 	return &BrowserManager{}
 }
 
+// chromeDebugURL 本地 Chrome 调试地址
+const chromeDebugURL = "http://127.0.0.1:9222"
+
+// chromeVersionInfo Chrome 版本信息（/json/version 响应）
+type chromeVersionInfo struct {
+	Browser              string `json:"Browser"`
+	WebSocketDebuggerURL string `json:"webSocketDebuggerUrl"`
+}
+
+// tryLocalChrome 尝试连接用户本地 Chrome 浏览器
+// 返回 (allocCtx, allocCancel, true) 成功；返回 (nil, nil, false) 需降级
+func (b *BrowserManager) tryLocalChrome() (context.Context, context.CancelFunc, bool) {
+	// 1. 检测 :9222 是否可用
+	if wsURL, ok := b.checkDebugPort(); ok {
+		log.Info("[Browser] 检测到本地 Chrome 调试端口，通过 CDP 连接")
+		allocCtx, allocCancel := chromedp.NewRemoteAllocator(context.Background(), wsURL)
+		return allocCtx, allocCancel, true
+	}
+
+	// 2. :9222 不可用，检查 Chrome 是否在运行
+	if b.isChromeRunning() {
+		log.Warn("[Browser] Chrome 运行中但调试端口不可用，降级到 headless 模式")
+		return nil, nil, false
+	}
+
+	// 3. Chrome 未运行，启动 Chrome + 用户 profile + :9222
+	log.Info("[Browser] Chrome 未运行，尝试启动本地 Chrome 并连接")
+	if wsURL, ok := b.launchChrome(); ok {
+		allocCtx, allocCancel := chromedp.NewRemoteAllocator(context.Background(), wsURL)
+		return allocCtx, allocCancel, true
+	}
+
+	log.Warn("[Browser] 无法启动本地 Chrome，降级到 headless 模式")
+	return nil, nil, false
+}
+
+// checkDebugPort 检测 :9222 是否有 Chrome 监听
+func (b *BrowserManager) checkDebugPort() (string, bool) {
+	client := &http.Client{Timeout: 2 * time.Second}
+	resp, err := client.Get(chromeDebugURL + "/json/version")
+	if err != nil {
+		return "", false
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", false
+	}
+
+	var info chromeVersionInfo
+	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
+		return "", false
+	}
+
+	// 验证确实是 Chrome
+	if !strings.Contains(strings.ToLower(info.Browser), "chrome") {
+		return "", false
+	}
+
+	if info.WebSocketDebuggerURL == "" {
+		return "", false
+	}
+
+	return info.WebSocketDebuggerURL, true
+}
+
+// isChromeRunning 检测 Chrome 进程是否在运行
+func (b *BrowserManager) isChromeRunning() bool {
+	cmd := exec.Command("pgrep", "-l", "Google Chrome")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return false
+	}
+	return len(output) > 0 && strings.Contains(string(output), "Google Chrome")
+}
+
+// launchChrome 启动本地 Chrome 并返回 WebSocket URL
+// 使用独立 profile 避免与用户正在运行的 Chrome 冲突
+func (b *BrowserManager) launchChrome() (string, bool) {
+	chromePath := "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+	profileDir := os.TempDir() + "/chrome-msa-debug"
+
+	// 清理可能残留的锁文件
+	os.RemoveAll(profileDir + "/SingletonLock")
+	os.RemoveAll(profileDir + "/SingletonSocket")
+
+	cmd := exec.Command(chromePath,
+		"--remote-debugging-port=9222",
+		"--user-data-dir="+profileDir,
+		"--no-first-run",
+		"--no-default-browser-check",
+		"--no-startup-window",
+		"about:blank",
+	)
+	if err := cmd.Start(); err != nil {
+		log.Warnf("[Browser] 启动 Chrome 失败: %v", err)
+		return "", false
+	}
+	log.Infof("[Browser] Chrome 已启动 (PID: %d)，等待调试端口就绪", cmd.Process.Pid)
+
+	// 轮询等待 :9222 就绪（最多等待 10 秒）
+	for i := 0; i < 20; i++ {
+		time.Sleep(500 * time.Millisecond)
+		if wsURL, ok := b.checkDebugPort(); ok {
+			return wsURL, true
+		}
+	}
+
+	log.Warn("[Browser] Chrome 启动超时，调试端口未就绪")
+	return "", false
+}
+
 // ensureBrowser 确保浏览器进程已启动（线程安全，只创建一次）
 // 若浏览器上下文已失效则自动重建
 func (b *BrowserManager) ensureBrowser() error {
@@ -71,7 +186,30 @@ func (b *BrowserManager) ensureBrowser() error {
 		b.chromeOK = true
 	}
 
-	// 启动 Chrome 进程（allocCtx 生命周期 = Chrome 进程生命周期）
+	// 尝试连接本地 Chrome（优先），失败则降级到 headless
+	if allocCtx, allocCancel, ok := b.tryLocalChrome(); ok {
+		browserCtx, browserCancel := chromedp.NewContext(allocCtx,
+			chromedp.WithLogf(func(format string, args ...interface{}) {
+				log.Debugf("[chromedp] "+format, args...)
+			}),
+		)
+
+		// 冒烟测试：导航 about:blank 验证 Chrome 可以创建标签
+		if err := chromedp.Run(browserCtx, chromedp.Navigate("about:blank")); err != nil {
+			browserCancel()
+			allocCancel()
+			log.Warnf("[Browser] 本地 Chrome 不可用 (%v)，降级到 headless", err)
+		} else {
+			b.allocCtx = allocCtx
+			b.allocCancel = allocCancel
+			b.browserCtx = browserCtx
+			b.browserCancel = browserCancel
+			log.Info("[Browser] 已连接到本地 Chrome 浏览器")
+			return nil
+		}
+	}
+
+	// 降级：启动 headless Chrome（allocCtx 生命周期 = Chrome 进程生命周期）
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.Flag("disable-gpu", true),
 		chromedp.Flag("disable-extensions", true),

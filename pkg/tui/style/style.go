@@ -169,15 +169,29 @@ var (
 
 	// MDCodeBlockStyle 代码块样式 — 缩进 + 灰底边框
 	MDCodeBlockStyle = lipgloss.NewStyle().
-			PaddingLeft(2).
-			Background(lipgloss.Color("#1a1a1a"))
+				PaddingLeft(2).
+				Background(lipgloss.Color("#1a1a1a"))
 
 	// MDBlockquoteStyle 引用块样式 — 竖线前缀 + 灰色
 	MDBlockquoteStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#9ca3af")).
-			Italic(true).
-			PaddingLeft(2)
+				Foreground(lipgloss.Color("#9ca3af")).
+				Italic(true).
+				PaddingLeft(2)
 
 	// MDListBullet 列表子弹
 	MDListBullet = "•"
+
+	// MDTableHeaderStyle 表格表头样式
+	MDTableHeaderStyle = lipgloss.NewStyle().
+				Bold(true).
+				Foreground(WhiteColor).
+				Padding(0, 1)
+
+	// MDTableCellStyle 表格数据单元格样式
+	MDTableCellStyle = lipgloss.NewStyle().
+				Foreground(TextColor).
+				Padding(0, 1)
+
+	// MDTableSeparator 表格列分隔符
+	MDTableSeparator = "│"
 )

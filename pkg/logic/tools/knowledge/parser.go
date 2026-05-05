@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // ErrorEntry 错误记录条目
@@ -188,6 +190,87 @@ func ParseSummaryFile(path string) (*SummaryData, error) {
 	return data, nil
 }
 
+// summaryTableFieldMap 表格字段名到 SummaryData 字段的映射
+var summaryTableFieldMap = map[string]string{
+	"初始资金":  "prev_asset",
+	"昨日资产":  "prev_asset",
+	"当前总资产": "curr_asset",
+	"今日资产":  "curr_asset",
+	"总盈亏":   "pnl",
+	"今日盈亏":  "pnl",
+	"总收益率":  "pnl_rate",
+	"收益率":   "pnl_rate",
+}
+
+// parseTableFields 从 Markdown 表格格式中提取字段值
+// 在 YAML frontmatter 和 extractField 都失败后作为 fallback
+func parseTableFields(content string, data *SummaryData) {
+	// 查找表格分隔行（|---| 或 |------|）来确认存在表格
+	separatorRe := regexp.MustCompile(`(?m)^\|[-:]+\|[-:|\s]+\|`)
+	if !separatorRe.MatchString(content) {
+		return
+	}
+
+	// 逐行匹配表格行：| 字段名 | 数值 |
+	tableRowRe := regexp.MustCompile(`^\|\s*(.+?)\s*\|\s*(.+?)\s*\|`)
+	lines := strings.Split(content, "\n")
+
+	for _, line := range lines {
+		matches := tableRowRe.FindStringSubmatch(line)
+		if len(matches) < 3 {
+			continue
+		}
+
+		fieldName := strings.TrimSpace(matches[1])
+		fieldValue := strings.TrimSpace(matches[2])
+
+		// 跳过表头行（"项目"、"------" 等）
+		if fieldName == "项目" || strings.Contains(fieldName, "---") {
+			continue
+		}
+
+		// 查找字段名映射
+		dataField, exists := summaryTableFieldMap[fieldName]
+		if !exists {
+			continue
+		}
+
+		// 提取数值：去除 Markdown 格式标记（**bold**、单位文字等）
+		numStr := extractNumberFromCellValue(fieldValue)
+
+		switch dataField {
+		case "prev_asset":
+			fmt.Sscanf(numStr, "%f", &data.PrevAsset)
+		case "curr_asset":
+			fmt.Sscanf(numStr, "%f", &data.CurrAsset)
+		case "pnl":
+			fmt.Sscanf(numStr, "%f", &data.PNL)
+		case "pnl_rate":
+			rateStr := strings.TrimSuffix(numStr, "%")
+			fmt.Sscanf(rateStr, "%f", &data.PNLRate)
+		}
+	}
+}
+
+// extractNumberFromCellValue 从表格单元格值中提取数值
+func extractNumberFromCellValue(value string) string {
+	// 去除所有 Markdown 标记符
+	cleaned := strings.NewReplacer(
+		"**", "",
+		"*", "",
+		"_", "",
+		"`", "",
+	).Replace(value)
+
+	// 提取数字部分（含负号、小数点、逗号）
+	re := regexp.MustCompile(`-?[\d,]+\.?\d*`)
+	matches := re.FindStringSubmatch(cleaned)
+	if len(matches) > 0 {
+		return strings.ReplaceAll(matches[0], ",", "")
+	}
+	return ""
+}
+
 // parseSummaryFields 解析总结文件中的字段
 func parseSummaryFields(content string, data *SummaryData) {
 	// 尝试解析 YAML frontmatter
@@ -202,19 +285,30 @@ func parseSummaryFields(content string, data *SummaryData) {
 
 	// 如果没有 frontmatter，尝试从内容中提取
 	// 匹配格式：**昨日资产**: 12345.67
+	hasBoldFieldData := false
 	if prevAsset := extractField(content, "昨日资产"); prevAsset != "" {
 		fmt.Sscanf(prevAsset, "%f", &data.PrevAsset)
+		hasBoldFieldData = true
 	}
 	if currAsset := extractField(content, "今日资产"); currAsset != "" {
 		fmt.Sscanf(currAsset, "%f", &data.CurrAsset)
+		hasBoldFieldData = true
 	}
 	if pnl := extractField(content, "今日盈亏"); pnl != "" {
 		fmt.Sscanf(pnl, "%f", &data.PNL)
+		hasBoldFieldData = true
 	}
 	if pnlRate := extractField(content, "收益率"); pnlRate != "" {
 		// 移除百分号
 		rate := strings.TrimSuffix(pnlRate, "%")
 		fmt.Sscanf(rate, "%f", &data.PNLRate)
+		hasBoldFieldData = true
+	}
+
+	// 如果 **字段**: 值 格式未提取到数据，尝试表格格式
+	if !hasBoldFieldData {
+		log.Debugf("Bold field extraction found no data, trying table format fallback")
+		parseTableFields(content, data)
 	}
 }
 

@@ -13,6 +13,7 @@ import (
 	"github.com/yuin/goldmark"
 	goldmarkAst "github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/extension"
+	extast "github.com/yuin/goldmark/extension/ast"
 	"github.com/yuin/goldmark/text"
 )
 
@@ -58,7 +59,10 @@ func (r *mdRenderer) renderBlock(n goldmarkAst.Node) {
 			seg := lines.At(i)
 			code.Write(seg.Value(r.source))
 		}
-		lang := string(node.Info.Text(r.source))
+		var lang string
+		if node.Info != nil {
+			lang = string(node.Info.Text(r.source))
+		}
 		r.buf.WriteString(r.highlightCode(code.String(), lang))
 		r.buf.WriteString("\n")
 
@@ -83,6 +87,9 @@ func (r *mdRenderer) renderBlock(n goldmarkAst.Node) {
 		text = strings.TrimSpace(text)
 		r.buf.WriteString(MDBlockquoteStyle.Render(text))
 		r.buf.WriteString("\n")
+
+	case extast.KindTable:
+		r.renderTable(n)
 
 	case goldmarkAst.KindThematicBreak:
 		r.buf.WriteString(ChatDividerStyle.Render(DividerLine))
@@ -153,6 +160,77 @@ func (r *mdRenderer) renderList(n goldmarkAst.Node) {
 			}
 		}
 	}
+}
+
+// renderTable 渲染 GFM 表格
+func (r *mdRenderer) renderTable(n goldmarkAst.Node) {
+	table := n.(*extast.Table)
+	alignments := table.Alignments
+
+	for c := n.FirstChild(); c != nil; c = c.NextSibling() {
+		switch c.Kind() {
+		case extast.KindTableHeader:
+			r.renderTableHeader(c, alignments)
+		case extast.KindTableRow:
+			r.renderTableRow(c, alignments)
+		}
+	}
+}
+
+// renderTableHeader 渲染表格表头行
+// TableHeader 直接包含 TableCell 子节点（见 goldmark extension/ast/table.go NewTableHeader）
+func (r *mdRenderer) renderTableHeader(n goldmarkAst.Node, alignments []extast.Alignment) {
+	var cells []string
+	for cell := n.FirstChild(); cell != nil; cell = cell.NextSibling() {
+		if cell.Kind() == extast.KindTableCell {
+			text := strings.TrimSpace(r.collectText(cell))
+			cells = append(cells, MDTableHeaderStyle.Render(text))
+		}
+	}
+	if len(cells) > 0 {
+		r.buf.WriteString(" " + strings.Join(cells, " "+MDTableSeparator+" "))
+		r.buf.WriteString("\n")
+	}
+}
+
+// renderTableRow 渲染表格数据行
+func (r *mdRenderer) renderTableRow(n goldmarkAst.Node, alignments []extast.Alignment) {
+	var cells []string
+	for cell := n.FirstChild(); cell != nil; cell = cell.NextSibling() {
+		if cell.Kind() == extast.KindTableCell {
+			text := r.renderTableCells(cell)
+			cells = append(cells, MDTableCellStyle.Render(text))
+		}
+	}
+	if len(cells) > 0 {
+		r.buf.WriteString(" " + strings.Join(cells, " "+MDTableSeparator+" "))
+		r.buf.WriteString("\n")
+	}
+}
+
+// renderTableCells 递归渲染表格单元格内的内联元素
+func (r *mdRenderer) renderTableCells(n goldmarkAst.Node) string {
+	var buf strings.Builder
+	for c := n.FirstChild(); c != nil; c = c.NextSibling() {
+		switch c.Kind() {
+		case goldmarkAst.KindText, goldmarkAst.KindString:
+			buf.WriteString(string(c.Text(r.source)))
+		case goldmarkAst.KindEmphasis:
+			e := c.(*goldmarkAst.Emphasis)
+			text := r.collectText(c)
+			if e.Level == 2 {
+				buf.WriteString(MDBoldStyle.Render(text))
+			} else {
+				buf.WriteString(MDItalicStyle.Render(text))
+			}
+		case goldmarkAst.KindCodeSpan:
+			text := r.collectText(c)
+			buf.WriteString(MDCodeStyle.Render(strings.TrimSpace(text)))
+		default:
+			buf.WriteString(r.collectText(c))
+		}
+	}
+	return strings.TrimSpace(buf.String())
 }
 
 // highlightCode 使用 chroma 高亮代码

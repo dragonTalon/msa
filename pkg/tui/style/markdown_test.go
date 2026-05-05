@@ -127,3 +127,74 @@ func TestRenderMarkdown_NewlineBehavior(t *testing.T) {
 		t.Errorf("output should contain both lines, got: %s", result)
 	}
 }
+
+func TestRenderMarkdown_Table(t *testing.T) {
+	input := `| 项目 | 数值 |
+|------|------|
+| 初始资金 | **500,000.00 元** |
+| 当前总资产 | 493,233.00 元 |
+`
+	result := RenderMarkdown(input)
+
+	if strings.Contains(result, "|---") || strings.Contains(result, "------") {
+		t.Errorf("output should not contain alignment separator line, got: %s", result)
+	}
+	if !strings.Contains(result, "初始资金") {
+		t.Errorf("output should contain '初始资金', got: %s", result)
+	}
+	if !strings.Contains(result, "500,000.00") {
+		t.Errorf("output should contain '500,000.00', got: %s", result)
+	}
+	if !strings.Contains(result, "当前总资产") {
+		t.Errorf("output should contain '当前总资产', got: %s", result)
+	}
+	if !strings.Contains(result, "493,233.00") {
+		t.Errorf("output should contain '493,233.00', got: %s", result)
+	}
+	if strings.Contains(result, "**500,000.00") || strings.Contains(result, "500,000.00**") {
+		t.Errorf("output should not contain '**' bold syntax inside table cells, got: %s", result)
+	}
+	if !strings.Contains(result, MDTableSeparator) {
+		t.Errorf("output should contain column separator '%s', got: %s", MDTableSeparator, result)
+	}
+}
+
+func TestRenderMarkdown_TableHeaderBold(t *testing.T) {
+	input := `| 表头 |
+|------|
+| 数据 |
+`
+	result := RenderMarkdown(input)
+
+	if !strings.Contains(result, "表头") {
+		t.Errorf("output should contain header text '表头', got: %s", result)
+	}
+	if !strings.Contains(result, "数据") {
+		t.Errorf("output should contain cell text '数据', got: %s", result)
+	}
+}
+
+func TestRenderMarkdown_EmptyTable(t *testing.T) {
+	input := `| 项目 | 数值 |
+|------|------|
+`
+	result := RenderMarkdown(input)
+
+	_ = result // 不应 panic
+}
+
+func TestRenderMarkdown_TableWithInlineFormatting(t *testing.T) {
+	input := `| 股票 | 涨跌幅 |
+|------|--------|
+| AAPL | +3.5% |
+| GOOGL | *待更新* |
+`
+	result := RenderMarkdown(input)
+
+	if !strings.Contains(result, "AAPL") || !strings.Contains(result, "GOOGL") {
+		t.Errorf("output should contain stock codes, got: %s", result)
+	}
+	if strings.Contains(result, "*待更新*") {
+		t.Errorf("output should not contain '*' italic syntax, got: %s", result)
+	}
+}

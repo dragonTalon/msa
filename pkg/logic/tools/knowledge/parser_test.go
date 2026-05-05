@@ -206,3 +206,105 @@ func TestParseSummaryFile_WithoutFrontmatter(t *testing.T) {
 		t.Errorf("CurrAsset = %v, want 102000.00", data.CurrAsset)
 	}
 }
+
+func TestParseSummaryFile_TableFormat(t *testing.T) {
+	tmpDir := t.TempDir()
+	summaryPath := filepath.Join(tmpDir, "2026-05-01.md")
+
+	content := `
+# 2026-05-01 交易日总结
+
+## 账户总览
+
+| 项目 | 数值 |
+|------|------|
+| 初始资金 | **500,000.00 元** |
+| 当前总资产 | **493,233.00 元** |
+| 总盈亏 | **-6,767.00 元** |
+| 总收益率 | **-1.35%** |
+`
+
+	err := os.WriteFile(summaryPath, []byte(content), 0644)
+	if err != nil {
+		t.Fatalf("WriteFile error = %v", err)
+	}
+
+	data, err := ParseSummaryFile(summaryPath)
+	if err != nil {
+		t.Fatalf("ParseSummaryFile() error = %v", err)
+	}
+
+	if data.Date != "2026-05-01" {
+		t.Errorf("Date = %v, want 2026-05-01", data.Date)
+	}
+	if data.PrevAsset != 500000.00 {
+		t.Errorf("PrevAsset = %v, want 500000.00", data.PrevAsset)
+	}
+	if data.CurrAsset != 493233.00 {
+		t.Errorf("CurrAsset = %v, want 493233.00", data.CurrAsset)
+	}
+	if data.PNL != -6767.00 {
+		t.Errorf("PNL = %v, want -6767.00", data.PNL)
+	}
+	if data.PNLRate != -1.35 {
+		t.Errorf("PNLRate = %v, want -1.35", data.PNLRate)
+	}
+	if data.Raw == "" {
+		t.Errorf("Raw should not be empty")
+	}
+}
+
+func TestParseSummaryFile_TableFormatFallbackPriority(t *testing.T) {
+	tmpDir := t.TempDir()
+	summaryPath := filepath.Join(tmpDir, "2026-05-01.md")
+
+	// 同时包含 frontmatter 和表格 - YAML 应优先
+	content := `---
+prev_asset: 200000.00
+curr_asset: 210000.00
+pnl: 10000.00
+pnl_rate: 5.0
+---
+
+# 总结
+
+| 项目 | 数值 |
+|------|------|
+| 当前总资产 | **300,000.00 元** |
+`
+
+	err := os.WriteFile(summaryPath, []byte(content), 0644)
+	if err != nil {
+		t.Fatalf("WriteFile error = %v", err)
+	}
+
+	data, err := ParseSummaryFile(summaryPath)
+	if err != nil {
+		t.Fatalf("ParseSummaryFile() error = %v", err)
+	}
+
+	// YAML frontmatter 优先，不应使用表格数据
+	if data.CurrAsset != 210000.00 {
+		t.Errorf("CurrAsset = %v, want 210000.00 (YAML frontmatter should take priority)", data.CurrAsset)
+	}
+}
+
+func TestExtractNumberFromCellValue(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"**500,000.00 元**", "500000.00"},
+		{"493,233.00 元", "493233.00"},
+		{"-6,767.00 元", "-6767.00"},
+		{"-1.35%", "-1.35"},
+		{"普通文本无数字", ""},
+		{"+3.5%", "3.5"},
+	}
+	for _, tt := range tests {
+		got := extractNumberFromCellValue(tt.input)
+		if got != tt.want {
+			t.Errorf("extractNumberFromCellValue(%q) = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}

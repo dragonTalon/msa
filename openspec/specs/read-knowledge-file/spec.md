@@ -48,4 +48,21 @@
 
 #### Scenario: 处理无 frontmatter 的文件
 - **WHEN** 文件不包含 YAML frontmatter
-- **THEN** 返回空元数据和完整正文内容
+- **THEN** 尝试从 `**字段**: 值` 格式中提取字段值
+- **AND** 如果仍未提取到，尝试从 Markdown 表格中提取
+- **AND** 返回提取到的元数据和完整正文内容
+
+#### Scenario: 从 Markdown 表格中提取 summary 字段
+- **GIVEN** summary 文件使用表格格式存储账户数据：
+  ```markdown
+  | 项目 | 数值 |
+  |------|------|
+  | 当前总资产 | **493,233.00 元** |
+  | 总盈亏 | **-6,767.00 元** |
+  | 总收益率 | **-1.35%** |
+  ```
+- **WHEN** 调用 `ParseSummaryFile(path)`
+- **THEN** `CurrAsset` 被提取为 `493233.00`
+- **AND** `PNL` 被提取为 `-6767.00`
+- **AND** `PNLRate` 被提取为 `-1.35`
+- **AND** `Raw` 字段保留完整的原始文件内容

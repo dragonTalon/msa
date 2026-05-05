@@ -233,6 +233,8 @@ type GetTransactionsParam struct {
 	Type      *string `json:"type,omitempty" jsonschema:"description=按类型筛选 BUY/SELL（可选）"`
 	Status    *string `json:"status,omitempty" jsonschema:"description=按状态筛选（可选）"`
 	Limit     *int    `json:"limit,omitempty" jsonschema:"description=返回数量限制（可选，默认50）"`
+	DateFrom  *string `json:"date_from,omitempty" jsonschema:"description=起始日期 YYYY-MM-DD（可选）"`
+	DateTo    *string `json:"date_to,omitempty" jsonschema:"description=截止日期 YYYY-MM-DD（可选）"`
 }
 
 // GetTransactionsTool 查询交易记录工具
@@ -304,6 +306,12 @@ func doGetTransactions(ctx context.Context, param *GetTransactionsParam) (string
 	}
 	if param.Status != nil {
 		query = query.Where("status = ?", *param.Status)
+	}
+	if param.DateFrom != nil && *param.DateFrom != "" {
+		query = query.Where("created_at >= ?", *param.DateFrom+" 00:00:00")
+	}
+	if param.DateTo != nil && *param.DateTo != "" {
+		query = query.Where("created_at <= ?", *param.DateTo+" 23:59:59")
 	}
 
 	// 默认限制 50 条

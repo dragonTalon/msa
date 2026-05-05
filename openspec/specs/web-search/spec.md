@@ -98,6 +98,18 @@
 
 系统 MUST 管理浏览器生命周期，平衡性能和资源占用。
 
+> 📚 更新：优先通过 CDP 连接用户本地 Chrome，从根源规避 CAPTCHA。headless chromedp 作为降级方案。
+
+#### Scenario: 浏览器初始化降级链
+
+- **GIVEN** BrowserManager 首次初始化
+- **WHEN** `ensureBrowser()` 被调用
+- **THEN** 按以下优先级尝试：
+  1. 连接到已有 :9222 端口的本地 Chrome
+  2. 启动本地 Chrome + profile + :9222
+  3. 启动 headless chromedp（现有行为）
+- **AND** 每一步失败时记录 WARN 日志并尝试下一个
+
 #### Scenario: 首次搜索启动浏览器
 
 - **当** Agent 第一次执行搜索
@@ -117,6 +129,17 @@
 - **并且** 释放相关资源（内存、进程）
 
 ---
+
+### Requirement: Google 多策略解析
+
+Google 解析器 SHALL 使用多策略 fallback 应对页面结构变化。
+
+#### Scenario: 页面结构变化时自动切换解析策略
+
+- **GIVEN** Google 搜索返回正常页面（无 CAPTCHA）
+- **WHEN** 页面结构变化导致 `class="g"` 不匹配
+- **THEN** 自动切换语义解析（`<h3>` + `<a>`）或通用链接提取
+- **AND** 不会返回 "未找到搜索结果" 错误
 
 ### Requirement: 错误处理和重试
 

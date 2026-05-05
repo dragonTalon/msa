@@ -13,7 +13,7 @@ TUI 输出按类型分段显示，带 emoji 前缀和分割线
 | 类型 | Emoji | 颜色 | 样式属性 |
 |-----|-------|------|---------|
 | 思考 (reason) | 💭 | 灰色 (#9ca3af) | 斜体 |
-| 工具 (tool) | ⚙️ (请求) / ✅ (结果) | 黄色 (#FFED4E) | 正常 |
+| 工具 (tool) | ⚙️ (请求) / ✅ (结果) | 黄色 (#FFED4E) | Markdown 渲染 |
 | 正文 (text) | 💬 | 白色 (#ffffff) | Markdown 渲染 |
 
 ### 工具输出格式
@@ -77,13 +77,37 @@ ChatTextPrefix      = "💬 正文: "
 
 `renderPendingMessages()` 根据消息类型选择：
 - 前缀 + 样式渲染
-- Markdown 渲染（仅正文类型）
+- Markdown 渲染（正文和工具类型）
 
 ## 约束
 
 - **分割线不侵入 Markdown**：分割线仅在消息之间，不影响正文内容的 Markdown 渲染
 - **emoji 在渲染层添加**：emoji 前缀在 `renderPendingMessages()` 中添加，不修改消息内容本身
 - **工具请求和结果共用类型**：`StreamMsgTypeTool` 不拆分，通过事件类型区分 emoji
+
+### 工具消息 Markdown 渲染场景
+
+#### Scenario: 工具结果支持 Markdown 渲染
+
+- **GIVEN** 工具返回结果包含 Markdown 格式内容（如表格、加粗等）
+- **WHEN** 渲染 `StreamMsgTypeTool` 类型的消息
+- **THEN** 使用 `RenderMarkdown()` 渲染消息内容
+- **AND** 加粗、表格等 Markdown 元素正确显示
+- **AND** 消息仍使用黄色 `ChatToolMsgStyle` 作为外层样式
+
+#### Scenario: 工具结果中无 Markdown 的纯文本
+
+- **GIVEN** 工具返回结果为纯文本，不包含 Markdown 格式标记
+- **WHEN** 渲染 `StreamMsgTypeTool` 类型的消息
+- **THEN** `RenderMarkdown()` 将纯文本正常输出
+- **AND** 外观与原有纯文本渲染效果一致
+
+#### Scenario: 思考消息保持纯文本渲染
+
+- **GIVEN** 思考消息包含类似 Markdown 的标记符
+- **WHEN** 渲染 `StreamMsgTypeReason` 类型的消息
+- **THEN** 继续使用纯文本斜体样式，不经过 `RenderMarkdown()`
+- **AND** 行为与变更前一致
 
 ## 验收标准
 
