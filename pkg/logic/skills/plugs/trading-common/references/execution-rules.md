@@ -1,5 +1,28 @@
 # 交易执行规范
 
+---
+
+## Phase 2 风险管理规则 (v2.3.0)
+
+在执行任何交易前，加载并执行以下规则:
+
+### 买入前附加检查
+- 加载 `trading-common/references/correlation-checklist.md` 执行行业集中度检查
+- 加载 `trading-common/references/risk-management.md` 检查回撤熔断状态
+- 如熔断触发（日内回撤 >5%、周内 >10%、月内 >20%）→ 拒绝开仓
+- 加载 `trading-common/references/operation-types.md` 确定操作类型
+
+### 卖出前附加检查
+- 加载 `trading-common/references/risk-management.md` 计算 ATR 止损/止盈位
+- 对盈利持仓更新移动止损位
+- 加载 `trading-common/references/operation-types.md` 确定卖出操作类型
+
+### 仓位计算
+- 参考 `trading-common/references/operation-types.md` 的置信度-仓位联动表
+- 凯利公式仓位 vs 市场状态仓位限制 → 取较小值
+
+---
+
 ## 执行前检查清单
 
 在执行任何交易前，必须完成以下检查：

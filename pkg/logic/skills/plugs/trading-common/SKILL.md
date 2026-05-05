@@ -86,6 +86,13 @@ dependencies: []
 | `decision-reasoning-template.md` | 6 段推理链模板 | 输出决策时 |
 | `decision-log-format.md` | JSON 决策日志格式 | 写入 Session 时 |
 
+### 策略体系升级 (Phase 2)
+| 文件 | 用途 | 加载时机 |
+|------|------|----------|
+| `operation-types.md` | 9种操作类型 + 置信度联动 (H1+H3) | 每次决策前 |
+| `risk-management.md` | ATR止损/回撤熔断/凯利公式 (H2) | 执行买卖前 |
+| `correlation-checklist.md` | 行业集中度/概念关联检查 (H4) | 买入决策前 |
+
 ---
 
 ## 约束条件

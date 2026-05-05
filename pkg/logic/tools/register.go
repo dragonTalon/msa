@@ -16,6 +16,9 @@ var _ MsaTool = (*skilltools.SkillAssetTool)(nil)
 var _ MsaTool = (*stock.CompanyCode)(nil)
 var _ MsaTool = (*stock.CompanyK)(nil)
 var _ MsaTool = (*stock.CompanyInfo)(nil)
+var _ MsaTool = (*stock.HistoryK)(nil)
+var _ MsaTool = (*stock.Industry)(nil)
+var _ MsaTool = (*stock.BoardRank)(nil)
 var _ MsaTool = (*search.SearchTool)(nil)
 var _ MsaTool = (*search.FetcherTool)(nil)
 
@@ -50,6 +53,9 @@ func registerStock() {
 	RegisterTool(&stock.CompanyCode{})
 	RegisterTool(&stock.CompanyK{})
 	RegisterTool(&stock.CompanyInfo{})
+	RegisterTool(&stock.HistoryK{})
+	RegisterTool(&stock.Industry{})
+	RegisterTool(&stock.BoardRank{})
 }
 
 func registerSearch() {

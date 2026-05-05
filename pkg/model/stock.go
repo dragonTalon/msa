@@ -326,40 +326,41 @@ func (s *StockKLineDetail) ToStockCurrentResp() *StockCurrentResp {
 	}
 
 	// 解析实时行情数据
+	// 字段映射参考: docs/tencent-finance-api.md
+	// qtData 为88字段数组，来自腾讯财经 minute/query API
 	if s.Qt != nil && len(s.Qt.StockQuoteArray) > 0 {
 		qtData := s.Qt.StockQuoteArray
-		if len(qtData) > 1 {
-			resp.Lot2Share = qtData[1]
-		}
+		// A股每手固定100股，港股每手不定但当前系统主要面向A股
+		resp.Lot2Share = "100"
 		if len(qtData) > 3 {
-			resp.CurrentPrice = qtData[3]
+			resp.CurrentPrice = qtData[3] // 最新价
 		}
 		if len(qtData) > 4 {
-			resp.PrevClose = qtData[4]
+			resp.PrevClose = qtData[4] // 昨收
 		}
 		if len(qtData) > 5 {
-			resp.CurrentStartPrice = qtData[5]
+			resp.CurrentStartPrice = qtData[5] // 今开
 		}
 		if len(qtData) > 6 {
-			resp.VolumeByLot = qtData[6]
+			resp.VolumeByLot = qtData[6] // 成交量(手)
 		}
 		if len(qtData) > 33 {
-			resp.CurrentMaxPrice = qtData[33]
+			resp.CurrentMaxPrice = qtData[33] // 今日最高
 		}
 		if len(qtData) > 34 {
-			resp.CurrentMinPrice = qtData[34]
+			resp.CurrentMinPrice = qtData[34] // 今日最低
 		}
 		if len(qtData) > 39 {
-			resp.PERatio = qtData[39]
+			resp.PERatio = qtData[39] // PE(TTM)
 		}
 		if len(qtData) > 43 {
-			resp.Amplitude = qtData[43]
+			resp.Amplitude = qtData[43] // 振幅
 		}
-		if len(qtData) > 48 {
-			resp.WeekHighIn52 = qtData[48]
+		if len(qtData) > 67 {
+			resp.WeekHighIn52 = qtData[67] // 52周最高价
 		}
-		if len(qtData) > 49 {
-			resp.WeekLowIn52 = qtData[49]
+		if len(qtData) > 68 {
+			resp.WeekLowIn52 = qtData[68] // 52周最低价
 		}
 	}
 

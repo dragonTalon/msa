@@ -4,4 +4,7 @@ const (
 	FinanceUrl                string = "https://proxy.finance.qq.com/"
 	FinanceSearchCode         string = FinanceUrl + "cgi/cgi-bin/smartbox/search?stockFlag=1&fundFlag=1&query="
 	FinanceSearchCurrentKLine        = "https://web.ifzq.gtimg.cn/appstock/app/minute/query?code="
+	FinanceKLineAPI                  = "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param="
+	FinanceStockIndustry             = FinanceUrl + "ifzqgtimg/appstock/app/stockinfo/jiankuang?code="
+	FinanceBoardRank                 = FinanceUrl + "ifzqgtimg/appstock/app/mktHs/rank"
 )

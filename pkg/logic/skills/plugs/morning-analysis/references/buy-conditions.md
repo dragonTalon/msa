@@ -140,3 +140,43 @@ max_qty = floor(可用余额 / (价格 × 100)) × 100
 | 单日限制 | 同一股票累计不超过计划仓位 70% |
 
 **注意**: 上述 [动态] 标记的参数均需从 market-regime-classifier.md 获取，不使用固定值。
+
+---
+
+## Phase 2 增强规则 (v2.3.0)
+
+### 操作类型选择
+
+买入前必须参照 `trading-common/references/operation-types.md` 选择操作类型:
+
+1. 根据信号数量和质量判断信号强度
+2. 查"信号强度 → 操作映射"表确定操作类型
+3. 根据置信度确定仓位系数
+4. 最终仓位 = 计划仓位 × 仓位系数
+
+### 持仓相关性检查
+
+买入前必须加载并执行 `trading-common/references/correlation-checklist.md`:
+
+1. 调用 `get_stock_industry` 获取新标的行业分类
+2. 与现有持仓行业对比，计算行业暴露
+3. 检查概念板块集中度
+4. 如触发限制 → 调整仓位或输出 HOLD
+
+### ATR 动态止损
+
+买入时必须加载 `trading-common/references/risk-management.md`:
+- 调用 `get_stock_history_k` 获取 14 天日K线
+- 计算 ATR(14) 和初始止损位（入场价 - 2×ATR）
+- 将止损位记录在推理链中
+
+### 买入执行检查清单（更新）
+
+在原有检查清单基础上增加:
+```
+□ 已选择操作类型 (TRIAL/STANDARD/ADD)
+□ 已标注置信度（高/中/低）及仓位系数
+□ 已通过行业集中度检查（单一行业≤50%、子行业≤30%、概念≤20%）
+□ 已计算 ATR 初始止损位（参考 risk-management.md）
+□ 已检查回撤熔断状态（日内≤5%、周内≤10%）
+```

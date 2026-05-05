@@ -1,6 +1,10 @@
 package model
 
-import "msa/pkg/utils"
+import (
+	"encoding/json"
+
+	log "github.com/sirupsen/logrus"
+)
 
 // ToolResult 统一的 Tool 响应结构
 type ToolResult struct {
@@ -17,7 +21,7 @@ func NewSuccessResult(data interface{}, message string) string {
 		Data:    data,
 		Message: message,
 	}
-	return utils.ToJSONString(result)
+	return toJSON(result)
 }
 
 // NewErrorResult 生成失败响应
@@ -27,5 +31,15 @@ func NewErrorResult(message string) string {
 		Data:     nil,
 		ErrorMsg: message,
 	}
-	return utils.ToJSONString(result)
+	return toJSON(result)
+}
+
+// toJSON 使用缩进格式序列化，避免单行过长被截断
+func toJSON(v interface{}) string {
+	bytes, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		log.Errorf("toJSON error: %v", err)
+		return `{"success":false,"error_msg":"JSON serialization failed"}`
+	}
+	return string(bytes)
 }
