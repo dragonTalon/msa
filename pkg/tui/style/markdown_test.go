@@ -273,6 +273,49 @@ func TestRenderMarkdown_StrikethroughInTable(t *testing.T) {
 	}
 }
 
+func TestRenderMarkdown_TableColumnAlignment(t *testing.T) {
+	input := `| ID | 描述 |
+|----|------|
+| 1 | 短 |
+| 2 | 这是一个很长的描述 |
+`
+	result := RenderMarkdown(input)
+
+	if !strings.Contains(result, "ID") || !strings.Contains(result, "描述") {
+		t.Errorf("output should contain headers, got: %s", result)
+	}
+	if !strings.Contains(result, "1") || !strings.Contains(result, "2") {
+		t.Errorf("output should contain row data, got: %s", result)
+	}
+	if strings.Contains(result, "|---") || strings.Contains(result, "----") {
+		t.Errorf("output should not contain separator line, got: %s", result)
+	}
+}
+
+func TestRenderMarkdown_TableUniformWidth(t *testing.T) {
+	input := `| 项目 | 数值 |
+|------|------|
+| 初始资金 | 500,000.00 元 |
+| 当前总资产 | 493,233.00 元 |
+`
+	result := RenderMarkdown(input)
+
+	lines := strings.Split(strings.TrimSpace(result), "\n")
+	if len(lines) < 2 {
+		t.Fatalf("expected at least 2 lines, got %d", len(lines))
+	}
+
+	// 验证每行数据都包含列分隔符
+	for _, line := range lines {
+		if strings.Contains(line, "初始资金") || strings.Contains(line, "当前总资产") {
+			sepIdx := strings.Index(line, MDTableSeparator)
+			if sepIdx < 0 {
+				t.Errorf("line should contain separator '%s': %s", MDTableSeparator, line)
+			}
+		}
+	}
+}
+
 func TestRenderMarkdown_TableWithInlineFormatting(t *testing.T) {
 	input := `| 股票 | 涨跌幅 |
 |------|--------|

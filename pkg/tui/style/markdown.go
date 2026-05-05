@@ -214,47 +214,137 @@ func (r *mdRenderer) renderList(n goldmarkAst.Node) {
 	}
 }
 
-// renderTable 渲染 GFM 表格
+// visibleWidth 计算去除 ANSI 转义序列后的可见字符宽度
+func visibleWidth(s string) int {
+	var buf strings.Builder
+	inEscape := false
+	for i := 0; i < len(s); i++ {
+		if inEscape {
+			if s[i] == 'm' {
+				inEscape = false
+			}
+			continue
+		}
+		if s[i] == '\x1b' {
+			inEscape = true
+			continue
+		}
+		buf.WriteByte(s[i])
+	}
+	return len(buf.String())
+}
+
+// padToWidth 将字符串填充到指定宽度，支持左/中/右对齐
+func padToWidth(s string, width int, align extast.Alignment) string {
+	visible := visibleWidth(s)
+	padding := width - visible
+	if padding <= 0 {
+		return s
+	}
+	switch align {
+	case extast.AlignRight:
+		return strings.Repeat(" ", padding) + s
+	case extast.AlignCenter:
+		leftPad := padding / 2
+		rightPad := padding - leftPad
+		return strings.Repeat(" ", leftPad) + s + strings.Repeat(" ", rightPad)
+	default: // AlignLeft, AlignNone
+		return s + strings.Repeat(" ", padding)
+	}
+}
+
+// tableCellData 存储表格单元格的渲染文本和对齐方式
+type tableCellData struct {
+	text      string
+	alignment extast.Alignment
+}
+
+// renderTable 渲染 GFM 表格（两遍扫描：收集数据 → 计算列宽 → 渲染）
 func (r *mdRenderer) renderTable(n goldmarkAst.Node) {
 	table := n.(*extast.Table)
 	alignments := table.Alignments
 
+	// 第一遍：收集所有行数据
+	type rowData struct {
+		cells    []tableCellData
+		isHeader bool
+	}
+	var rows []rowData
+
 	for c := n.FirstChild(); c != nil; c = c.NextSibling() {
 		switch c.Kind() {
 		case extast.KindTableHeader:
-			r.renderTableHeader(c, alignments)
+			var cells []tableCellData
+			for cell := c.FirstChild(); cell != nil; cell = cell.NextSibling() {
+				if cell.Kind() == extast.KindTableCell {
+					tc := cell.(*extast.TableCell)
+					text := strings.TrimSpace(r.renderTableCells(cell))
+					cells = append(cells, tableCellData{text: text, alignment: tc.Alignment})
+				}
+			}
+			rows = append(rows, rowData{cells: cells, isHeader: true})
 		case extast.KindTableRow:
-			r.renderTableRow(c, alignments)
+			var cells []tableCellData
+			for cell := c.FirstChild(); cell != nil; cell = cell.NextSibling() {
+				if cell.Kind() == extast.KindTableCell {
+					tc := cell.(*extast.TableCell)
+					text := strings.TrimSpace(r.renderTableCells(cell))
+					cells = append(cells, tableCellData{text: text, alignment: tc.Alignment})
+				}
+			}
+			rows = append(rows, rowData{cells: cells, isHeader: false})
 		}
 	}
-}
 
-// renderTableHeader 渲染表格表头行
-// TableHeader 直接包含 TableCell 子节点（见 goldmark extension/ast/table.go NewTableHeader）
-func (r *mdRenderer) renderTableHeader(n goldmarkAst.Node, alignments []extast.Alignment) {
-	var cells []string
-	for cell := n.FirstChild(); cell != nil; cell = cell.NextSibling() {
-		if cell.Kind() == extast.KindTableCell {
-			text := strings.TrimSpace(r.collectText(cell))
-			cells = append(cells, MDTableHeaderStyle.Render(text))
-		}
+	if len(rows) == 0 {
+		return
 	}
-	if len(cells) > 0 {
-		r.buf.WriteString(" " + strings.Join(cells, " "+MDTableSeparator+" "))
-		r.buf.WriteString("\n")
-	}
-}
 
-// renderTableRow 渲染表格数据行
-func (r *mdRenderer) renderTableRow(n goldmarkAst.Node, alignments []extast.Alignment) {
-	var cells []string
-	for cell := n.FirstChild(); cell != nil; cell = cell.NextSibling() {
-		if cell.Kind() == extast.KindTableCell {
-			text := r.renderTableCells(cell)
-			cells = append(cells, MDTableCellStyle.Render(text))
+	// 计算列数（取最多列的行）
+	numCols := len(rows[0].cells)
+	for _, row := range rows {
+		if len(row.cells) > numCols {
+			numCols = len(row.cells)
 		}
 	}
-	if len(cells) > 0 {
+
+	// 第二遍：计算每列最大可见宽度
+	colWidths := make([]int, numCols)
+	for _, row := range rows {
+		for i, cell := range row.cells {
+			w := visibleWidth(cell.text)
+			if w > colWidths[i] {
+				colWidths[i] = w
+			}
+		}
+	}
+
+	// 使用 table 级别的对齐信息映射到列
+	colAlignments := make([]extast.Alignment, numCols)
+	for i := range colAlignments {
+		if i < len(alignments) {
+			colAlignments[i] = alignments[i]
+		} else {
+			colAlignments[i] = extast.AlignNone
+		}
+	}
+
+	// 第三遍：渲染各行（列对齐）
+	for _, row := range rows {
+		var cells []string
+		for i, cell := range row.cells {
+			align := cell.alignment
+			if align == extast.AlignNone {
+				align = colAlignments[i]
+			}
+			var styled string
+			if row.isHeader {
+				styled = MDTableHeaderStyle.Render(padToWidth(cell.text, colWidths[i], align))
+			} else {
+				styled = MDTableCellStyle.Render(padToWidth(cell.text, colWidths[i], align))
+			}
+			cells = append(cells, styled)
+		}
 		r.buf.WriteString(" " + strings.Join(cells, " "+MDTableSeparator+" "))
 		r.buf.WriteString("\n")
 	}
@@ -296,8 +386,8 @@ func (r *mdRenderer) highlightCode(code, lang string) string {
 
 	// 恢复可能的 panic
 	defer func() {
-		if recover() != nil {
-			// chroma 失败时已在调用方回退，此处静默
+		if r := recover(); r != nil {
+			log.Warnf("chroma syntax highlight panic for lang=%s: %v", lang, r)
 		}
 	}()
 
