@@ -192,6 +192,16 @@ var (
 				Foreground(TextColor).
 				Padding(0, 1)
 
+	// MDStrikethroughStyle 删除线样式
+	MDStrikethroughStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#6b7280")).
+				Strikethrough(true)
+
+	// MDLinkURLStyle 链接 URL 样式（淡化显示）
+	MDLinkURLStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#6b7280")).
+			Faint(true)
+
 	// MDTableSeparator 表格列分隔符
 	MDTableSeparator = "│"
 )

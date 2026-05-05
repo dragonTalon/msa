@@ -124,6 +124,9 @@ func (r *mdRenderer) renderInlines(n goldmarkAst.Node) string {
 		case goldmarkAst.KindLink:
 			text := r.collectText(c)
 			buf.WriteString(text)
+		case extast.KindStrikethrough:
+			text := r.collectText(c)
+			buf.WriteString(MDStrikethroughStyle.Render(text))
 		default:
 			buf.WriteString(r.collectText(c))
 		}
@@ -226,6 +229,9 @@ func (r *mdRenderer) renderTableCells(n goldmarkAst.Node) string {
 		case goldmarkAst.KindCodeSpan:
 			text := r.collectText(c)
 			buf.WriteString(MDCodeStyle.Render(strings.TrimSpace(text)))
+		case extast.KindStrikethrough:
+			text := r.collectText(c)
+			buf.WriteString(MDStrikethroughStyle.Render(strings.TrimSpace(text)))
 		default:
 			buf.WriteString(r.collectText(c))
 		}

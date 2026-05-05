@@ -183,6 +183,35 @@ func TestRenderMarkdown_EmptyTable(t *testing.T) {
 	_ = result // 不应 panic
 }
 
+func TestRenderMarkdown_Strikethrough(t *testing.T) {
+	result := RenderMarkdown("这是~~删除的~~文字")
+
+	if strings.Contains(result, "~~删除的~~") || strings.Contains(result, "~~") {
+		t.Errorf("output should not contain '~~' markdown syntax, got: %s", result)
+	}
+	if !strings.Contains(result, "删除的") {
+		t.Errorf("output should contain strikethrough text '删除的', got: %s", result)
+	}
+	if !strings.Contains(result, "文字") {
+		t.Errorf("output should contain surrounding text '文字', got: %s", result)
+	}
+}
+
+func TestRenderMarkdown_StrikethroughInTable(t *testing.T) {
+	input := `| 项目 | 状态 |
+|------|------|
+| 旧功能 | ~~已移除~~ |
+`
+	result := RenderMarkdown(input)
+
+	if strings.Contains(result, "~~") {
+		t.Errorf("output should not contain '~~' syntax in table, got: %s", result)
+	}
+	if !strings.Contains(result, "已移除") {
+		t.Errorf("output should contain strikethrough text in table cell, got: %s", result)
+	}
+}
+
 func TestRenderMarkdown_TableWithInlineFormatting(t *testing.T) {
 	input := `| 股票 | 涨跌幅 |
 |------|--------|
